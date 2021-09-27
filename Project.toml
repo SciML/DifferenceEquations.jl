@@ -1,0 +1,8 @@
+name = "DifferenceEquations"
+uuid = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
+authors = ["Jesse Perla <jesseperla@gmail.com> and contributors"]
+version = "0.1.0"
+
+
+[deps]
+SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
