@@ -1,4 +1,4 @@
-struct StateSpaceProblem{isinplace, dType, uType,tType,noiseType,oType} <: AbstractStateSpaceProblem{isinplace}
+struct StateSpaceProblem{isinplace, dType, uType,tType,noiseType,oType, lType} <: AbstractStateSpaceProblem{isinplace}
     f::Function # Evolution
     g::Function # Noise function
     h::Function # Observation function
@@ -7,29 +7,20 @@ struct StateSpaceProblem{isinplace, dType, uType,tType,noiseType,oType} <: Abstr
     tspan::tType # Timespan to use
     noise::noiseType # The noise to use
     observables::oType # Data to use, if any
+    likelihood::lType # Likelihood function, if any
 end
 
-function StateSpaceProblem(f, g, h, D, u0, tspan, noise, observables)
+function StateSpaceProblem(f, g, h, D, u0, tspan, noise, observables, likelihood=((x...) -> 0.0))
     return StateSpaceProblem{
-        Val(false),
+        Val(false), # Default to out-of-place
         typeof(D),
         typeof(u0),
         typeof(tspan),
         typeof(noise),
-        typeof(observables)
-    }(f, g, h, D, u0, SciMLBase.promote_tspan(tspan), noise, observables)
+        typeof(observables),
+        typeof(likelihood)
+    }(f, g, h, D, u0, SciMLBase.promote_tspan(tspan), noise, observables, likelihood)
 end
-
-# Likelhood remains 0 if no obserables.  Need to verify no overhead
-maybe_logpdf(observables::Nothing, D, z, i) = 0.0
-function maybe_logpdf(observables, D, z, i)
-    # println(logpdf(D, observables[i] .- z))
-    return logpdf(D, observables[i] .- z)
-end
-
-# function transition(prob::StateSpaceProblem{A,B,C,D,Nothing,F}, u, params, t) where {A,B,C,D,F}
-#     return prob.f(u[t - 1], params, t-1)
-# end
 
 index_or_nothing(x::AbstractArray, i::Int) = x[i]
 index_or_nothing(x::Nothing, i::Int) = nothing
@@ -55,9 +46,8 @@ function _solve(prob::StateSpaceProblem, params)
 
     for t in 2:T+1
         u[t] = transition(prob, u, params, t)
-        # u[t] = prob.f(u[t - 1], params, t-1) .+ prob.g(u[t - 1], params, t-1) * prob.noise[t-1]
         z[t] = prob.h(u[t], params, t, prob.noise)
-        loglik += maybe_logpdf(prob.observables, prob.D, z[t], t-1)  # z_0 doesn't enter likelihood        
+        loglik += prob.likelihood(z[t], params, t, prob.observables)
     end
 
     return StateSpaceSolution(copy(z),copy(u),prob.noise,nothing,loglik)
