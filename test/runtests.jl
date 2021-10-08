@@ -5,29 +5,17 @@ using Random
 using Test
 
 function ar2_transition(u, p, t) # f
-    A = [p[1] p[2]; 1 0] 
+    A = [p[1] p[2]; 1 0]
     return A * u
 end
 
-function ar2_noise(u, p, t, noise::Nothing) # g
-    z = [p[3] * randn(); 0]
-    return [p[3] * randn(); 0]
+function ar2_noise(u, p, t) # g
+    return [1.0, 0.0]
 end
 
-function ar2_noise(u, p, t, noise) # g
-    return [noise; 0]
-end
-
-function ar2_observation(u, p, t, noise) # h
+function ar2_observation(u, p, t) # h
     # @info "Observation" u
     return [1 0] * u
-end
-
-function ar2_logpdf(u, p, t, observables::Nothing)
-    return missing
-end
-function ar2_logpdf(u, p, t, observables)
-    return logpdf(Normal(u[1], p[3]), observables[t-1])
 end
 
 Random.seed!(1)
@@ -50,18 +38,22 @@ end
 u0 = [Y[2]; Y[1]]
 
 prob = StateSpaceProblem(
-    ar2_transition, 
-    ar2_noise, 
-    ar2_observation, 
-    MvNormal(1,1), 
+    ar2_transition,
+    ar2_noise,
+    ar2_observation,
+    MvNormal([1],[1]),
     [0.0, 0.0],
-    tspan, 
-    n, 
-    Y,
-    ar2_logpdf
+    tspan,
+    n,
+    Y
 )
 
-sol = DifferenceEquations._solve(prob, [phi1, phi2, sigma])
+sol = DifferenceEquations._solve(
+    prob,
+    ConditionalGaussian(),
+    [phi1, phi2, sigma]
+)
+
 trans_x(x) = [x[1], x[2], exp(x[3])]
 target(x) = -DifferenceEquations._solve(prob, trans_x(x)).likelihood
 res = optimize(target, [0.0, 0.0, 1.0])
