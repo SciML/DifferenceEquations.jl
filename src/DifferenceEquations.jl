@@ -1,11 +1,11 @@
 module DifferenceEquations
 
-using SciMLBase
 using Distributions
 using LinearAlgebra
 using CommonSolve
 
-import SciMLBase: SciMLProblem
+import SciMLBase
+import SciMLBase: SciMLProblem, solve
 
 abstract type DifferenceProblem <: SciMLProblem end
 abstract type AbstractStateSpaceProblem{isinplace} <: DifferenceProblem end
