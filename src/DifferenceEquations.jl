@@ -28,6 +28,7 @@ export StateSpaceProblem,
     LinearGaussian,
     LinearStateSpaceProblem,
     StandardGaussian,
-    DefinedNoise
+    DefinedNoise,
+    solve
 
 end # module
