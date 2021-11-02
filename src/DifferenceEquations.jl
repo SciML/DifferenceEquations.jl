@@ -19,7 +19,6 @@ promote_noise(x::AbstractArray, y::AbstractArray) = x, y
 include("noise.jl")
 include("alg.jl")
 include("linear.jl")
-include("nonlinear.jl")
 include("solution.jl")
 
 # Exports
