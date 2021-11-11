@@ -6,6 +6,7 @@ using CommonSolve
 
 import SciMLBase
 import SciMLBase: SciMLProblem, solve
+import StatsBase
 
 abstract type DifferenceProblem <: SciMLProblem end
 abstract type AbstractStateSpaceProblem{isinplace} <: DifferenceProblem end
@@ -20,9 +21,11 @@ include("noise.jl")
 include("alg.jl")
 include("linear.jl")
 include("solution.jl")
+include("nonlinear.jl")
 
 # Exports
-export StateSpaceProblem,
+export 
+    StateSpaceProblem,
     ConditionalGaussian,
     LinearGaussian,
     LinearStateSpaceProblem,
