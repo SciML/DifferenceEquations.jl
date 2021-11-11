@@ -73,9 +73,8 @@ end
 CommonSolve.init(::LinearStateSpaceProblem, args...; kwargs...) = LinearGaussian()
 solve!(::LinearGaussian) = StateSpaceSolution(missing,missing,missing,missing) # TODO: Need more sensible defaults
 
-function SciMLBase.solve(
+function CommonSolve.solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
-    ::LinearGaussian, 
     args...; 
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype<:Nothing}
@@ -103,9 +102,8 @@ function SciMLBase.solve(
     return StateSpaceSolution(z, u, n, nothing)
 end
 
-function SciMLBase.solve(
+function CommonSolve.solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
-    ::LinearGaussian, 
     args...; 
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype}
