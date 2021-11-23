@@ -28,9 +28,9 @@ function StateSpaceProblem(
     u0::utype,
     tspan::ttype,
     params=nothing;
-    obs_noise = StandardGaussian(length(u0)), # FIX THIS CAMERON
+    obs_noise = StandardGaussian(size(h(u0, params, 0))), # TODO: Might be suboptimal way to get size of obs
     observables = nothing,
-    noise = StandardGaussian(length(u0)),
+    noise = StandardGaussian(size(u0)),
 ) where {
     ftype, 
     gtype, 
@@ -93,9 +93,8 @@ function CommonSolve.solve!(
     # Simulate it, homie
     for t in 2:T+1
         n[t] = noise(prob.noise, t)
-        @info "" n[t] prob.f(u[t-1], prob.params, t-1) prob.g(u[t-1], prob.params, t-1)
-        u[t] = prob.f(u[t-1], prob.params, t-1) + prob.g(u[t-1], prob.params, t-1) * n[t]
-        z[t] = prob.h(u[t], prob.params, t) + noise(prob.obs_noise, t)
+        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
+        z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, t)
     end
 
     return StateSpaceSolution(z, u, n, nothing)
@@ -114,16 +113,17 @@ function CommonSolve.solve!(
     z = Vector{utype}(undef, T+1) # Observables generated
 
     u[1] = prob.u0
-    z[1] = prob.h(u[1], p, 1) + noise(prob.obs_noise, 1)
+    z[1] = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
     n[1] = noise(prob.noise, 1)  # XXX: This noise term is never used?
 
     # Simulate it, homie
+    loglik = 0.0
     for t in 2:T+1
         n[t] = noise(prob.noise, t)
-        u[t] = prob.f(u[t-1], p, t-1) + prob.g(u[t-1], p, t-1) * n[t]
-        z[t] = prob.h(u[t], p, t) + noise(prob.obs_noise, 1)
+        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
+        z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, 1)
         err = z[t] - prob.observables[t]
-        loglik += loglikelihood(err, prob.noise, t)
+        loglik += loglikelihood(err, prob.obs_noise, t)
     end
 
     return StateSpaceSolution(z, u, n, loglik)
