@@ -11,7 +11,7 @@ p_d = (α=0.5, β=0.95)
 c = SolverCache(m, Val(1), p_d)
 sol = generate_perturbation(m, p_d, p_f; cache = c)
 
-T = 9
+T = 500
 eps_value = [[0.22], [0.01], [0.14], [0.03], [0.15], [0.21], [0.22], [0.05], [0.18]]
 x0 = zeros(m.n_x)
 
@@ -24,4 +24,19 @@ problem = StateSpaceProblem(
     sol
 )
 
+
 simul = DifferenceEquations.solve(problem)
+
+z, n, u = simul.z, simul.n, simul.u
+
+problem_data = StateSpaceProblem(
+    DifferentiableStateSpaceModels.dssm_evolution,
+    DifferentiableStateSpaceModels.dssm_volatility,
+    DifferentiableStateSpaceModels.dssm_observation,
+    x0,
+    (1,T),
+    sol,
+    observables = z
+)
+
+s2 = DifferenceEquations.solve(problem_data)
