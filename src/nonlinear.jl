@@ -81,13 +81,12 @@ function CommonSolve.solve!(
     u = Vector{utype}(undef, T+1) # Latent states
     u[1] = prob.u0
 
-    n1 = noise(prob.noise, 1)  # XXX: This noise term is never used?
-    z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
-
+    n1 = noise(prob.obs_noise, 1)
     n = Vector{typeof(n1)}(undef, T+1) # Latent noise
-    z = Vector{typeof(z1)}(undef, T+1) # Observables generated
-
     n[1] = n1
+
+    z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
+    z = Vector{typeof(z1)}(undef, T+1) # Observables generated
     z[1] = z1
 
     # Simulate it, homie
@@ -109,12 +108,17 @@ function CommonSolve.solve!(
     T = prob.tspan[2]
 
     u = Vector{utype}(undef, T+1) # Latent states
-    n = Vector{utype}(undef, T+1) # Latent noise
-    z = Vector{utype}(undef, T+1) # Observables generated
-
     u[1] = prob.u0
-    z[1] = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
-    n[1] = noise(prob.noise, 1)  # XXX: This noise term is never used?
+    
+    n1 = noise(prob.obs_noise, 1)
+    n = Vector{typeof(n1)}(undef, T+1) # Latent noise
+    n[1] = n1
+
+    z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
+    z = Vector{typeof(z1)}(undef, T+1) # Observables generated
+    z[1] = z1
+
+    @info "" n1 n
 
     # Simulate it, homie
     loglik = 0.0
