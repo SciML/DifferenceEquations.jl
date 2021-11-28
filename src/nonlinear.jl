@@ -72,6 +72,7 @@ CommonSolve.init(prob::StateSpaceProblem, args...; kwargs...) = prob
 
 function CommonSolve.solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
+    ::ConditionalGaussian,
     args...; 
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype<:Nothing}
@@ -101,6 +102,7 @@ end
 
 function CommonSolve.solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
+    ::ConditionalGaussian,
     args...; 
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}
