@@ -105,3 +105,7 @@ using Test
     
     @test sol2.n == sol3.n
 end
+
+@testset "Nonlinear" begin
+    
+end
