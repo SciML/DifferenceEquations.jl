@@ -67,12 +67,13 @@ function StateSpaceProblem(
     )
 end
 
+# Default is ConditionalGaussian
+CommonSolve.init(prob::StateSpaceProblem, args...; kwargs...) = StateSpaceCache(prob, ConditionalGaussian())
+CommonSolve.init(prob::StateSpaceProblem, solver::SciMLBase.SciMLAlgorithm, args...; kwargs...) = StateSpaceCache(prob, solver)
 
-CommonSolve.init(prob::StateSpaceProblem, args...; kwargs...) = prob
-
-function CommonSolve.solve!(
-    prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
-    ::ConditionalGaussian,
+function _solve!(
+    prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype},
+    solver::ConditionalGaussian,
     args...; 
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype<:Nothing}
@@ -100,7 +101,7 @@ function CommonSolve.solve!(
     return StateSpaceSolution(z, u, n, nothing)
 end
 
-function CommonSolve.solve!(
+function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
     ::ConditionalGaussian,
     args...; 
@@ -119,8 +120,6 @@ function CommonSolve.solve!(
     z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
     z = Vector{typeof(z1)}(undef, T+1) # Observables generated
     z[1] = z1
-
-    @info "" n1 n
 
     # Simulate it, homie
     loglik = 0.0

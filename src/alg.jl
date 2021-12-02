@@ -1,4 +1,4 @@
 """
 """
-struct ConditionalGaussian <: SciMLBase.AbstractLinearAlgorithm end
-struct LinearGaussian <: SciMLBase.AbstractLinearAlgorithm end
+struct ConditionalGaussian <: SciMLBase.SciMLAlgorithm end
+struct KalmanFilter <: SciMLBase.SciMLAlgorithm end

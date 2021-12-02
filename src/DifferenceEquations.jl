@@ -11,6 +11,22 @@ import StatsBase
 abstract type DifferenceProblem <: SciMLProblem end
 abstract type AbstractStateSpaceProblem{isinplace} <: DifferenceProblem end
 
+# Wrapper struct, eventually needs to be a full cache
+struct StateSpaceCache{probtype<:AbstractStateSpaceProblem, solvertype<:SciMLBase.SciMLAlgorithm}
+    problem::probtype
+    solver::solvertype
+end 
+
+# Unpack the cache. In future, this unwrapping should be eliminated when the cache
+# actually does something more than just wrap around prob/solver.
+function CommonSolve.solve!(
+    cache::StateSpaceCache,
+    args...; 
+    kwargs...
+)
+    return _solve!(cache.problem, cache.solver, args...; kwargs...)
+end
+
 # Yuck hate this so much
 promote_noise(x, y) = [x], [y]
 promote_noise(x, y::AbstractArray) = [x], y
@@ -27,7 +43,6 @@ include("nonlinear.jl")
 export 
     StateSpaceProblem,
     ConditionalGaussian,
-    LinearGaussian,
     LinearStateSpaceProblem,
     StandardGaussian,
     DefinedNoise,
