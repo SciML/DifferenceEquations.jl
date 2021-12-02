@@ -70,11 +70,12 @@ function LinearStateSpaceProblem(
 end
 
 
-CommonSolve.init(::LinearStateSpaceProblem, args...; kwargs...) = LinearGaussian()
-solve!(::LinearGaussian) = StateSpaceSolution(missing,missing,missing,missing) # TODO: Need more sensible defaults
+CommonSolve.init(prob::LinearStateSpaceProblem, args...; kwargs...) = StateSpaceCache(prob, ConditionalGaussian())
+CommonSolve.init(prob::LinearStateSpaceProblem, solver::SciMLBase.SciMLAlgorithm, args...; kwargs...) = StateSpaceCache(prob, ConditionalGaussian())
 
-function CommonSolve.solve!(
+function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
+    ::ConditionalGaussian,
     args...; 
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype<:Nothing}
@@ -104,6 +105,7 @@ end
 
 function CommonSolve.solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
+    ::ConditionalGaussian,
     args...; 
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype}
