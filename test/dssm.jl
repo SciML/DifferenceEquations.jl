@@ -2,6 +2,8 @@ using Revise
 using DifferenceEquations
 using DifferentiableStateSpaceModels
 using DifferentiableStateSpaceModels.Examples
+using LinearAlgebra
+using Distributions
 
 # Grab the model
 m = @include_example_module(Examples.rbc_observables)
@@ -49,3 +51,18 @@ problem_data = StateSpaceProblem(
 
 # Generate likelihood.
 s2 = DifferenceEquations.solve(problem_data, ConditionalGaussian())
+
+## Kalman filter test
+linear_problem = LinearStateSpaceProblem(
+    sol.A,
+    sol.B,
+    sol.C,
+    MvNormal(u0, diagm(ones(length(u0)))),
+    (1,T),
+    noise=sol.Q,
+    R=diagm(abs2.(sol.D.σ)),
+    observables = z
+)
+
+# Solve with Kalman filter
+simul_k = DifferenceEquations.solve(linear_problem, KalmanFilter())
