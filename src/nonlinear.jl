@@ -98,7 +98,7 @@ function _solve!(
         z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, t)
     end
 
-    return StateSpaceSolution(z, u, n, nothing)
+    return StateSpaceSolution(z, u, n, nothing, nothing)
 end
 
 function _solve!(
@@ -131,5 +131,5 @@ function _solve!(
         loglik += loglikelihood(err, prob.obs_noise, t)
     end
 
-    return StateSpaceSolution(z, u, n, loglik)
+    return StateSpaceSolution(z, u, n, nothing, loglik)
 end

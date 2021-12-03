@@ -71,7 +71,7 @@ end
 
 
 CommonSolve.init(prob::LinearStateSpaceProblem, args...; kwargs...) = StateSpaceCache(prob, ConditionalGaussian())
-CommonSolve.init(prob::LinearStateSpaceProblem, solver::SciMLBase.SciMLAlgorithm, args...; kwargs...) = StateSpaceCache(prob, ConditionalGaussian())
+CommonSolve.init(prob::LinearStateSpaceProblem, solver::SciMLBase.SciMLAlgorithm, args...; kwargs...) = StateSpaceCache(prob, solver)
 
 function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 

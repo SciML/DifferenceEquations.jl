@@ -38,11 +38,13 @@ include("alg.jl")
 include("linear.jl")
 include("solution.jl")
 include("nonlinear.jl")
+include("kalman.jl")
 
 # Exports
 export 
     StateSpaceProblem,
     ConditionalGaussian,
+    KalmanFilter,
     LinearStateSpaceProblem,
     StandardGaussian,
     DefinedNoise,
