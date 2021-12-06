@@ -24,7 +24,6 @@ function _solve!(
     z[1] = C * u[1]
 
     for i = 2:T+1
-        @info "" u0_mean
         # Kalman iteration
         u[i] = A * u[i-1]
         P[i] = A * P[i-1] * A' + B_prod
