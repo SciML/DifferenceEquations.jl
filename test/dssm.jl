@@ -27,7 +27,8 @@ problem = StateSpaceProblem(
     DifferentiableStateSpaceModels.dssm_observation,
     u0,
     (1,T),
-    sol
+    sol,
+    noise=StandardGaussian(1)
 )
 
 # Solve the model, this generates
@@ -46,7 +47,8 @@ problem_data = StateSpaceProblem(
     u0,
     (1,T),
     sol,
-    observables = z
+    observables = z,
+    noise=StandardGaussian(1)
 )
 
 # Generate likelihood.
