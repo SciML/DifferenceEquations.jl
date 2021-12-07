@@ -82,7 +82,6 @@ function _solve!(
     # Preallocate values
     T = prob.tspan[2]
     A,B,C,R = prob.A, prob.B, prob.C, prob.R
-    K = size(B, 1) # Rows of latent states
     L = size(C, 1) # Rows of observations
 
     u = Vector{utype}(undef, T+1) # Latent states
@@ -112,7 +111,6 @@ function CommonSolve.solve!(
     # Preallocate values
     T = prob.tspan[2]
     A,B,C,R = prob.A, prob.B, prob.C, prob.R
-    K = size(B, 1) # Rows of latent states
     L = size(C, 1) # Rows of observations
 
     u = Vector{utype}(undef, T+1) # Latent states
