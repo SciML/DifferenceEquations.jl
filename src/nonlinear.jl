@@ -68,8 +68,24 @@ function StateSpaceProblem(
 end
 
 # Default is ConditionalGaussian
-CommonSolve.init(prob::StateSpaceProblem, args...; kwargs...) = StateSpaceCache(prob, ConditionalGaussian())
-CommonSolve.init(prob::StateSpaceProblem, solver::SciMLBase.SciMLAlgorithm, args...; kwargs...) = StateSpaceCache(prob, solver)
+function CommonSolve.init(
+    prob::StateSpaceProblem, 
+    args...; 
+    vectype=Vector, 
+    kwargs...
+)
+    return StateSpaceCache(prob, ConditionalGaussian(), vectype)
+end
+
+function CommonSolve.init(
+    prob::StateSpaceProblem, 
+    solver::SciMLBase.SciMLAlgorithm, 
+    args...; 
+    vectype=Vector, 
+    kwargs...
+) 
+    return StateSpaceCache(prob, solver, vectype)
+end
 
 function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype},
@@ -104,26 +120,30 @@ end
 function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
     ::ConditionalGaussian,
-    args...; 
+    args...;
+    vectype = Vector,
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2]
 
-    u = Vector{utype}(undef, T+1) # Latent states
+    # u = Vector{utype}(undef, T) # Latent states
+    u = vectype{utype}(undef, T) # Latent states
     u[1] = prob.u0
     
     n1 = noise(prob.obs_noise, 1)
-    n = Vector{typeof(n1)}(undef, T+1) # Latent noise
+    # n = Vector{typeof(n1)}(undef, T) # Latent noise
+    n = vectype{typeof(n1)}(undef, T) # Latent noise
     n[1] = n1
 
     z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
-    z = Vector{typeof(z1)}(undef, T+1) # Observables generated
+    # z = Vector{typeof(z1)}(undef, T) # Observables generated
+    z = vectype{typeof(z1)}(undef, T) # Observables generated
     z[1] = z1
 
     # Simulate it, homie
     loglik = 0.0
-    for t in 2:T+1
+    for t in 2:T
         n[t] = noise(prob.noise, t)
         u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
         z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, 1)
