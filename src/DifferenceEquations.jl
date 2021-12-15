@@ -23,7 +23,7 @@ struct StateSpaceCache{
 end 
 
 function StateSpaceCache(problem::AbstractStateSpaceProblem, solver::SciMLBase.SciMLAlgorithm)
-    return StateSpaceCache(problem, solver, Vector)
+    return StateSpaceCache(problem, solver, identity)
 end
 
 # Unpack the cache. In future, this unwrapping should be eliminated when the cache
@@ -33,7 +33,6 @@ function CommonSolve.solve!(
     args...; 
     kwargs...
 )
-    println(cache.vtype)
     return _solve!(cache.problem, cache.solver, args...; vectype=cache.vtype, kwargs...)
 end
 
