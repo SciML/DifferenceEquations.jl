@@ -71,17 +71,17 @@ end
 function CommonSolve.init(
     prob::StateSpaceProblem, 
     args...; 
-    vectype=Vector, 
+    vectype=identity, 
     kwargs...
 )
     return StateSpaceCache(prob, ConditionalGaussian(), vectype)
 end
 
 function CommonSolve.init(
-    prob::StateSpaceProblem, 
-    solver::SciMLBase.SciMLAlgorithm, 
-    args...; 
-    vectype=Vector, 
+    prob::StateSpaceProblem,
+    solver::SciMLBase.SciMLAlgorithm,
+    args...;
+    vectype=identity,
     kwargs...
 ) 
     return StateSpaceCache(prob, solver, vectype)
@@ -90,21 +90,22 @@ end
 function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype},
     solver::ConditionalGaussian,
-    args...; 
+    args...;
+    vectype = identity,
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype<:Nothing}
     # Preallocate values
     T = prob.tspan[2]
 
-    u = Vector{utype}(undef, T+1) # Latent states
+    u = vectype(Vector{utype}(undef, T)) # Latent states
     u[1] = prob.u0
 
-    n1 = noise(prob.obs_noise, 1)
-    n = Vector{typeof(n1)}(undef, T+1) # Latent noise
+    n1 = noise(prob.noise, 1)
+    n = vectype(Vector{typeof(n1)}(undef, T)) # Latent noise
     n[1] = n1
 
     z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
-    z = Vector{typeof(z1)}(undef, T+1) # Observables generated
+    z = vectype(Vector{typeof(z1)}(undef, T)) # Observables generated
     z[1] = z1
 
     # Simulate it, homie
@@ -121,33 +122,30 @@ function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
     ::ConditionalGaussian,
     args...;
-    vectype = Vector,
+    vectype = identity,
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2]
 
-    # u = Vector{utype}(undef, T) # Latent states
-    u = vectype{utype}(undef, T) # Latent states
+    u = vectype(Vector{utype}(undef, T)) # Latent states
     u[1] = prob.u0
     
-    n1 = noise(prob.obs_noise, 1)
-    # n = Vector{typeof(n1)}(undef, T) # Latent noise
-    n = vectype{typeof(n1)}(undef, T) # Latent noise
+    n1 = noise(prob.noise, 1)
+    n = vectype(Vector{typeof(n1)}(undef, T)) # Latent noise
     n[1] = n1
 
     z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
-    # z = Vector{typeof(z1)}(undef, T) # Observables generated
-    z = vectype{typeof(z1)}(undef, T) # Observables generated
+    z = vectype(Vector{typeof(z1)}(undef, T)) # Observables generated
     z[1] = z1
 
     # Simulate it, homie
     loglik = 0.0
     for t in 2:T
         n[t] = noise(prob.noise, t)
-        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
+        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t-1]
         z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, 1)
-        err = z[t] - prob.observables[t]
+        err = z[t-1] - prob.observables[t]
         loglik += loglikelihood(err, prob.obs_noise, t)
     end
 
