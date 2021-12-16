@@ -123,7 +123,7 @@ function CommonSolve.solve!(
     loglik = 0.0
 
     # Simulate it, homie
-    for t in 2:T+1
+    for t in 2:T
         n[t] = noise(prob.noise, t)
         u[t] = A * u[t-1] + B * n[t] # Call latent_noise here
         z[t] = C*u[t] + R*randn(L)
