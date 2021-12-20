@@ -109,7 +109,7 @@ function _solve!(
     z[1] = z1
 
     # Simulate it, homie
-    for t in 2:T+1
+    for t in 2:T
         n[t] = noise(prob.noise, t)
         u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
         z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, t)
@@ -143,7 +143,7 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         n[t] = noise(prob.noise, t)
-        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t-1]
+        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
         z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, 1)
         err = z[t-1] - prob.observables[t]
         loglik += loglikelihood(err, prob.obs_noise, t)
