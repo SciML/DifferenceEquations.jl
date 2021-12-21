@@ -36,7 +36,6 @@ function _solve!(
         CP_t = C * P[t]
         V = Symmetric(CP_t * C' + R)
         loglik += logpdf(MvNormal(z[t], V), prob.observables[t-1])
-        # loglik += logpdf(MvNormal(z[i], V), observables[i-1])
         K = CP_t' / V  # gain
         u[t] += K * (prob.observables[t-1] - z[t])
         P[t] -= K * CP_t
