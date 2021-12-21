@@ -99,16 +99,16 @@ function _solve!(
     A,B,C = prob.A, prob.B, prob.C
     L = size(C, 1) # Rows of observations
 
-    u = vectype(Vector{utype}(undef, T+1)) # Latent states
-    n = vectype(Vector{utype}(undef, T+1)) # Latent noise
-    z = vectype(Vector{utype}(undef, T+1)) # Observables generated
+    u = vectype(Vector{utype}(undef, T)) # Latent states
+    n = vectype(Vector{utype}(undef, T)) # Latent noise
+    z = vectype(Vector{utype}(undef, T)) # Observables generated
 
     u[1] = prob.u0
     z[1] = C * u[1] + noise(prob.obs_noise, 1)
     n[1] = noise(prob.noise, 1)  # This noise term is never used
 
     # Simulate it, homie
-    for t in 2:T+1
+    for t in 2:T
         n[t] = noise(prob.noise, t)
         u[t] = A * u[t-1] + B * n[t] # Call latent_noise here
         z[t] = C*u[t] + noise(prob.obs_noise, t)
@@ -128,9 +128,9 @@ function _solve!(
     A,B,C = prob.A, prob.B, prob.C
     L = size(C, 1) # Rows of observations
 
-    u = vectype(Vector{utype}(undef, T+1)) # Latent states
-    n = vectype(Vector{utype}(undef, T+1)) # Latent noise
-    z = vectype(Vector{utype}(undef, T+1)) # Observables generated
+    u = vectype(Vector{utype}(undef, T)) # Latent states
+    n = vectype(Vector{utype}(undef, T)) # Latent noise
+    z = vectype(Vector{utype}(undef, T)) # Observables generated
 
     u[1] = prob.u0
     z[1] = C * u[1] + noise(prob.obs_noise, 1)
