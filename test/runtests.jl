@@ -36,12 +36,13 @@ using DifferentiableStateSpaceModels.Examples
             DifferentiableStateSpaceModels.dssm_observation,
             u0,
             (1,T),
-            sol
+            sol,
+            noise=StandardGaussian(1)
         )
 
         # Solve the model, this generates
         # simulated data.
-        simul = DifferenceEquations.solve(problem, ConditionalGaussian())
+        simul = DifferenceEquations.solve(problem, NoiseConditionalFilter())
 
         # Extract the observables, latent noise, and latent states.
         z, n, u = simul.z, simul.n, simul.u
@@ -55,10 +56,11 @@ using DifferentiableStateSpaceModels.Examples
             u0,
             (1,T),
             sol,
-            observables = z
+            observables = z,
+            noise=StandardGaussian(1)
         )
 
         # Generate likelihood.
-        s2 = DifferenceEquations.solve(problem_data, ConditionalGaussian())
+        s2 = DifferenceEquations.solve(problem_data, NoiseConditionalFilter())
     end
 end

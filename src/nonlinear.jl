@@ -67,14 +67,14 @@ function StateSpaceProblem(
     )
 end
 
-# Default is ConditionalGaussian
+# Default is NoiseConditionalFilter
 function CommonSolve.init(
     prob::StateSpaceProblem, 
     args...; 
     vectype=identity, 
     kwargs...
 )
-    return StateSpaceCache(prob, ConditionalGaussian(), vectype)
+    return StateSpaceCache(prob, NoiseConditionalFilter(), vectype)
 end
 
 function CommonSolve.init(
@@ -89,7 +89,7 @@ end
 
 function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype},
-    solver::ConditionalGaussian,
+    solver::NoiseConditionalFilter,
     args...;
     vectype = identity,
     kwargs...
@@ -114,12 +114,12 @@ function _solve!(
         z[t] = prob.h(u[t], prob.params, t_n)
     end
 
-    return StateSpaceSolution(z, u, n, nothing, nothing)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, nothing)
 end
 
 function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
-    solver::ConditionalGaussian,
+    solver::NoiseConditionalFilter,
     args...;
     vectype = identity,
     kwargs...

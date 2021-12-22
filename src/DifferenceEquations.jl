@@ -52,7 +52,7 @@ include("kalman.jl")
 # Exports
 export 
     StateSpaceProblem,
-    ConditionalGaussian,
+    NoiseConditionalFilter,
     KalmanFilter,
     LinearStateSpaceProblem,
     StandardGaussian,
