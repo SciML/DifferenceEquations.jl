@@ -6,6 +6,8 @@ using DifferenceEquations
 using DifferentiableStateSpaceModels
 using DifferentiableStateSpaceModels.Examples
 
+# The test here is just checking whether the codes can run, but not to check the validity of the results
+
 @testset "DifferenceEquations.jl" begin
     @testset "Linear model" begin
         include("dssm.jl")

@@ -18,7 +18,7 @@ noise(s::Gaussian{<:Integer, <:Nothing}, t) = randn(s.size)
 noise(s::Gaussian{<:Tuple, <:Nothing}, t) = randn(s.size...)
 
 # Scaling draws by a matrix
-noise(s::Gaussian{<:Integer, AbstractArray}, t) = S.B * randn(s.size)
+noise(s::Gaussian{<:Integer, AbstractArray}, t) = s.B * randn(s.size)
 noise(s::Gaussian{<:Tuple, AbstractArray}, t) = s.B * randn(s.size...)
 
 

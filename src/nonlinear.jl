@@ -95,24 +95,23 @@ function _solve!(
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype<:Nothing}
     # Preallocate values
-    T = prob.tspan[2]
+    T = prob.tspan[2] - prob.tspan[1] + 1
 
     u = vectype(Vector{utype}(undef, T)) # Latent states
-    u[1] = prob.u0
-
-    n1 = noise(prob.noise, 1)
+    n1 = noise(prob.noise, 1) # This is only to grab the type of the noises
     n = vectype(Vector{typeof(n1)}(undef, T)) # Latent noise
-    n[1] = n1
-
-    z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
+    z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
     z = vectype(Vector{typeof(z1)}(undef, T)) # Observables generated
+
+    # Initialize
+    u[1] = prob.u0
     z[1] = z1
 
-    # Simulate it, homie
     for t in 2:T
-        n[t] = noise(prob.noise, t)
-        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
-        z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, t)
+        t_n = t - 1 + prob.tspan[1]
+        n[t] = noise(prob.noise, t_n)
+        u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
+        z[t] = prob.h(u[t], prob.params, t_n)
     end
 
     return StateSpaceSolution(z, u, n, nothing, nothing)
@@ -120,34 +119,34 @@ end
 
 function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
-    ::ConditionalGaussian,
+    solver::ConditionalGaussian,
     args...;
     vectype = identity,
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}
     # Preallocate values
-    T = prob.tspan[2]
+    T = prob.tspan[2] - prob.tspan[1] + 1
 
     u = vectype(Vector{utype}(undef, T)) # Latent states
-    u[1] = prob.u0
-    
-    n1 = noise(prob.noise, 1)
+    n1 = noise(prob.noise, 1) # This is only to grab the type of the noises
     n = vectype(Vector{typeof(n1)}(undef, T)) # Latent noise
-    n[1] = n1
-
-    z1 = prob.h(u[1], prob.params, 1) + noise(prob.obs_noise, 1)
+    z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
     z = vectype(Vector{typeof(z1)}(undef, T)) # Observables generated
+
+    # Initialize
+    u[1] = prob.u0
     z[1] = z1
 
-    # Simulate it, homie
     loglik = 0.0
     for t in 2:T
-        n[t] = noise(prob.noise, t)
-        u[t] = prob.f(u[t-1], prob.params, t-1) .+ prob.g(u[t-1], prob.params, t-1) * n[t]
-        z[t] = prob.h(u[t], prob.params, t) .+ noise(prob.obs_noise, 1)
-        err = z[t-1] - prob.observables[t]
+        t_n = t - 1 + prob.tspan[1]
+        n[t] = noise(prob.noise, t_n)
+        u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
+        z[t] = prob.h(u[t], prob.params, t_n)
+        # Likelihood accumulation when data observations are provided
+        err = z[t] - prob.observables[t_n]
         loglik += loglikelihood(err, prob.obs_noise, t)
     end
 
-    return StateSpaceSolution(z, u, n, nothing, loglik)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, loglik)
 end
