@@ -114,7 +114,7 @@ function _solve!(
         z[t] = C*u[t] + noise(prob.obs_noise, t)
     end
 
-    return StateSpaceSolution(z, u, n, nothing)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing)
 end
 
 function _solve!(
@@ -146,5 +146,5 @@ function _solve!(
         loglik += logpdf(MvNormal(R), err)
     end
 
-    return StateSpaceSolution(z, u, n, loglik)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), loglik)
 end

@@ -114,7 +114,7 @@ function _solve!(
         z[t] = prob.h(u[t], prob.params, t_n)
     end
 
-    return StateSpaceSolution(z, u, n, nothing, nothing)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, nothing)
 end
 
 function _solve!(

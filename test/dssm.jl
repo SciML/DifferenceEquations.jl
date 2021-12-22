@@ -62,7 +62,7 @@ linear_problem = LinearStateSpaceProblem(
     MvNormal(u0, diagm(ones(length(u0)))),
     (1,T),
     noise=sol.Q,
-    R=diagm(abs2.(sol.D.σ)),
+    obs_noise=sol.D,
     observables = z
 )
 
