@@ -11,7 +11,7 @@ struct StateSpaceSolution{T1, T2, T3, T4, T5}
     u::T2 # hidden state, or mean of prior if filtering/estimating
     n::T3 # shocks, if not filtering
     P::T4 # Prior variances
-    likelihood::T5  #likelihood of observables
+    loglikelihood::T5  # log-likelihood of observables
 end
 
 

@@ -111,7 +111,7 @@ function _solve!(
         t_n = t - 1 + prob.tspan[1]
         n[t] = noise(prob.noise, t_n)
         u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
-        z[t] = prob.h(u[t], prob.params, t_n) .+ noise(prob.obs_noise, t_n)
+        z[t] = prob.h(u[t], prob.params, t_n)
     end
 
     return StateSpaceSolution(z, u, n, nothing, nothing)
@@ -142,7 +142,7 @@ function _solve!(
         t_n = t - 1 + prob.tspan[1]
         n[t] = noise(prob.noise, t_n)
         u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
-        z[t] = prob.h(u[t], prob.params, t_n) .+ noise(prob.obs_noise, t_n)
+        z[t] = prob.h(u[t], prob.params, t_n)
         # Likelihood accumulation when data observations are provided
         err = z[t] - prob.observables[t_n]
         loglik += loglikelihood(err, prob.obs_noise, t)
