@@ -148,5 +148,5 @@ function _solve!(
         loglik += loglikelihood(err, prob.obs_noise, t)
     end
 
-    return StateSpaceSolution(z, u, n, nothing, loglik)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, loglik)
 end
