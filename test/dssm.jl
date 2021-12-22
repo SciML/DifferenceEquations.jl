@@ -1,4 +1,4 @@
-using Revise
+using Test
 using DifferenceEquations
 using DifferentiableStateSpaceModels
 using DifferentiableStateSpaceModels.Examples
@@ -33,7 +33,7 @@ problem = StateSpaceProblem(
 
 # Solve the model, this generates
 # simulated data.
-simul = DifferenceEquations.solve(problem, ConditionalGaussian())
+simul = @inferred DifferenceEquations.solve(problem, NoiseConditionalFilter())
 
 # Extract the observables, latent noise, and latent states.
 z, n, u = simul.z, simul.n, simul.u
@@ -52,7 +52,7 @@ problem_data = StateSpaceProblem(
 )
 
 # Generate likelihood.
-s2 = DifferenceEquations.solve(problem_data, ConditionalGaussian())
+s2 = @inferred DifferenceEquations.solve(problem_data, NoiseConditionalFilter())
 
 ## Kalman filter test
 linear_problem = LinearStateSpaceProblem(
@@ -67,4 +67,4 @@ linear_problem = LinearStateSpaceProblem(
 )
 
 # Solve with Kalman filter
-simul_k = DifferenceEquations.solve(linear_problem, KalmanFilter())
+simul_k = @inferred DifferenceEquations.solve(linear_problem, KalmanFilter())

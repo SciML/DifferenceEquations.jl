@@ -67,14 +67,14 @@ function LinearStateSpaceProblem(
     )
 end
 
-# Default is ConditionalGaussian
+# Default is NoiseConditionalFilter
 function CommonSolve.init(
     prob::LinearStateSpaceProblem, 
     args...; 
     vectype=identity, 
     kwargs...
 )
-    return StateSpaceCache(prob, ConditionalGaussian(), vectype)
+    return StateSpaceCache(prob, NoiseConditionalFilter(), vectype)
 end
 
 function CommonSolve.init(
@@ -89,7 +89,7 @@ end
 
 function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
-    ::ConditionalGaussian,
+    ::NoiseConditionalFilter,
     args...;
     vectype=identity,
     kwargs...
@@ -119,7 +119,7 @@ end
 
 function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
-    ::ConditionalGaussian,
+    ::NoiseConditionalFilter,
     args...; 
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype}
