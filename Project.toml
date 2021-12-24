@@ -5,7 +5,9 @@ version = "0.4.0"
 
 [deps]
 CommonSolve = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
+DifferentiableStateSpaceModels = "beacd9db-9e5e-4956-9b09-459a4b2028df"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+DistributionsAD = "ced4e74d-a319-5a8a-b0ac-84af2272839c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
