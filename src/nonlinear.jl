@@ -28,7 +28,7 @@ function StateSpaceProblem(
     u0::utype,
     tspan::ttype,
     params = nothing;
-    obs_noise = MvNormal(ones(size(h(u0, params, 0)))), # Assume the default measurement error is MvNormal with identity covariance
+    obs_noise = MvNormal(diagm(ones(size(h(u0, params, 0))))), # Assume the default measurement error is MvNormal with identity covariance
     observables = nothing,
     noise = StandardGaussian(size(u0)),
 ) where {
