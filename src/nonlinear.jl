@@ -28,7 +28,7 @@ function StateSpaceProblem(
     u0::utype,
     tspan::ttype,
     params = nothing;
-    obs_noise =  (h0 = h(u0, params, t0); MvNormal(Zeros{eltype(h0)}(length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
+    obs_noise = (h0 = h(u0, params, tspan[1]); MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
     observables = nothing,
     noise = StandardGaussian(size(u0)),
 ) where {
@@ -140,8 +140,7 @@ function _solve!(
         u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
         z[t] = prob.h(u[t], prob.params, t_n)
         # Likelihood accumulation when data observations are provided
-        err = z[t] - prob.observables[t_n]
-        loglik += loglikelihood(err, prob.obs_noise, t)
+        loglik += logpdf(prob.obs_noise, z[t] - prob.observables[t_n])
     end
 
     return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, loglik)

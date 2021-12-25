@@ -1,14 +1,17 @@
 using Test
 using DifferenceEquations
 using DifferentiableStateSpaceModels
-using DifferentiableStateSpaceModels.Examples
-using LinearAlgebra
 using Distributions
+using LaTeXStrings
+using LinearAlgebra
+using SymbolicUtils
 
 # Grab the model
-m = @include_example_module(Examples.rbc_observables)
-p_f = (ρ=0.2, δ=0.02, σ=0.01, Ω_1=0.1)
-p_d = (α=0.5, β=0.95)
+# Keep the model generated files static in the test folder just to avoid DSSM upstream disturbances
+include(joinpath(pkgdir(DifferenceEquations), "test/generated_models/rbc_observables.jl"))
+m = PerturbationModel(Main.rbc_observables)
+p_f = (ρ = 0.2, δ = 0.02, σ = 0.01, Ω_1 = 0.1)
+p_d = (α = 0.5, β = 0.95)
 
 # Generate cache, create perutrbation solution
 c = SolverCache(m, Val(1), p_d)
@@ -26,9 +29,9 @@ problem = StateSpaceProblem(
     DifferentiableStateSpaceModels.dssm_volatility,
     DifferentiableStateSpaceModels.dssm_observation,
     u0,
-    (1,T),
+    (0, T),
     sol,
-    noise=StandardGaussian(1)
+    noise = StandardGaussian(1)
 )
 
 # Solve the model, this generates
@@ -45,10 +48,11 @@ problem_data = StateSpaceProblem(
     DifferentiableStateSpaceModels.dssm_volatility,
     DifferentiableStateSpaceModels.dssm_observation,
     u0,
-    (1,T),
+    (0, T),
     sol,
+    obs_noise = sol.D,
     observables = z,
-    noise=StandardGaussian(1)
+    noise = StandardGaussian(1)
 )
 
 # Generate likelihood.
