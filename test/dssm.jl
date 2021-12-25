@@ -1,4 +1,3 @@
-using Test
 using DifferenceEquations
 using DifferentiableStateSpaceModels
 using Distributions
@@ -37,9 +36,8 @@ problem = StateSpaceProblem(
 # Solve the model, this generates
 # simulated data.
 simul = @inferred DifferenceEquations.solve(problem, NoiseConditionalFilter())
-
-# Extract the observables, latent noise, and latent states.
-z, n, u = simul.z, simul.n, simul.u
+# Grab simulated data for the next tests
+z = simul.z
 
 # Now solve using the previous data as observables.
 # Solving this problem also includes a likelihood.
@@ -56,19 +54,19 @@ problem_data = StateSpaceProblem(
 )
 
 # Generate likelihood.
-s2 = @inferred DifferenceEquations.solve(problem_data, NoiseConditionalFilter())
+simul_with_likelihood = @inferred DifferenceEquations.solve(problem_data, NoiseConditionalFilter())
 
 ## Kalman filter test
 linear_problem = LinearStateSpaceProblem(
     sol.A,
     sol.B,
     sol.C,
-    MvNormal(u0, diagm(ones(length(u0)))),
-    (1,T),
-    noise=sol.Q,
-    obs_noise=sol.D,
+    MvNormal(zeros(eltype(u0), length(u0)), I),
+    (0, T),
+    noise = nothing,
+    obs_noise = sol.D,
     observables = z
 )
 
 # Solve with Kalman filter
-simul_k = @inferred DifferenceEquations.solve(linear_problem, KalmanFilter())
+simul_kalman_filter = @inferred DifferenceEquations.solve(linear_problem, KalmanFilter())
