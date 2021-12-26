@@ -1,6 +1,7 @@
 module DifferenceEquations
 
 using Distributions
+using DistributionsAD
 using LinearAlgebra
 using CommonSolve
 
