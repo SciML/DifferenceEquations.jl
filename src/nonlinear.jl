@@ -4,7 +4,7 @@ struct StateSpaceProblem{
     gtype, # TODO: Replace with LinearOperator 
     htype, # TODO: Replace with LinearOperator 
     wtype, 
-    vtype, # TODO: Add support methods for vtype <: Distribution
+    vtype, # We assume for vtype <: Distribution
     utype,
     ttype,
     otype,
@@ -14,7 +14,7 @@ struct StateSpaceProblem{
     g::gtype # Noise function
     h::htype # Observation function
     noise::wtype # Latent noise distribution
-    obs_noise::vtype # Observation noise matrix
+    obs_noise::vtype # Observation noise / measurement error distribution
     u0::utype # Initial condition
     tspan::ttype # Timespan to use
     observables::otype # Observed data to use, if any
@@ -27,8 +27,8 @@ function StateSpaceProblem(
     h::htype,
     u0::utype,
     tspan::ttype,
-    params=nothing;
-    obs_noise = StandardGaussian(size(h(u0, params, 0))), # TODO: Might be suboptimal way to get size of obs
+    params = nothing;
+    obs_noise = (h0 = h(u0, params, tspan[1]); MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
     observables = nothing,
     noise = StandardGaussian(size(u0)),
 ) where {
@@ -38,10 +38,6 @@ function StateSpaceProblem(
     utype,
     ttype,
 }
-    if obs_noise isa Vector
-        @assert length(obs_noise) == 1
-        obs_noise = hcat(obs_noise) # Convert to matrix
-    end
 
     return StateSpaceProblem{
         Val(false), 
@@ -59,7 +55,7 @@ function StateSpaceProblem(
         g, # Noise function
         h, # Observation function
         noise, # Latent noise matrix/function/distribution
-        obs_noise, # Observation noise matrix/function/distribution
+        obs_noise, # Observation noise distribution
         u0, # Initial condition
         tspan, # Timespan to use
         observables, # Observed data to use, if any
@@ -71,7 +67,7 @@ end
 function CommonSolve.init(
     prob::StateSpaceProblem, 
     args...; 
-    vectype=identity, 
+    vectype = identity, 
     kwargs...
 )
     return StateSpaceCache(prob, NoiseConditionalFilter(), vectype)
@@ -81,7 +77,7 @@ function CommonSolve.init(
     prob::StateSpaceProblem,
     solver::SciMLBase.SciMLAlgorithm,
     args...;
-    vectype=identity,
+    vectype = identity,
     kwargs...
 ) 
     return StateSpaceCache(prob, solver, vectype)
@@ -144,8 +140,7 @@ function _solve!(
         u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
         z[t] = prob.h(u[t], prob.params, t_n)
         # Likelihood accumulation when data observations are provided
-        err = z[t] - prob.observables[t_n]
-        loglik += loglikelihood(err, prob.obs_noise, t)
+        loglik += logpdf(prob.obs_noise, z[t] - prob.observables[t_n])
     end
 
     return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, loglik)

@@ -27,8 +27,3 @@ struct DefinedNoise{T} <: AbstractNoise
 end
 
 noise(s::DefinedNoise{<:Vector}, t) = s.values[t]
-
-# Likelihood definitions
-StatsBase.loglikelihood(x, noise::Gaussian{<:Any, <:Nothing}, t) = loglikelihood(MvNormal(diagm(ones(noise.size))), x)
-StatsBase.loglikelihood(x, noise::Gaussian, t) = loglikelihood(MvNormal(noise.B), x)
-StatsBase.loglikelihood(x, noise::AbstractMatrix, t) = loglikelihood(MvNormal(noise), x)
