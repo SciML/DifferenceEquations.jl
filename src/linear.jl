@@ -40,10 +40,6 @@ function LinearStateSpaceProblem(
     utype,
     ttype,
 }
-    if obs_noise isa Vector
-        @assert length(obs_noise) == 1
-        obs_noise = hcat(obs_noise) # Convert to matrix
-    end
     
     return LinearStateSpaceProblem{
         Val(false), 
@@ -71,36 +67,33 @@ end
 function CommonSolve.init(
     prob::LinearStateSpaceProblem, 
     args...; 
-    vectype = identity, 
     kwargs...
 )
-    return StateSpaceCache(prob, NoiseConditionalFilter(), vectype)
+    return StateSpaceCache(prob, NoiseConditionalFilter())
 end
 
 function CommonSolve.init(
     prob::LinearStateSpaceProblem,
     solver::SciMLBase.SciMLAlgorithm,
     args...;
-    vectype = identity,
     kwargs...
 ) 
-    return StateSpaceCache(prob, solver, vectype)
+    return StateSpaceCache(prob, solver)
 end
 
 function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
     ::NoiseConditionalFilter,
     args...;
-    vectype = identity,
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype<:Nothing}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
 
-    u = vectype(Vector{utype}(undef, T)) # Latent states
-    n = vectype(Vector{utype}(undef, T)) # Latent noise
-    z = vectype(Vector{utype}(undef, T)) # Observables generated
+    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
+    n = Zygote.buffer(Vector{utype}(undef, T)) # Latent noise
+    z = Zygote.buffer(Vector{utype}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -120,16 +113,15 @@ function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
     ::NoiseConditionalFilter,
     args...;
-    vectype = identity,
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
 
-    u = vectype(Vector{utype}(undef, T)) # Latent states
-    n = vectype(Vector{utype}(undef, T)) # Latent noise
-    z = vectype(Vector{utype}(undef, T)) # Observables generated
+    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
+    n = Zygote.buffer(Vector{utype}(undef, T)) # Latent noise
+    z = Zygote.buffer(Vector{utype}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -144,5 +136,5 @@ function _solve!(
         loglik += logpdf(MvNormal(R), z[t] - prob.observables[t_n])
     end
 
-    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, loglik)
+    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end

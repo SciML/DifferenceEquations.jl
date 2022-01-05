@@ -2,7 +2,6 @@ function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype},
     solver::KalmanFilter,
     args...;
-    vectype = identity,
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:Distribution, utype, ttype, otype}
     # Preallocate values
@@ -16,9 +15,9 @@ function _solve!(
     u0_mean = mean(prob.u0)
     u0_variance = cov(prob.u0)
 
-    u = vectype(Vector{typeof(u0_mean)}(undef, T)) # Mean of Kalman filter inferred latent states
-    P = vectype(Vector{Matrix{eltype(u0_mean)}}(undef, T)) # Posterior variance of Kalman filter inferred latent states
-    z = vectype(Vector{typeof(u0_mean)}(undef, T)) # Mean of observables, generated from mean of latent states
+    u = Zygote.buffer(Vector{typeof(u0_mean)}(undef, T)) # Mean of Kalman filter inferred latent states
+    P = Zygote.buffer(Vector{Matrix{eltype(u0_mean)}}(undef, T)) # Posterior variance of Kalman filter inferred latent states
+    z = Zygote.buffer(Vector{typeof(u0_mean)}(undef, T)) # Mean of observables, generated from mean of latent states
 
     u[1] = u0_mean
     P[1] = u0_variance

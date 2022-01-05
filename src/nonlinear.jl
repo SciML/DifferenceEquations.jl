@@ -67,37 +67,34 @@ end
 function CommonSolve.init(
     prob::StateSpaceProblem, 
     args...; 
-    vectype = identity, 
     kwargs...
 )
-    return StateSpaceCache(prob, NoiseConditionalFilter(), vectype)
+    return StateSpaceCache(prob, NoiseConditionalFilter())
 end
 
 function CommonSolve.init(
     prob::StateSpaceProblem,
     solver::SciMLBase.SciMLAlgorithm,
     args...;
-    vectype = identity,
     kwargs...
 ) 
-    return StateSpaceCache(prob, solver, vectype)
+    return StateSpaceCache(prob, solver)
 end
 
 function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype},
     solver::NoiseConditionalFilter,
     args...;
-    vectype = identity,
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype<:Nothing}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
 
-    u = vectype(Vector{utype}(undef, T)) # Latent states
+    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
     n1 = noise(prob.noise, 1) # This is only to grab the type of the noises
-    n = vectype(Vector{typeof(n1)}(undef, T)) # Latent noise
+    n = Zygote.buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
-    z = vectype(Vector{typeof(z1)}(undef, T)) # Observables generated
+    z = Zygote.buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -117,17 +114,16 @@ function _solve!(
     prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
     solver::NoiseConditionalFilter,
     args...;
-    vectype = identity,
     kwargs...
 ) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
 
-    u = vectype(Vector{utype}(undef, T)) # Latent states
+    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
     n1 = noise(prob.noise, 1) # This is only to grab the type of the noises
-    n = vectype(Vector{typeof(n1)}(undef, T)) # Latent noise
+    n = Zygote.buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
-    z = vectype(Vector{typeof(z1)}(undef, T)) # Observables generated
+    z = Zygote.buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -143,5 +139,5 @@ function _solve!(
         loglik += logpdf(prob.obs_noise, z[t] - prob.observables[t_n])
     end
 
-    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, loglik)
+    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end
