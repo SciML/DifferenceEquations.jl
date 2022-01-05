@@ -32,7 +32,7 @@ function LinearStateSpaceProblem(
     tspan::ttype;
     obs_noise = (h0 = C * u0; MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
     observables = nothing,
-    noise,
+    noise = nothing,
 ) where {
     Atype<:AbstractArray, 
     Btype<:AbstractArray, 
@@ -91,9 +91,9 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
 
-    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
-    n = Zygote.buffer(Vector{utype}(undef, T)) # Latent noise
-    z = Zygote.buffer(Vector{utype}(undef, T)) # Observables generated
+    u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
+    n = Zygote.Buffer(Vector{utype}(undef, T)) # Latent noise
+    z = Zygote.Buffer(Vector{utype}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -119,9 +119,9 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
 
-    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
-    n = Zygote.buffer(Vector{utype}(undef, T)) # Latent noise
-    z = Zygote.buffer(Vector{utype}(undef, T)) # Observables generated
+    u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
+    n = Zygote.Buffer(Vector{utype}(undef, T)) # Latent noise
+    z = Zygote.Buffer(Vector{utype}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0

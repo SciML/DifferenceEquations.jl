@@ -33,7 +33,7 @@ function CommonSolve.solve!(
     args...; 
     kwargs...
 )
-    return _solve!(cache.problem, cache.solver, args...; vectype=cache.vtype, kwargs...)
+    return _solve!(cache.problem, cache.solver, args...; kwargs...)
 end
 
 # Yuck hate this so much

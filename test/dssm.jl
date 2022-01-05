@@ -30,14 +30,14 @@ problem = StateSpaceProblem(
     u0,
     (0, T),
     sol,
-    noise = StandardGaussian(1)
+    noise = [randn(sol.n_ϵ) for _ in 1:T]
 )
 
 # Solve the model, this generates
 # simulated data.
 simul = @inferred DifferenceEquations.solve(problem, NoiseConditionalFilter())
-# Grab simulated data for the next tests
-z = simul.z
+# Grab simulated data for the next tests, leave the first one -- the initial condition -- out
+z = simul.z[2:end]
 
 # Now solve using the previous data as observables.
 # Solving this problem also includes a likelihood.
@@ -50,7 +50,7 @@ problem_data = StateSpaceProblem(
     sol,
     obs_noise = sol.D,
     observables = z,
-    noise = StandardGaussian(1)
+    noise = [randn(sol.n_ϵ) for _ in 1:T]
 )
 
 # Generate likelihood.

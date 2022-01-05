@@ -30,7 +30,7 @@ function StateSpaceProblem(
     params = nothing;
     obs_noise = (h0 = h(u0, params, tspan[1]); MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
     observables = nothing,
-    noise,
+    noise = nothing,
 ) where {
     ftype, 
     gtype, 
@@ -90,11 +90,11 @@ function _solve!(
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
 
-    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
+    u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
     n1 = prob.noise[1] # This is only to grab the type of the noises. We won't use it in the simulation
-    n = Zygote.buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
+    n = Zygote.Buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
-    z = Zygote.buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
+    z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -119,11 +119,11 @@ function _solve!(
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
 
-    u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
+    u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
     n1 = prob.noise[1] # This is only to grab the type of the noises. We won't use it in the simulation
-    n = Zygote.buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
+    n = Zygote.Buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
-    z = Zygote.buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
+    z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
