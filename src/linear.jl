@@ -9,7 +9,7 @@ struct LinearStateSpaceProblem{
     Btype<:AbstractArray, 
     Ctype<:AbstractArray, 
     wtype, 
-    Rtype, # Should be expanded later on to include distributions
+    Rtype, # Distributions only
     utype,
     ttype,
     otype
@@ -17,8 +17,8 @@ struct LinearStateSpaceProblem{
     A::Atype # Evolution matrix
     B::Btype # Noise matrix
     C::Ctype # Observation matrix
-    noise::wtype # Latent noise distribution
-    obs_noise::Rtype # Observation noise matrix
+    noise::wtype # Latent noises
+    obs_noise::Rtype # Observation noise / measurement error distribution
     u0::utype # Initial condition
     tspan::ttype # Timespan to use
     observables::otype # Observed data to use, if any
@@ -30,9 +30,9 @@ function LinearStateSpaceProblem(
     C::Ctype,
     u0::utype,
     tspan::ttype;
-    obs_noise = diagm(ones(size(C,1))),
+    obs_noise = (h0 = C * u0; MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
     observables = nothing,
-    noise = StandardGaussian(size(u0)),
+    noise,
 ) where {
     Atype<:AbstractArray, 
     Btype<:AbstractArray, 
@@ -86,7 +86,7 @@ function _solve!(
     ::NoiseConditionalFilter,
     args...;
     kwargs...
-) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype<:Nothing}
+) where {isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype<:Nothing}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
@@ -101,7 +101,7 @@ function _solve!(
 
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        n[t] = noise(prob.noise, t_n)
+        n[t] = prob.noise[t_n]
         u[t] = A * u[t - 1] + B * n[t]
         z[t] = C * u[t]
     end
@@ -114,7 +114,7 @@ function _solve!(
     ::NoiseConditionalFilter,
     args...;
     kwargs...
-) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype}
+) where {isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
@@ -130,10 +130,10 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        n[t] = noise(prob.noise, t_n)
+        n[t] = prob.noise[t_n]
         u[t] = A * u[t - 1] + B * n[t]
         z[t] = C * u[t]
-        loglik += logpdf(MvNormal(R), z[t] - prob.observables[t_n])
+        loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)

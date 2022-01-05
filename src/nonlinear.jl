@@ -13,7 +13,7 @@ struct StateSpaceProblem{
     f::ftype # Evolution function
     g::gtype # Noise function
     h::htype # Observation function
-    noise::wtype # Latent noise distribution
+    noise::wtype # Latent noises
     obs_noise::vtype # Observation noise / measurement error distribution
     u0::utype # Initial condition
     tspan::ttype # Timespan to use
@@ -30,7 +30,7 @@ function StateSpaceProblem(
     params = nothing;
     obs_noise = (h0 = h(u0, params, tspan[1]); MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
     observables = nothing,
-    noise = StandardGaussian(size(u0)),
+    noise,
 ) where {
     ftype, 
     gtype, 
@@ -54,7 +54,7 @@ function StateSpaceProblem(
         f, # Evolution function
         g, # Noise function
         h, # Observation function
-        noise, # Latent noise matrix/function/distribution
+        noise, # Latent noises
         obs_noise, # Observation noise distribution
         u0, # Initial condition
         tspan, # Timespan to use
@@ -91,7 +91,7 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
 
     u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
-    n1 = noise(prob.noise, 1) # This is only to grab the type of the noises
+    n1 = prob.noise[1] # This is only to grab the type of the noises. We won't use it in the simulation
     n = Zygote.buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
     z = Zygote.buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
@@ -102,7 +102,7 @@ function _solve!(
 
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        n[t] = noise(prob.noise, t_n)
+        n[t] = prob.noise[t_n]
         u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
         z[t] = prob.h(u[t], prob.params, t_n)
     end
@@ -120,7 +120,7 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
 
     u = Zygote.buffer(Vector{utype}(undef, T)) # Latent states
-    n1 = noise(prob.noise, 1) # This is only to grab the type of the noises
+    n1 = prob.noise[1] # This is only to grab the type of the noises. We won't use it in the simulation
     n = Zygote.buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = prob.h(prob.u0, prob.params, prob.tspan[1]) # Grab the type of the observations of the initial latent states
     z = Zygote.buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
@@ -132,11 +132,11 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        n[t] = noise(prob.noise, t_n)
+        n[t] = prob.noise[t_n]
         u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
         z[t] = prob.h(u[t], prob.params, t_n)
         # Likelihood accumulation when data observations are provided
-        loglik += logpdf(prob.obs_noise, z[t] - prob.observables[t_n])
+        loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
