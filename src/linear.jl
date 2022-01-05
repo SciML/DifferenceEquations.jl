@@ -1,7 +1,7 @@
 """
-
 u(t+1) = A u(t) + B w(t+1)
-z(t) = C u(t) + v(t+1)
+z(t) = C u(t)
+z_tilde{t} = z(t) + v(t+1)
 """
 struct LinearStateSpaceProblem{
     isinplace, 
@@ -32,7 +32,7 @@ function LinearStateSpaceProblem(
     tspan::ttype;
     obs_noise = diagm(ones(size(C,1))),
     observables = nothing,
-    noise = StandardGaussian(size(B, 1)),
+    noise = StandardGaussian(size(u0)),
 ) where {
     Atype<:AbstractArray, 
     Btype<:AbstractArray, 
@@ -71,7 +71,7 @@ end
 function CommonSolve.init(
     prob::LinearStateSpaceProblem, 
     args...; 
-    vectype=identity, 
+    vectype = identity, 
     kwargs...
 )
     return StateSpaceCache(prob, NoiseConditionalFilter(), vectype)
@@ -81,7 +81,7 @@ function CommonSolve.init(
     prob::LinearStateSpaceProblem,
     solver::SciMLBase.SciMLAlgorithm,
     args...;
-    vectype=identity,
+    vectype = identity,
     kwargs...
 ) 
     return StateSpaceCache(prob, solver, vectype)
@@ -91,60 +91,58 @@ function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
     ::NoiseConditionalFilter,
     args...;
-    vectype=identity,
+    vectype = identity,
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype<:Nothing}
     # Preallocate values
-    T = prob.tspan[2]
-    A,B,C = prob.A, prob.B, prob.C
-    L = size(C, 1) # Rows of observations
+    T = prob.tspan[2] - prob.tspan[1] + 1
+    A, B, C = prob.A, prob.B, prob.C
 
     u = vectype(Vector{utype}(undef, T)) # Latent states
     n = vectype(Vector{utype}(undef, T)) # Latent noise
     z = vectype(Vector{utype}(undef, T)) # Observables generated
 
+    # Initialize
     u[1] = prob.u0
-    z[1] = C * u[1] + noise(prob.obs_noise, 1)
-    n[1] = noise(prob.noise, 1)  # This noise term is never used
+    z[1] = C * u[1]
 
-    # Simulate it, homie
     for t in 2:T
-        n[t] = noise(prob.noise, t)
-        u[t] = A * u[t-1] + B * n[t] # Call latent_noise here
-        z[t] = C*u[t] + noise(prob.obs_noise, t)
+        t_n = t - 1 + prob.tspan[1]
+        n[t] = noise(prob.noise, t_n)
+        u[t] = A * u[t - 1] + B * n[t]
+        z[t] = C * u[t]
     end
 
-    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, nothing)
 end
 
 function _solve!(
     prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
     ::NoiseConditionalFilter,
-    args...; 
+    args...;
+    vectype = identity,
     kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype<:AbstractMatrix, utype, ttype, otype}
     # Preallocate values
-    T = prob.tspan[2]
-    A,B,C = prob.A, prob.B, prob.C
-    L = size(C, 1) # Rows of observations
+    T = prob.tspan[2] - prob.tspan[1] + 1
+    A, B, C = prob.A, prob.B, prob.C
 
     u = vectype(Vector{utype}(undef, T)) # Latent states
     n = vectype(Vector{utype}(undef, T)) # Latent noise
     z = vectype(Vector{utype}(undef, T)) # Observables generated
 
+    # Initialize
     u[1] = prob.u0
-    z[1] = C * u[1] + noise(prob.obs_noise, 1)
-    n[1] = noise(prob.noise, 1) # This noise term is never used
-    loglik = 0.0
+    z[1] = C * u[1]
 
-    # Simulate it, homie
+    loglik = 0.0
     for t in 2:T
-        n[t] = noise(prob.noise, t)
-        u[t] = A * u[t-1] + B * n[t] # Call latent_noise here
-        z[t] = C*u[t] + noise(prob.obs_noise, t)
-        err = z[t] - prob.observables[t]
-        loglik += logpdf(MvNormal(R), err)
+        t_n = t - 1 + prob.tspan[1]
+        n[t] = noise(prob.noise, t_n)
+        u[t] = A * u[t - 1] + B * n[t]
+        z[t] = C * u[t]
+        loglik += logpdf(MvNormal(R), z[t] - prob.observables[t_n])
     end
 
-    return StateSpaceSolution(copy(z), copy(u), copy(n), loglik)
+    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, loglik)
 end
