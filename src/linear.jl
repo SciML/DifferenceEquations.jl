@@ -92,8 +92,10 @@ function _solve!(
     A, B, C = prob.A, prob.B, prob.C
 
     u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
-    n = Zygote.Buffer(Vector{utype}(undef, T)) # Latent noise
-    z = Zygote.Buffer(Vector{utype}(undef, T)) # Observables generated
+    n1 = prob.noise[1]
+    n = Zygote.Buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
+    z1 = C * prob.u0
+    z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -120,8 +122,10 @@ function _solve!(
     A, B, C = prob.A, prob.B, prob.C
 
     u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
-    n = Zygote.Buffer(Vector{utype}(undef, T)) # Latent noise
-    z = Zygote.Buffer(Vector{utype}(undef, T)) # Observables generated
+    n1 = prob.noise[1]
+    n = Zygote.Buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
+    z1 = C * prob.u0
+    z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
     # Initialize
     u[1] = prob.u0

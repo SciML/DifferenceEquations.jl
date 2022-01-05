@@ -1,3 +1,4 @@
+# Tests as a downstream of DSSM, taking the solutions there as inputs
 using DifferenceEquations
 using DifferentiableStateSpaceModels
 using Distributions
@@ -39,34 +40,53 @@ simul = @inferred DifferenceEquations.solve(problem, NoiseConditionalFilter())
 # Grab simulated data for the next tests, leave the first one -- the initial condition -- out
 z = simul.z[2:end]
 
-# Now solve using the previous data as observables.
-# Solving this problem also includes a likelihood.
-problem_data = StateSpaceProblem(
-    DifferentiableStateSpaceModels.dssm_evolution,
-    DifferentiableStateSpaceModels.dssm_volatility,
-    DifferentiableStateSpaceModels.dssm_observation,
-    u0,
-    (0, T),
-    sol,
-    obs_noise = sol.D,
-    observables = z,
-    noise = [randn(sol.n_ϵ) for _ in 1:T]
-)
+@testset "General Nonlinear Simulations" begin
+    # Now solve using the previous data as observables.
+    # Solving this problem also includes a likelihood.
+    problem_data = StateSpaceProblem(
+        DifferentiableStateSpaceModels.dssm_evolution,
+        DifferentiableStateSpaceModels.dssm_volatility,
+        DifferentiableStateSpaceModels.dssm_observation,
+        u0,
+        (0, T),
+        sol,
+        obs_noise = sol.D,
+        observables = z,
+        noise = [randn(sol.n_ϵ) for _ in 1:T]
+    )
+    # Generate likelihood.
+    simul_with_likelihood = @inferred DifferenceEquations.solve(problem_data, NoiseConditionalFilter())
+end
 
-# Generate likelihood.
-simul_with_likelihood = @inferred DifferenceEquations.solve(problem_data, NoiseConditionalFilter())
+@testset "Kalman" begin
+    ## Kalman filter test
+    linear_problem = LinearStateSpaceProblem(
+        sol.A,
+        sol.B,
+        sol.C,
+        MvNormal(zeros(eltype(u0), length(u0)), I), # Prior of initial point
+        (0, T),
+        noise = nothing,
+        obs_noise = sol.D,
+        observables = z
+    )
 
-## Kalman filter test
-linear_problem = LinearStateSpaceProblem(
-    sol.A,
-    sol.B,
-    sol.C,
-    MvNormal(zeros(eltype(u0), length(u0)), I),
-    (0, T),
-    noise = nothing,
-    obs_noise = sol.D,
-    observables = z
-)
+    # Solve with Kalman filter
+    simul_kalman_filter = @inferred DifferenceEquations.solve(linear_problem, KalmanFilter())
+end
 
-# Solve with Kalman filter
-simul_kalman_filter = @inferred DifferenceEquations.solve(linear_problem, KalmanFilter())
+@testset "Linear" begin
+    linear_problem = LinearStateSpaceProblem(
+        sol.A,
+        sol.B,
+        sol.C,
+        u0,
+        (0, T),
+        noise = [randn(sol.n_ϵ) for _ in 1:T],
+        obs_noise = sol.D,
+        observables = z
+    )
+
+    # Solve with Kalman filter
+    simul_linear = @inferred DifferenceEquations.solve(linear_problem, NoiseConditionalFilter())
+end
