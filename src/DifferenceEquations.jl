@@ -4,6 +4,7 @@ using Distributions
 using DistributionsAD
 using LinearAlgebra
 using CommonSolve
+using Zygote
 
 import SciMLBase
 import SciMLBase: SciMLProblem, solve
@@ -15,16 +16,14 @@ abstract type AbstractStateSpaceProblem{isinplace} <: DifferenceProblem end
 # Wrapper struct, eventually needs to be a full cache
 struct StateSpaceCache{
     probtype<:AbstractStateSpaceProblem, 
-    solvertype<:SciMLBase.SciMLAlgorithm,
-    vectype
+    solvertype<:SciMLBase.SciMLAlgorithm
 }
     problem::probtype
     solver::solvertype
-    vtype::vectype
 end 
 
 function StateSpaceCache(problem::AbstractStateSpaceProblem, solver::SciMLBase.SciMLAlgorithm)
-    return StateSpaceCache(problem, solver, identity)
+    return StateSpaceCache(problem, solver)
 end
 
 # Unpack the cache. In future, this unwrapping should be eliminated when the cache
@@ -34,7 +33,7 @@ function CommonSolve.solve!(
     args...; 
     kwargs...
 )
-    return _solve!(cache.problem, cache.solver, args...; vectype=cache.vtype, kwargs...)
+    return _solve!(cache.problem, cache.solver, args...; kwargs...)
 end
 
 # Yuck hate this so much
