@@ -87,6 +87,6 @@ end
         observables = z
     )
 
-    # Solve with Kalman filter
+    # Simulate linear AR(1) process
     simul_linear = @inferred DifferenceEquations.solve(linear_problem, NoiseConditionalFilter())
 end
