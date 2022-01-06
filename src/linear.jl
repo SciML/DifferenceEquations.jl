@@ -92,8 +92,6 @@ function _solve!(
     A, B, C = prob.A, prob.B, prob.C
 
     u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
-    n1 = prob.noise[1]
-    n = Zygote.Buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = C * prob.u0
     z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
@@ -103,12 +101,11 @@ function _solve!(
 
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        n[t] = prob.noise[t_n]
-        u[t] = A * u[t - 1] + B * n[t]
+        u[t] = A * u[t - 1] + B * prob.noise[t_n]
         z[t] = C * u[t]
     end
 
-    return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, nothing)
+    return StateSpaceSolution(copy(z), copy(u), prob.noise, nothing, nothing)
 end
 
 function _solve!(
@@ -122,8 +119,6 @@ function _solve!(
     A, B, C = prob.A, prob.B, prob.C
 
     u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
-    n1 = prob.noise[1]
-    n = Zygote.Buffer(Vector{typeof(n1)}(undef, T)) # Latent noise
     z1 = C * prob.u0
     z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
 
@@ -134,8 +129,7 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        n[t] = prob.noise[t_n]
-        u[t] = A * u[t - 1] + B * n[t]
+        u[t] = A * u[t - 1] + B * prob.noise[t_n]
         z[t] = C * u[t]
         loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
     end
