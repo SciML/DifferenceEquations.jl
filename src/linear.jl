@@ -1,7 +1,7 @@
 """
 u(t+1) = A u(t) + B w(t+1)
 z(t) = C u(t)
-z_tilde{t} = z(t) + v(t+1)
+z_tilde(t) = z(t) + v(t+1)
 """
 struct LinearStateSpaceProblem{
     isinplace, 
@@ -101,7 +101,7 @@ function _solve!(
 
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u[t] = A * u[t - 1] + B * prob.noise[t_n]
+        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
         z[t] = C * u[t]
     end
 
@@ -129,7 +129,7 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u[t] = A * u[t - 1] + B * prob.noise[t_n]
+        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
         z[t] = C * u[t]
         loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
     end
