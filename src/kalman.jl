@@ -8,7 +8,7 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = prob.obs_noise.C.U' * prob.obs_noise.C.U # Extract covariance from noise distribution
+    R = Diagonal(abs2.(prob.noise.σ)) # Extract covariance from noise distribution
     B_prod = B * B'
 
     # Gaussian Prior
@@ -41,5 +41,5 @@ function _solve!(
         P[t] -= K * CP_t
     end
 
-    return StateSpaceSolution(copy(z), copy(u), nothing, copy(P), loglik)
+    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end
