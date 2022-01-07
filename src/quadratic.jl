@@ -159,34 +159,6 @@ function _solve!(
     ::NoiseConditionalFilter,
     args...;
     kwargs...
-) where {isinplace, A_0type, A_1type, A_2type, Btype, C_0type, C_1type, C_2type, wtype, Rtype, utype, ttype, otype<:Nothing}
-    # Preallocate values
-    T = prob.tspan[2] - prob.tspan[1] + 1
-    A_0, A_1, A_2, B, C_0, C_1, C_2 = prob.A_0, prob.A_1, prob.A_2, prob.B, prob.C_0, prob.C_1, prob.C_2
-
-    u_f = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
-    u = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
-    z0 = C_0 + C_1 * prob.u0 + quad(C_2, prob.u0)
-    z = Zygote.Buffer(Vector{typeof(z0)}(undef, T))
-    u[1] = prob.u0
-    u_f[1] = prob.u0
-    z[1] = z0
-    
-    for t in 2:T
-        t_n = t - 1 + prob.tspan[1]
-        u_f[t] = A_1 * u_f[t - 1] .+ B * prob.noise[t_n]
-        u[t] = A_0 + A_1 * u[t - 1] + quad(A_2, u_f[t - 1]) .+ B * prob.noise[t_n]
-        z[t] = C_0 + C_1 * u[t] + quad(C_2, u_f[t])
-    end
-
-    return StateSpaceSolution(copy(z), copy(u), prob.noise, nothing, nothing)
-end
-
-function _solve!(
-    prob::QuadraticStateSpaceProblem{isinplace, A_0type, A_1type, A_2type, Btype, C_0type, C_1type, C_2type, wtype, Rtype, utype, ttype, otype}, 
-    ::NoiseConditionalFilter,
-    args...;
-    kwargs...
 ) where {isinplace, A_0type, A_1type, A_2type, Btype, C_0type, C_1type, C_2type, wtype, Rtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
