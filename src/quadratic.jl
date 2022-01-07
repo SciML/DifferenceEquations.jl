@@ -55,13 +55,13 @@ struct QuadraticStateSpaceProblem{
 end
 
 function QuadraticStateSpaceProblem(
-    A_0::A_0type
-    A_1::A_1type
-    A_2::A_2type
-    B::Btype
-    C_0::C_0type
-    C_1::C_1type
-    C_2::C_2type
+    A_0::A_0type,
+    A_1::A_1type,
+    A_2::A_2type,
+    B::Btype,
+    C_0::C_0type,
+    C_1::C_1type,
+    C_2::C_2type,
     u0::utype,
     tspan::ttype;
     obs_noise = (h0 = C_1 * u0; MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
@@ -94,13 +94,13 @@ function QuadraticStateSpaceProblem(
         ttype,
         typeof(observables)
     }(
-        A_0::A_0type
-        A_1::A_1type
-        A_2::A_2type # Evolution matrix
-        B::Btype # Noise matrix
-        C_0::C_0type
-        C_1::C_1type
-        C_2::C_2type # Observation matrix
+        A_0::A_0type,
+        A_1::A_1type,
+        A_2::A_2type, # Evolution matrix
+        B::Btype, # Noise matrix
+        C_0::C_0type,
+        C_1::C_1type,
+        C_2::C_2type, # Observation matrix
         noise, # Latent noise distribution
         obs_noise, # Observation noise matrix
         u0, # Initial condition
