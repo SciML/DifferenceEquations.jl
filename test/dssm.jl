@@ -95,12 +95,6 @@ end
 c = SolverCache(m, Val(2), p_d)
 sol = generate_perturbation(m, p_d, p_f, Val(2); cache = c)
 
-# Timespan to simulate across
-T = 500
-
-# Set initial state
-u0 = zeros(m.n_x)
-
 @testset "Quadratic" begin
     quadratic_problem = QuadraticStateSpaceProblem(
         sol.A_0,
@@ -118,5 +112,5 @@ u0 = zeros(m.n_x)
     )
 
     # Simulate quadratic pruned process
-    simul_linear = solve(quadratic_problem, NoiseConditionalFilter())
+    simul_quadratic = @inferred solve(quadratic_problem, NoiseConditionalFilter())
 end
