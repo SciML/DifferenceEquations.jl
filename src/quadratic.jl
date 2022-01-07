@@ -8,22 +8,21 @@ function quad(A::AbstractArray{<:Number,3}, x)
     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
 end
 
-# Uncomment this after adding CRC as dependency
-# function ChainRulesCore.rrule(::typeof(quad), A::AbstractArray{<:Number,3}, x)
-#     res = quad_DE(A, x)
-#     function quad_pb(Δres)
-#         ΔA = similar(A)
-#         Δx = zeros(length(x))
-#         tmp = x * x'
-#         n = size(A, 1)
-#         for i in 1:n
-#             ΔA[i, :, :] .= tmp .* Δres[i]
-#             Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
-#         end
-#         return NoTangent(), ΔA, Δx
-#     end
-#     return res, quad_pb
-# end
+function ChainRulesCore.rrule(::typeof(quad), A::AbstractArray{<:Number,3}, x)
+    res = quad_DE(A, x)
+    function quad_pb(Δres)
+        ΔA = similar(A)
+        Δx = zeros(length(x))
+        tmp = x * x'
+        n = size(A, 1)
+        for i in 1:n
+            ΔA[i, :, :] .= tmp .* Δres[i]
+            Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
+        end
+        return NoTangent(), ΔA, Δx
+    end
+    return res, quad_pb
+end
 
 struct QuadraticStateSpaceProblem{
     isinplace, 
