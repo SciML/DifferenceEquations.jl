@@ -9,7 +9,7 @@ function quad(A::AbstractArray{<:Number,3}, x)
 end
 
 function ChainRulesCore.rrule(::typeof(quad), A::AbstractArray{<:Number,3}, x)
-    res = quad_DE(A, x)
+    res = quad(A, x)
     function quad_pb(Δres)
         ΔA = similar(A)
         Δx = zeros(length(x))
