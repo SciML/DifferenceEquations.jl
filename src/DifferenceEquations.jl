@@ -55,8 +55,7 @@ export
     NoiseConditionalFilter,
     KalmanFilter,
     LinearStateSpaceProblem,
-    StandardGaussian,
-    DefinedNoise,
+    QuadraticStateSpaceProblem,
     solve
 
 end # module
