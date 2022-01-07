@@ -7,13 +7,14 @@ function _solve!(
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
-    R = cov(prob.obs_noise) # Extract covariance from noise distribution
+    # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
+    R = Diagonal(abs2.(prob.noise.σ)) # Extract covariance from noise distribution
     B_prod = B * B'
 
     # Gaussian Prior
     # u0 has to be a multivariate Normal distribution
-    u0_mean = mean(prob.u0)
-    u0_variance = cov(prob.u0)
+    u0_mean = prob.u0.m
+    u0_variance = prob.u0.C.U' * prob.u0.C.U
 
     u = Zygote.Buffer(Vector{typeof(u0_mean)}(undef, T)) # Mean of Kalman filter inferred latent states
     P = Zygote.Buffer(Vector{Matrix{eltype(u0_mean)}}(undef, T)) # Posterior variance of Kalman filter inferred latent states
@@ -40,5 +41,5 @@ function _solve!(
         P[t] -= K * CP_t
     end
 
-    return StateSpaceSolution(copy(z), copy(u), nothing, copy(P), loglik)
+    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end
