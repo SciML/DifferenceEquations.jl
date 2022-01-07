@@ -1,7 +1,7 @@
 name = "DifferenceEquations"
 uuid = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
 authors = ["Cameron Pfiffer <cameron@pfiffer.org> and contributors"]
-version = "0.4.3"
+version = "0.4.4"
 
 [deps]
 CommonSolve = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
