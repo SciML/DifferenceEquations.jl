@@ -193,8 +193,8 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A_0, A_1, A_2, B, C_0, C_1, C_2 = prob.A_0, prob.A_1, prob.A_2, prob.B, prob.C_0, prob.C_1, prob.C_2
 
-    u_f = Zygote.Buffer(Vector{typeof(u0)}(undef, T))
-    u = Zygote.Buffer(Vector{typeof(u0)}(undef, T))
+    u_f = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
+    u = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
     z0 = C_0 + C_1 * prob.u0 + quad(C_2, prob.u0)
     z = Zygote.Buffer(Vector{typeof(z0)}(undef, T))
     u[1] = prob.u0
