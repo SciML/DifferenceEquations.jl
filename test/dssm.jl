@@ -36,7 +36,7 @@ problem = StateSpaceProblem(
 
 # Solve the model, this generates
 # simulated data.
-simul = @inferred DifferenceEquations.solve(problem, NoiseConditionalFilter())
+simul = DifferenceEquations.solve(problem, NoiseConditionalFilter())
 # Grab simulated data for the next tests, leave the first one -- the initial condition -- out
 z = simul.z[2:end]
 
@@ -55,7 +55,7 @@ z = simul.z[2:end]
         noise = [randn(sol.n_ϵ) for _ in 1:T]
     )
     # Generate likelihood.
-    simul_with_likelihood = @inferred DifferenceEquations.solve(problem_data, NoiseConditionalFilter())
+    simul_with_likelihood = @inferred solve(problem_data, NoiseConditionalFilter())
 end
 
 @testset "Kalman" begin
@@ -72,7 +72,7 @@ end
     )
 
     # Solve with Kalman filter
-    simul_kalman_filter = @inferred DifferenceEquations.solve(linear_problem, KalmanFilter())
+    simul_kalman_filter = @inferred solve(linear_problem, KalmanFilter())
 end
 
 @testset "Linear" begin
@@ -88,5 +88,29 @@ end
     )
 
     # Simulate linear AR(1) process
-    simul_linear = @inferred DifferenceEquations.solve(linear_problem, NoiseConditionalFilter())
+    simul_linear = @inferred solve(linear_problem, NoiseConditionalFilter())
+end
+
+# Second-order preparations
+c = SolverCache(m, Val(2), p_d)
+sol = generate_perturbation(m, p_d, p_f, Val(2); cache = c)
+
+@testset "Quadratic" begin
+    quadratic_problem = QuadraticStateSpaceProblem(
+        sol.A_0,
+        sol.A_1,
+        sol.A_2,
+        sol.B,
+        sol.C_0,
+        sol.C_1,
+        sol.C_2,
+        u0,
+        (0, T),
+        noise = [randn(sol.n_ϵ) for _ in 1:T],
+        obs_noise = sol.D,
+        observables = z
+    )
+
+    # Simulate quadratic pruned process
+    simul_quadratic = @inferred solve(quadratic_problem, NoiseConditionalFilter())
 end

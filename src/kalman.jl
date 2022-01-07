@@ -8,7 +8,7 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = Diagonal(abs2.(prob.noise.σ)) # Extract covariance from noise distribution
+    R = Diagonal(abs2.(prob.obs_noise.σ)) # Extract covariance from noise distribution
     B_prod = B * B'
 
     # Gaussian Prior

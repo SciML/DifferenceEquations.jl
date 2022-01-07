@@ -1,5 +1,6 @@
 module DifferenceEquations
 
+using ChainRulesCore
 using Distributions
 using DistributionsAD
 using LinearAlgebra
@@ -45,6 +46,7 @@ promote_noise(x::AbstractArray, y::AbstractArray) = x, y
 include("noise.jl")
 include("alg.jl")
 include("linear.jl")
+include("quadratic.jl")
 include("solution.jl")
 include("nonlinear.jl")
 include("kalman.jl")
@@ -55,8 +57,7 @@ export
     NoiseConditionalFilter,
     KalmanFilter,
     LinearStateSpaceProblem,
-    StandardGaussian,
-    DefinedNoise,
+    QuadraticStateSpaceProblem,
     solve
 
 end # module
