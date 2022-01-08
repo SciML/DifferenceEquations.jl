@@ -36,7 +36,7 @@ problem = StateSpaceProblem(
 
 # Solve the model, this generates
 # simulated data.
-simul = DifferenceEquations.solve(problem, NoiseConditionalFilter())
+simul = solve(problem, NoiseConditionalFilter())
 # Grab simulated data for the next tests, leave the first one -- the initial condition -- out
 z = simul.z[2:end]
 
