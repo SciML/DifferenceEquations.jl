@@ -118,9 +118,9 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
 
-    u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
+    u = Vector{utype}(undef, T) # Latent states
     z1 = C * prob.u0
-    z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
+    z = Vector{typeof(z1)}(undef, T) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -135,4 +135,60 @@ function _solve!(
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+end
+
+function ChainRulesCore.rrule(::typeof(_solve!),
+    prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
+    ::NoiseConditionalFilter,
+    args...;
+    kwargs...
+) where {isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}
+    # Preallocate values
+    T = prob.tspan[2] - prob.tspan[1] + 1
+    A, B, C = prob.A, prob.B, prob.C
+
+    u = Vector{utype}(undef, T) # Latent states
+    z1 = C * prob.u0
+    z = Vector{typeof(z1)}(undef, T) # Observables generated
+
+    # Initialize
+    u[1] = prob.u0
+    z[1] = C * u[1]
+
+    loglik = 0.0
+    for t in 2:T
+        t_n = t - 1 + prob.tspan[1]
+        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
+        z[t] = C * u[t]
+        loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
+    end
+
+    sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    function solve_pb(Δsol)
+        Δloglik = Δsol.loglikelihood
+        if iszero(Δloglik)
+            return (NoTangent(), Tangent{typeof(prob)}(), map(_ -> NoTangent(), args)...)
+        end
+        ΔA = similar(A)
+        ΔB = similar(B)
+        ΔC = similar(C)
+        Δnoise = similar(noise)
+        Δu = [zero(prob.u0) for _ in 1:T]
+        fill!(ΔA, 0)
+        fill!(ΔB, 0)
+        fill!(ΔC, 0)
+        for t in T:-1:2
+            t_n = t - 1 + prob.tspan[1]
+            Δz = -1 * Δlogpdf * Zygote.gradient(logpdf, prob.obs_noise, prob.observables[t_n] - z[t])[2]
+            Δu[t] += C' * Δz
+            Δu[t - 1] = A' * Δu[t]
+            Δnoise[t_n] = B' * Δu[t]
+            # Now, deal with the coefficients
+            ΔA += Δu[t] * u[t - 1]'
+            ΔB += Δu[t] * prob.noise[t_n]'
+            ΔC += Δz * u[t]'
+        end
+        return (NoTangent(), Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, noise = Δnoise), map(_ -> NoTangent(), args)...)
+    end
+    return sol, solve_pb
 end
