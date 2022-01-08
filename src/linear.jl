@@ -165,8 +165,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
     function solve_pb(Δsol)
-        Δloglik = Δsol.loglikelihood
-        if iszero(Δloglik)
+        Δlogpdf = Δsol.loglikelihood
+        if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), map(_ -> NoTangent(), args)...)
         end
         ΔA = similar(A)
