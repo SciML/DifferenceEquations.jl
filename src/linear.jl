@@ -167,7 +167,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     function solve_pb(Δsol)
         Δlogpdf = Δsol.loglikelihood
         if iszero(Δlogpdf)
-            return (NoTangent(), Tangent{typeof(prob)}(), map(_ -> NoTangent(), args)...)
+            return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(), map(_ -> NoTangent(), args)...)
         end
         ΔA = similar(A)
         ΔB = similar(B)
@@ -188,7 +188,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             ΔB += Δu[t] * prob.noise[t_n]'
             ΔC += Δz * u[t]'
         end
-        return (NoTangent(), Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, noise = Δnoise), map(_ -> NoTangent(), args)...)
+        return (NoTangent(), Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, noise = Δnoise), NoTangent(), map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end
