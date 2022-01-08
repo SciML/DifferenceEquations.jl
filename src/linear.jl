@@ -172,7 +172,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         ΔA = similar(A)
         ΔB = similar(B)
         ΔC = similar(C)
-        Δnoise = similar(noise)
+        Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
         fill!(ΔA, 0)
         fill!(ΔB, 0)
