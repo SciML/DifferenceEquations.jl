@@ -91,9 +91,9 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
 
-    u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
+    u = Vector{utype}(undef, T) # Latent states
     z1 = C * prob.u0
-    z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
+    z = Vector{typeof(z1)}(undef, T) # Observables generated
 
     # Initialize
     u[1] = prob.u0
@@ -169,14 +169,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(), map(_ -> NoTangent(), args)...)
         end
-        ΔA = similar(A)
-        ΔB = similar(B)
-        ΔC = similar(C)
+        ΔA = zero(A)
+        ΔB = zero(B)
+        ΔC = zero(C)
         Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
-        fill!(ΔA, 0)
-        fill!(ΔB, 0)
-        fill!(ΔC, 0)
         for t in T:-1:2
             t_n = t - 1 + prob.tspan[1]
             Δz = -1 * Δlogpdf * Zygote.gradient(logpdf, prob.obs_noise, prob.observables[t_n] - z[t])[2]
