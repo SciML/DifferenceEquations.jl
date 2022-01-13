@@ -36,7 +36,7 @@ end
     @inferred joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D) 
 end
 
-# If you are going to see the speed...
+# If you are going to see the speed of RBC...
 # T = 500
 # observables = [randn(2) for _ in 1:T]
 # noise = [randn(1) for _ in 1:T]
@@ -71,6 +71,7 @@ u0 = zeros(size(A, 1))
 
 @testset "linear FVGQ joint likelihood" begin
     # The likelihood number is huge, so we just test the gradients.
+    # test_rrule(Zygote.ZygoteRuleConfig(), joint_likelihood_1, A, B, C, u0, noise, observables, D; rrule_f = rrule_via_ad, check_inferred = false)
     # Note: test_rrule struggles on D. Hence we only test a subset of the inputs with FiniteDiff
     res = gradient(joint_likelihood_1, A, B, C, u0, noise, observables, D)
     @test finite_difference_gradient(A -> joint_likelihood_1(A, B, C, u0, noise, observables, D), A) ≈ res[1] rtol = 1e-3
@@ -82,6 +83,8 @@ u0 = zeros(size(A, 1))
 end
 
 @testset "linear FVGQ Kalman" begin
+    # Note: set rtol to be higher than the default case because of huge gradient numbers
+    test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A, B, C, u0, observables, D; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
     res = gradient(kalman_likelihood, A, B, C, u0, observables, D)
     @test finite_difference_gradient(A -> kalman_likelihood(A, B, C, u0, observables, D), A) ≈ res[1] rtol = 1e-3
     @test finite_difference_gradient(B -> kalman_likelihood(A, B, C, u0, observables, D), B) ≈ res[2] rtol = 1e-3
