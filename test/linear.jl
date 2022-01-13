@@ -81,4 +81,10 @@ u0 = zeros(size(A, 1))
     @test [noise_grad[i, :] for i in 1:size(noise_raw, 1)] ≈ res[5] rtol = 1e-5
 end
 
-@testset ""
+@testset "linear FVGQ Kalman" begin
+    res = gradient(kalman_likelihood, A, B, C, u0, observables, D)
+    @test finite_difference_gradient(A -> kalman_likelihood(A, B, C, u0, observables, D), A) ≈ res[1] rtol = 1e-3
+    @test finite_difference_gradient(B -> kalman_likelihood(A, B, C, u0, observables, D), B) ≈ res[2] rtol = 1e-3
+    @test finite_difference_gradient(C -> kalman_likelihood(A, B, C, u0, observables, D), C) ≈ res[3] rtol = 1e-3
+    @test finite_difference_gradient(u0 -> kalman_likelihood(A, B, C, u0, observables, D), u0) ≈ res[4] rtol = 1e-3
+end
