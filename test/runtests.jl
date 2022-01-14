@@ -4,9 +4,6 @@ using Distributions
 using LinearAlgebra
 using Random
 
-# At this point, the test here is just checking whether the codes can run, but not to check the validity of the results
-# TODO: add unit tests
-
 @testset "Linear tests" begin
     include("linear.jl")
 end
