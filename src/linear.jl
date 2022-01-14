@@ -4,11 +4,11 @@ z(t) = C u(t)
 z_tilde(t) = z(t) + v(t+1)
 """
 struct LinearStateSpaceProblem{
-    isinplace, 
-    Atype<:AbstractArray, 
-    Btype<:AbstractArray, 
-    Ctype<:AbstractArray, 
-    wtype, 
+    isinplace,
+    Atype<:AbstractArray,
+    Btype<:AbstractArray,
+    Ctype<:AbstractArray,
+    wtype,
     Rtype, # Distributions only
     utype,
     ttype,
@@ -25,8 +25,8 @@ struct LinearStateSpaceProblem{
 end
 
 function LinearStateSpaceProblem(
-    A::Atype, 
-    B::Btype, 
+    A::Atype,
+    B::Btype,
     C::Ctype,
     u0::utype,
     tspan::ttype;
@@ -34,19 +34,19 @@ function LinearStateSpaceProblem(
     observables = nothing,
     noise = nothing,
 ) where {
-    Atype<:AbstractArray, 
-    Btype<:AbstractArray, 
-    Ctype<:AbstractArray, 
+    Atype<:AbstractArray,
+    Btype<:AbstractArray,
+    Ctype<:AbstractArray,
     utype,
     ttype,
 }
-    
+
     return LinearStateSpaceProblem{
-        Val(false), 
-        Atype, 
-        Btype, 
-        Ctype, 
-        typeof(noise), 
+        Val(false),
+        Atype,
+        Btype,
+        Ctype,
+        typeof(noise),
         typeof(obs_noise),
         utype,
         ttype,
@@ -65,8 +65,8 @@ end
 
 # Default is NoiseConditionalFilter
 function CommonSolve.init(
-    prob::LinearStateSpaceProblem, 
-    args...; 
+    prob::LinearStateSpaceProblem,
+    args...;
     kwargs...
 )
     return StateSpaceCache(prob, NoiseConditionalFilter())
@@ -77,39 +77,12 @@ function CommonSolve.init(
     solver::SciMLBase.SciMLAlgorithm,
     args...;
     kwargs...
-) 
+)
     return StateSpaceCache(prob, solver)
 end
 
 function _solve!(
-    prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
-    ::NoiseConditionalFilter,
-    args...;
-    kwargs...
-) where {isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype<:Nothing}
-    # Preallocate values
-    T = prob.tspan[2] - prob.tspan[1] + 1
-    A, B, C = prob.A, prob.B, prob.C
-
-    u = Vector{utype}(undef, T) # Latent states
-    z1 = C * prob.u0
-    z = Vector{typeof(z1)}(undef, T) # Observables generated
-
-    # Initialize
-    u[1] = prob.u0
-    z[1] = C * u[1]
-
-    for t in 2:T
-        t_n = t - 1 + prob.tspan[1]
-        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
-        z[t] = C * u[t]
-    end
-
-    return StateSpaceSolution(copy(z), copy(u), prob.noise, nothing, nothing)
-end
-
-function _solve!(
-    prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
+    prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype},
     ::NoiseConditionalFilter,
     args...;
     kwargs...
@@ -129,16 +102,16 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
+        u[t] = A * u[t - 1] .+ B * prob.noise[:, t_n]
         z[t] = C * u[t]
-        loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
+        loglik += logpdf(prob.obs_noise, prob.observables[:, t_n] - z[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
-    prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
+    prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype},
     ::NoiseConditionalFilter,
     args...;
     kwargs...
