@@ -11,19 +11,17 @@ u0_rbc = zeros(2)
 
 path = joinpath(pkgdir(DifferenceEquations), "test", "data")
 file_prefix = "RBC"
-observables_raw = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_observables.csv"); header = false)))
-noise_raw = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_noise.csv"); header = false)))
-observables = [observables_raw[i, :] for i in 1:size(observables_raw, 1)]
-noise = [noise_raw[i, :] for i in 1:size(noise_raw, 1)]
+observables = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_observables.csv"); header = false)))')
+noise = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_noise.csv"); header = false)))')
 
 # Data and Noise
 T = 5
-observables_rbc = observables[1:T]
-noise_rbc = noise[1:T]
+observables_rbc = observables[:, 1:T]
+noise_rbc = noise[:, 1:T]
 
 # joint case
 function joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, length(noise)); obs_noise = TuringDiagMvNormal(zeros(length(D)), D), noise, observables)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2)); obs_noise = TuringDiagMvNormal(zeros(length(D)), D), noise, observables)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
 
@@ -39,7 +37,7 @@ end
 
 # Kalman only
 function kalman_likelihood(A, B, C, u0, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, TuringDenseMvNormal(zeros(length(u0)), cholesky(diagm(ones(length(u0))))), (0, length(observables)); noise = nothing, obs_noise = TuringDiagMvNormal(zeros(length(D)), D), observables)
+    problem = LinearStateSpaceProblem(A, B, C, TuringDenseMvNormal(zeros(length(u0)), cholesky(diagm(ones(length(u0))))), (0, size(observables, 2)); noise = nothing, obs_noise = TuringDiagMvNormal(zeros(length(D)), D), observables)
     return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
 end
 
@@ -57,10 +55,8 @@ B = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_B.csv"); header = f
 C = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_C.csv"); header = false)))
 # D_raw = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_D.csv"); header = false)))
 D = ones(6) * 1e-3
-observables_raw = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_observables.csv"); header = false)))
-noise_raw = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_noise.csv"); header = false)))
-observables = [observables_raw[i, :] for i in 1:size(observables_raw, 1)]
-noise = [noise_raw[i, :] for i in 1:size(noise_raw, 1)]
+observables = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_observables.csv"); header = false)))')
+noise = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_noise.csv"); header = false)))')
 u0 = zeros(size(A, 1))
 
 @testset "linear FVGQ joint likelihood" begin
@@ -72,8 +68,7 @@ u0 = zeros(size(A, 1))
     @test finite_difference_gradient(B -> joint_likelihood_1(A, B, C, u0, noise, observables, D), B) ≈ res[2] rtol = 1e-3
     @test finite_difference_gradient(C -> joint_likelihood_1(A, B, C, u0, noise, observables, D), C) ≈ res[3] rtol = 1e-3
     @test finite_difference_gradient(u0 -> joint_likelihood_1(A, B, C, u0, noise, observables, D), u0) ≈ res[4] rtol = 1e-3
-    noise_grad = finite_difference_gradient(noise_mat -> joint_likelihood_1(A, B, C, u0, [noise_mat[i, :] for i in 1:size(noise_mat, 1)], observables, D), noise_raw)
-    @test [noise_grad[i, :] for i in 1:size(noise_raw, 1)] ≈ res[5] rtol = 1e-5
+    @test finite_difference_gradient(noise -> joint_likelihood_1(A, B, C, u0, noise, observables, D), noise) ≈ res[5] rtol = 1e-5
 end
 
 @testset "linear FVGQ Kalman" begin

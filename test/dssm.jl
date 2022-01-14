@@ -1,4 +1,5 @@
 # Tests as a downstream of DSSM, taking the solutions there as inputs
+# This file will be obsolete when we move all the tests to linear.jl and quadratic.jl
 using DifferenceEquations
 using DifferentiableStateSpaceModels
 using Distributions
