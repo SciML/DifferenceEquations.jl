@@ -86,33 +86,6 @@ function _solve!(
     ::NoiseConditionalFilter,
     args...;
     kwargs...
-) where {isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype<:Nothing}
-    # Preallocate values
-    T = prob.tspan[2] - prob.tspan[1] + 1
-    A, B, C = prob.A, prob.B, prob.C
-
-    u = Zygote.Buffer(Vector{utype}(undef, T)) # Latent states
-    z1 = C * prob.u0
-    z = Zygote.Buffer(Vector{typeof(z1)}(undef, T)) # Observables generated
-
-    # Initialize
-    u[1] = prob.u0
-    z[1] = C * u[1]
-
-    for t in 2:T
-        t_n = t - 1 + prob.tspan[1]
-        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
-        z[t] = C * u[t]
-    end
-
-    return StateSpaceSolution(copy(z), copy(u), prob.noise, nothing, nothing)
-end
-
-function _solve!(
-    prob::LinearStateSpaceProblem{isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}, 
-    ::NoiseConditionalFilter,
-    args...;
-    kwargs...
 ) where {isinplace, Atype, Btype, Ctype, wtype, Rtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
@@ -129,9 +102,9 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
+        u[t] = A * u[t - 1] .+ B * prob.noise[:, t_n]
         z[t] = C * u[t]
-        loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
+        loglik += logpdf(prob.obs_noise, prob.observables[:, t_n] - z[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
