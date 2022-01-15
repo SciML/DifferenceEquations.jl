@@ -196,7 +196,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δu_f = [zero(prob.u0) for _ in 1:T]
         for t in T:-1:2
             t_n = t - 1 + prob.tspan[1]
-            Δz = Δlogpdf * (prob.observables[:, t_n] - z[t]) ./ abs2.(prob.obs_noise.σ)
+            Δz = Δlogpdf * (prob.observables[:, t_n] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
             tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
             Δu[t] += C_1' * Δz
             Δu_f[t] += tmp2
