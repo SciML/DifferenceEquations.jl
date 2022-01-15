@@ -8,20 +8,15 @@ function quad(A::AbstractArray{<:Number,3}, x)
     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
 end
 
-function ChainRulesCore.rrule(::typeof(quad), A::AbstractArray{<:Number,3}, x)
-    res = quad(A, x)
-    function quad_pb(Δres)
-        ΔA = similar(A)
-        Δx = zeros(length(x))
-        tmp = x * x'
-        n = size(A, 1)
-        for i in 1:n
-            ΔA[i, :, :] .= tmp .* Δres[i]
-            Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
-        end
-        return NoTangent(), ΔA, Δx
+function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::AbstractVector)
+    ΔA = similar(A)
+    Δx = zeros(length(x))
+    tmp = x * x'
+    for i in 1:size(A, 1)
+        ΔA[i, :, :] .= tmp .* Δres[i]
+        Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
     end
-    return res, quad_pb
+    return ΔA, Δx
 end
 
 struct QuadraticStateSpaceProblem{
@@ -131,30 +126,32 @@ function _solve!(
     ::NoiseConditionalFilter,
     args...;
     kwargs...
-) where {isinplace, A_0type, A_1type, A_2type, Btype, C_0type, C_1type, C_2type, wtype, Rtype, utype, ttype, otype<:Nothing}
+) where {isinplace, A_0type, A_1type, A_2type, Btype, C_0type, C_1type, C_2type, wtype, Rtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     A_0, A_1, A_2, B, C_0, C_1, C_2 = prob.A_0, prob.A_1, prob.A_2, prob.B, prob.C_0, prob.C_1, prob.C_2
 
-    u_f = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
-    u = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
+    u_f = Vector{typeof(prob.u0)}(undef, T)
+    u = Vector{typeof(prob.u0)}(undef, T)
     z0 = C_0 + C_1 * prob.u0 + quad(C_2, prob.u0)
-    z = Zygote.Buffer(Vector{typeof(z0)}(undef, T))
+    z = Vector{typeof(z0)}(undef, T)
     u[1] = prob.u0
     u_f[1] = prob.u0
     z[1] = z0
     
+    loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u_f[t] = A_1 * u_f[t - 1] .+ B * prob.noise[t_n]
-        u[t] = A_0 + A_1 * u[t - 1] + quad(A_2, u_f[t - 1]) .+ B * prob.noise[t_n]
+        u_f[t] = A_1 * u_f[t - 1] .+ B * prob.noise[:, t_n]
+        u[t] = A_0 + A_1 * u[t - 1] + quad(A_2, u_f[t - 1]) .+ B * prob.noise[:, t_n]
         z[t] = C_0 + C_1 * u[t] + quad(C_2, u_f[t])
+        loglik += logpdf(prob.obs_noise, prob.observables[:, t_n] - z[t])
     end
 
-    return StateSpaceSolution(copy(z), copy(u), prob.noise, nothing, nothing)
+    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end
 
-function _solve!(
+function ChainRulesCore.rrule(::typeof(_solve!),
     prob::QuadraticStateSpaceProblem{isinplace, A_0type, A_1type, A_2type, Btype, C_0type, C_1type, C_2type, wtype, Rtype, utype, ttype, otype}, 
     ::NoiseConditionalFilter,
     args...;
@@ -164,10 +161,10 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A_0, A_1, A_2, B, C_0, C_1, C_2 = prob.A_0, prob.A_1, prob.A_2, prob.B, prob.C_0, prob.C_1, prob.C_2
 
-    u_f = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
-    u = Zygote.Buffer(Vector{typeof(prob.u0)}(undef, T))
+    u_f = Vector{typeof(prob.u0)}(undef, T)
+    u = Vector{typeof(prob.u0)}(undef, T)
     z0 = C_0 + C_1 * prob.u0 + quad(C_2, prob.u0)
-    z = Zygote.Buffer(Vector{typeof(z0)}(undef, T))
+    z = Vector{typeof(z0)}(undef, T)
     u[1] = prob.u0
     u_f[1] = prob.u0
     z[1] = z0
@@ -175,11 +172,48 @@ function _solve!(
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u_f[t] = A_1 * u_f[t - 1] .+ B * prob.noise[t_n]
-        u[t] = A_0 + A_1 * u[t - 1] + quad(A_2, u_f[t - 1]) .+ B * prob.noise[t_n]
+        u_f[t] = A_1 * u_f[t - 1] .+ B * prob.noise[:, t_n]
+        u[t] = A_0 + A_1 * u[t - 1] + quad(A_2, u_f[t - 1]) .+ B * prob.noise[:, t_n]
         z[t] = C_0 + C_1 * u[t] + quad(C_2, u_f[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
+       loglik += logpdf(prob.obs_noise, prob.observables[:, t_n] - z[t])
     end
+    sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 
-    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    function solve_pb(Δsol)
+        Δlogpdf = Δsol.loglikelihood
+        if iszero(Δlogpdf)
+            return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(), map(_ -> NoTangent(), args)...)
+        end
+        ΔA_0 = zero(A_0)
+        ΔA_1 = zero(A_1)
+        ΔA_2 = zero(A_2)
+        ΔB = zero(B)
+        ΔC_0 = zero(C_0)
+        ΔC_1 = zero(C_1)
+        ΔC_2 = zero(C_2)
+        Δnoise = similar(prob.noise)
+        Δu = [zero(prob.u0) for _ in 1:T]
+        Δu_f = [zero(prob.u0) for _ in 1:T]
+        for t in T:-1:2
+            t_n = t - 1 + prob.tspan[1]
+            Δz = Δlogpdf * (prob.observables[:, t_n] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
+            Δu[t] += C_1' * Δz
+            Δu_f[t] += tmp2
+            tmp3, tmp4 = quad_pb(Δu[t], A_2, u_f[t - 1])
+            Δu[t - 1] = A_1' * Δu[t]
+            Δu_f[t - 1] = A_1' * Δu_f[t] + tmp4
+            Δnoise[t_n] = B' * (Δu[t] .+ Δu_f[t])
+            # Now, deal with the coefficients
+            ΔA_0 += Δu[t]
+            ΔA_1 += Δu[t] * u[t - 1]' + Δu_f[t] * u_f[t - 1]'
+            ΔA_2 += tmp3
+            ΔB += (Δu[t] + Δu_f[t]) * prob.noise[:, t_n]'
+            ΔC_0 += Δz
+            ΔC_1 += Δz * u[t]'
+            ΔC_2 += tmp1
+        end
+        return (NoTangent(), Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB, C_0 = ΔC_0, C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1], noise = Δnoise), NoTangent(), map(_ -> NoTangent(), args)...)
+    end
+    return sol, solve_pb
 end

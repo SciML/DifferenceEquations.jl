@@ -28,7 +28,10 @@ end
 @testset "linear rbc joint likelihood" begin
     @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈ -690.9407412360038
     @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
-    test_rrule(Zygote.ZygoteRuleConfig(), joint_likelihood_1, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+    # We only test A, B, C, and noise
+    f = (A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) -> joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+    @test f(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) ≈ -690.9407412360038
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
     # Redundant struct on those matrices
     x = (; A = A_rbc, B = B_rbc, C = C_rbc, u0 = u0_rbc, noise = noise_rbc, observables = observables_rbc, D = D_rbc)
     @test joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D) ≈ -690.9407412360038
@@ -60,20 +63,16 @@ noise = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_noise.c
 u0 = zeros(size(A, 1))
 
 @testset "linear FVGQ joint likelihood" begin
-    # The likelihood number is huge, so we just test the gradients.
-    # test_rrule(Zygote.ZygoteRuleConfig(), joint_likelihood_1, A, B, C, u0, noise, observables, D; rrule_f = rrule_via_ad, check_inferred = false)
-    # Note: test_rrule struggles on D. Hence we only test a subset of the inputs with FiniteDiff
-    res = gradient(joint_likelihood_1, A, B, C, u0, noise, observables, D)
-    @test finite_difference_gradient(A -> joint_likelihood_1(A, B, C, u0, noise, observables, D), A) ≈ res[1] rtol = 1e-3
-    @test finite_difference_gradient(B -> joint_likelihood_1(A, B, C, u0, noise, observables, D), B) ≈ res[2] rtol = 1e-3
-    @test finite_difference_gradient(C -> joint_likelihood_1(A, B, C, u0, noise, observables, D), C) ≈ res[3] rtol = 1e-3
-    @test finite_difference_gradient(u0 -> joint_likelihood_1(A, B, C, u0, noise, observables, D), u0) ≈ res[4] rtol = 1e-3
-    @test finite_difference_gradient(noise -> joint_likelihood_1(A, B, C, u0, noise, observables, D), noise) ≈ res[5] rtol = 1e-5
+    @test joint_likelihood_1(A, B, C, u0, noise, observables, D) ≈ -1.4648817357717388e9
+    @inferred joint_likelihood_1(A, B, C, u0, noise, observables, D)
+    f = (A, B, C, u0, noise) -> joint_likelihood_1(A, B, C, u0, noise, observables, D)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0, noise; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
 @testset "linear FVGQ Kalman" begin
     # Note: set rtol to be higher than the default case because of huge gradient numbers
-    test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A, B, C, u0, observables, D; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
+    @test kalman_likelihood(A, B, C, u0, observables, D) ≈ -108.52706300389917
+    # test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A, B, C, u0, observables, D; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
     # res = gradient(kalman_likelihood, A, B, C, u0, observables, D)
     # @test finite_difference_gradient(A -> kalman_likelihood(A, B, C, u0, observables, D), A) ≈ res[1] rtol = 1e-3
     # @test finite_difference_gradient(B -> kalman_likelihood(A, B, C, u0, observables, D), B) ≈ res[2] rtol = 1e-3
