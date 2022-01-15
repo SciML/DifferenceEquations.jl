@@ -65,8 +65,8 @@ u0 = zeros(size(A, 1))
 @testset "linear FVGQ joint likelihood" begin
     @test joint_likelihood_1(A, B, C, u0, noise, observables, D) ≈ -1.4648817357717388e9
     @inferred joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    f = (A, B, C, noise) -> joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, noise; rrule_f = rrule_via_ad, check_inferred = false)
+    f = (A, B, C, u0, noise) -> joint_likelihood_1(A, B, C, u0, noise, observables, D)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0, noise; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
 @testset "linear FVGQ Kalman" begin
