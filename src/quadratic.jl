@@ -203,7 +203,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             tmp3, tmp4 = quad_pb(Δu[t], A_2, u_f[t - 1])
             Δu[t - 1] = A_1' * Δu[t]
             Δu_f[t - 1] = A_1' * Δu_f[t] + tmp4
-            Δnoise[t_n] = B' * (Δu[t] .+ Δu_f[t])
+            Δnoise[:, t_n] = B' * (Δu[t] .+ Δu_f[t])
             # Now, deal with the coefficients
             ΔA_0 += Δu[t]
             ΔA_1 += Δu[t] * u[t - 1]' + Δu_f[t] * u_f[t - 1]'
