@@ -29,9 +29,9 @@ end
     @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈ -690.9407412360038
     @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
     # We only test A, B, C, and noise
-    f = (A_rbc, B_rbc, C_rbc, noise_rbc) -> joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
-    @test f(A_rbc, B_rbc, C_rbc, noise_rbc) ≈ -690.9407412360038
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+    f = (A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) -> joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+    @test f(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) ≈ -690.9407412360038
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
     # Redundant struct on those matrices
     x = (; A = A_rbc, B = B_rbc, C = C_rbc, u0 = u0_rbc, noise = noise_rbc, observables = observables_rbc, D = D_rbc)
     @test joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D) ≈ -690.9407412360038
