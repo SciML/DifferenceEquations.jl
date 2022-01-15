@@ -149,7 +149,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δu = [zero(prob.u0) for _ in 1:T]
         for t in T:-1:2
             t_n = t - 1 + prob.tspan[1]
-            Δz = -1 * Δlogpdf * Zygote.gradient(logpdf, prob.obs_noise, prob.observables[:, t_n] - z[t])[2]
+            Δz = Δlogpdf * (prob.observables[:, t_n] - z[t]) ./ abs2.(prob.obs_noise.σ)
             Δu[t] += C' * Δz
             Δu[t - 1] = A' * Δu[t]
             Δnoise[:, t_n] = B' * Δu[t]

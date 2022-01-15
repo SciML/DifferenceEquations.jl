@@ -71,7 +71,7 @@ end
 
 @testset "linear FVGQ Kalman" begin
     # Note: set rtol to be higher than the default case because of huge gradient numbers
-    @test kalman_likelihood(A, B, C, u0, observables, D) = -108.52706300389917
+    @test kalman_likelihood(A, B, C, u0, observables, D) ≈ -108.52706300389917
     # test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A, B, C, u0, observables, D; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
     # res = gradient(kalman_likelihood, A, B, C, u0, observables, D)
     # @test finite_difference_gradient(A -> kalman_likelihood(A, B, C, u0, observables, D), A) ≈ res[1] rtol = 1e-3
