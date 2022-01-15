@@ -131,9 +131,9 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     loglik = 0.0
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u[t] = A * u[t - 1] .+ B * prob.noise[t_n]
+        u[t] = A * u[t - 1] .+ B * prob.noise[:, t_n]
         z[t] = C * u[t]
-        loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
+        loglik += logpdf(prob.obs_noise, prob.observables[:, t_n] - z[t])
     end
 
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -149,13 +149,13 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δu = [zero(prob.u0) for _ in 1:T]
         for t in T:-1:2
             t_n = t - 1 + prob.tspan[1]
-            Δz = -1 * Δlogpdf * Zygote.gradient(logpdf, prob.obs_noise, prob.observables[t_n] - z[t])[2]
+            Δz = -1 * Δlogpdf * Zygote.gradient(logpdf, prob.obs_noise, prob.observables[:, t_n] - z[t])[2]
             Δu[t] += C' * Δz
             Δu[t - 1] = A' * Δu[t]
-            Δnoise[t_n] = B' * Δu[t]
+            Δnoise[:, t_n] = B' * Δu[t]
             # Now, deal with the coefficients
             ΔA += Δu[t] * u[t - 1]'
-            ΔB += Δu[t] * prob.noise[t_n]'
+            ΔB += Δu[t] * prob.noise[:, t_n]'
             ΔC += Δz * u[t]'
         end
         return (NoTangent(), Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, noise = Δnoise), NoTangent(), map(_ -> NoTangent(), args)...)
