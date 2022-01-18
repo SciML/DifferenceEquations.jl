@@ -15,5 +15,6 @@ BenchmarkTools.DEFAULT_PARAMETERS.evals = 5
 # Benchmark groups
 const SUITE = BenchmarkGroup()
 SUITE["linear"] = include(pkgdir(DifferenceEquations) * "/benchmark/linear.jl")
+SUITE["quadratic"] = include(pkgdir(DifferenceEquations) * "/benchmark/quadratic.jl")
 
 # results = run(SUITE; verbose = true)

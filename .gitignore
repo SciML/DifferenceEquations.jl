@@ -1,5 +1,5 @@
 Manifest.toml
 .vscode/
 *.code-workspace
-benchmark/tune.json
-benchmark/baseline.json
+/.benchmarkci
+/benchmark/*.json
