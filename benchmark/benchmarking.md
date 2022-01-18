@@ -3,13 +3,29 @@
 
 ## Setup
 One time setup:
-1. First, setup your environment for [VS Code](https://julia.quantecon.org/software_engineering/tools_editors.html), [github](https://julia.quantecon.org/software_engineering/version_control.html) and [unit testing](https://julia.quantecon.org/software_engineering/testing.html).
-2. In your global environment, (i.e. start julia without `--project` or use `]activate` to deactivate the current project) add in
-   ```julia
-   ] add BenchmarkTools Infiltrator TestEnv PkgBenchmark
-   ```
-## Benchmarking
-This assumes you are running the repository in VS Code (and hence have the project file activated).  If not, then you will need to activate it accordingly (e.g. `--project` when running Julia).
+1. Setup your environment for [VS Code](https://julia.quantecon.org/software_engineering/tools_editors.html), [github](https://julia.quantecon.org/software_engineering/version_control.html) and [unit testing](https://julia.quantecon.org/software_engineering/testing.html).
+2. First start up a Julia repl in vscode this project
+3. Activate the global environment with `] activate` instead of the project environment
+4. Add in global packages for debugging and benchmarking
+```julia
+] add BenchmarkTools Infiltrator TestEnv PkgBenchmark
+```
+5. Activate the benchmarking project
+```julia
+] activate benchmark
+```
+6. Connect it the current version of the DifferenceEquations package,
+```julia
+] dev .
+```
+7. Instantiate all benchmarking dependencies,
+```julia
+] instantiate
+```
+# Benchmarking
+This assumes you are running as a package in VS Code.  If not, then you will need to activate project files more carefulluy.
+
+Or start julia in the `DifferenceEquations/benchmark` folder with the  `--project`  CLI argument.
 
 ### Running the Full Benchmarks
 In your terminal
