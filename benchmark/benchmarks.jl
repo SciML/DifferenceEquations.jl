@@ -9,11 +9,11 @@ end
 
 println("Running Testsuite with Threads.nthreads() = $(Threads.nthreads()) BLAS.vendor = $(BLAS.vendor()), and BLAS.num_threads = $(BLAS.get_num_threads()) \n")
 
-# Setting miniumum number of evalations to avoid compilation
-BenchmarkTools.DEFAULT_PARAMETERS.evals = 5
-
 # Benchmark groups
+BenchmarkTools.DEFAULT_PARAMETERS.seconds = 10.0 # 10 seconds per benchmark by default.
+
 const SUITE = BenchmarkGroup()
 SUITE["linear"] = include(pkgdir(DifferenceEquations) * "/benchmark/linear.jl")
+SUITE["quadratic"] = include(pkgdir(DifferenceEquations) * "/benchmark/quadratic.jl")
 
 # results = run(SUITE; verbose = true)
