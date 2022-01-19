@@ -57,8 +57,11 @@ function kalman_likelihood(A, B, C, u0, observables, D)
 end
 
 # RBC sized specific tests
-# Verifying code prior to benchmark
-joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+# executing gradients once to avoid compilation time in benchmarking
+gradient(joint_likelihood_1, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+gradient(kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
+gradient(joint_likelihood_1, A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ)
+gradient(kalman_likelihood, A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, D_FVGQ)
 
 const LINEAR["rbc"] = BenchmarkGroup()
 const LINEAR["rbc"]["joint_1"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc, $u0_rbc,
