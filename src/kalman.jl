@@ -125,10 +125,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             ΔP_mid += C' * ΔV * C
             ΔC += Δz * u_mid[t]'
             Δu_mid += C' * Δz
-            ΔA += (ΔP_mid + ΔP_mid') * A * P_mid[t]
+            ΔA += (ΔP_mid + ΔP_mid') * A * P[t - 1]
             ΔP = A' * ΔP_mid * A # pass into next period
             ΔB += (ΔP_mid + ΔP_mid') * B
-            ΔA += Δu_mid * u_mid[t]'
+            ΔA += Δu_mid * u[t - 1]'
             Δu = A' * Δu_mid
         end
         return (NoTangent(), Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC), NoTangent(), map(_ -> NoTangent(), args)...)
