@@ -47,7 +47,9 @@ end
 @testset "linear rbc kalman likelihood" begin
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈ -607.3698273765538
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
-    test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+    # test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+    f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
 # Load FVGQ data for checks
