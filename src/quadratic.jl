@@ -8,6 +8,18 @@ function quad(A::AbstractArray{<:Number,3}, x)
     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
 end
 
+# y += quad(A, x)
+function quad_muladd!(y, A::AbstractArray{<:Number,3}, x)
+    # @inbounds for j in 1:size(A,1)
+    #     y[j] .+= dot(x, view(A, j, :, :), x)
+    # end
+    temp = quad(A, x)
+    y .+= temp
+    nothing
+end
+
+
+# quadratic form with inplace addition
 function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::AbstractVector)
     ΔA = similar(A)
     Δx = zeros(length(x))
@@ -129,22 +141,32 @@ function _solve!(
 ) where {isinplace, A_0type, A_1type, A_2type, Btype, C_0type, C_1type, C_2type, wtype, Rtype, utype, ttype, otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
-    A_0, A_1, A_2, B, C_0, C_1, C_2 = prob.A_0, prob.A_1, prob.A_2, prob.B, prob.C_0, prob.C_1, prob.C_2
+    @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
-    u_f = Vector{typeof(prob.u0)}(undef, T)
-    u = Vector{typeof(prob.u0)}(undef, T)
-    z0 = C_0 + C_1 * prob.u0 + quad(C_2, prob.u0)
-    z = Vector{typeof(z0)}(undef, T)
-    u[1] = prob.u0
-    u_f[1] = prob.u0
-    z[1] = z0
+    u_f = [zero(prob.u0) for _ in 1:T]  # TODO: move to internal algorithm cache
+    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
+    z = [zero(C_0) for _ in 1:T] # TODO: move to internal algorithm cache
+
+    @! u[1] .= prob.u0
+    @! u_f[1] .= prob.u0
+    @! z[1]  .= C_0
+    mul!(z[1], C_1, prob.u0, 1, 1)
+    quad_muladd!(z[1], C_2, prob.u0) #z0 .+= quad(C_2, prob.u0)
     
     loglik = 0.0
-    for t in 2:T
+    @inbounds @views for t in 2:T
         t_n = t - 1 + prob.tspan[1]
-        u_f[t] = A_1 * u_f[t - 1] .+ B * prob.noise[:, t_n]
-        u[t] = A_0 + A_1 * u[t - 1] + quad(A_2, u_f[t - 1]) .+ B * prob.noise[:, t_n]
-        z[t] = C_0 + C_1 * u[t] + quad(C_2, u_f[t])
+        mul!(u_f[t], A_1, u_f[t - 1])
+        mul!(u_f[t], B, prob.noise[:, t_n], 1, 1)
+
+        u[t] .= A_0
+        mul!(u[t], A_1, u[t - 1], 1, 1)
+        quad_muladd!(u[t], A_2, u_f[t-1]) # u[t] .+= quad(A_2, u_f[t - 1])
+        mul!(u[t], B,  prob.noise[:, t_n], 1, 1)
+        
+        z[t] .= C_0
+        mul!(z[t], C_1, u[t], 1, 1)
+        quad_muladd!(z[t], C_2, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
         loglik += logpdf(prob.obs_noise, prob.observables[:, t_n] - z[t])
     end
 
@@ -198,11 +220,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             t_n = t - 1 + prob.tspan[1]
             Δz = Δlogpdf * (prob.observables[:, t_n] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
             tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
-            Δu[t] += C_1' * Δz
-            Δu_f[t] += tmp2
+            Δu[t] .+= C_1' * Δz
+            Δu_f[t] .+= tmp2
             tmp3, tmp4 = quad_pb(Δu[t], A_2, u_f[t - 1])
-            Δu[t - 1] = A_1' * Δu[t]
-            Δu_f[t - 1] = A_1' * Δu_f[t] + tmp4
+            Δu[t - 1] .= A_1' * Δu[t]
+            Δu_f[t - 1] .= A_1' * Δu_f[t] + tmp4
             Δnoise[:, t_n] = B' * (Δu[t] .+ Δu_f[t])
             # Now, deal with the coefficients
             ΔA_0 += Δu[t]
