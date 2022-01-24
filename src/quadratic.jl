@@ -9,13 +9,12 @@ function quad(A::AbstractArray{<:Number,3}, x)
 end
 
 # y += quad(A, x)
-function quad_muladd!(y, A::AbstractArray{<:Number,3}, x)
-    # @inbounds for j in 1:size(A,1)
-    #     y[j] .+= dot(x, view(A, j, :, :), x)
-    # end
-    temp = quad(A, x)
-    y .+= temp
-    nothing
+# The quad_muladd! uses on a vector of matrices for A
+function quad_muladd!(y, A, x)
+    @inbounds for j in 1:size(A,1)
+        @views y[j] += dot(x, A[j], x)
+    end
+    return y
 end
 
 
@@ -143,15 +142,19 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
+    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)] # should be the native datastructure
+    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)] 
+
+
     u_f = [zero(prob.u0) for _ in 1:T]  # TODO: move to internal algorithm cache
     u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
     z = [zero(C_0) for _ in 1:T] # TODO: move to internal algorithm cache
 
-    @! u[1] .= prob.u0
-    @! u_f[1] .= prob.u0
-    @! z[1]  .= C_0
+    u[1] .= prob.u0
+    u_f[1] .= prob.u0
+    z[1]  .= C_0
     mul!(z[1], C_1, prob.u0, 1, 1)
-    quad_muladd!(z[1], C_2, prob.u0) #z0 .+= quad(C_2, prob.u0)
+    quad_muladd!(z[1], C_2_vec, prob.u0) #z0 .+= quad(C_2, prob.u0)
     
     loglik = 0.0
     @inbounds @views for t in 2:T
@@ -161,12 +164,12 @@ function _solve!(
 
         u[t] .= A_0
         mul!(u[t], A_1, u[t - 1], 1, 1)
-        quad_muladd!(u[t], A_2, u_f[t-1]) # u[t] .+= quad(A_2, u_f[t - 1])
+        quad_muladd!(u[t], A_2_vec, u_f[t-1]) # u[t] .+= quad(A_2, u_f[t - 1])
         mul!(u[t], B,  prob.noise[:, t_n], 1, 1)
         
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
-        quad_muladd!(z[t], C_2, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
+        quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
         loglik += logpdf(prob.obs_noise, prob.observables[:, t_n] - z[t])
     end
 

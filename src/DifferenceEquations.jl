@@ -8,7 +8,6 @@ using CommonSolve
 using Zygote
 using LoopVectorization
 using Parameters
-using BangBang
 
 import SciMLBase
 import SciMLBase: SciMLProblem, solve
