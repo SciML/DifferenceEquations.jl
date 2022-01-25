@@ -186,27 +186,28 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         end
         ΔA_0 = zero(A_0)
         ΔA_1 = zero(A_1)
+        ΔA_2_vec = [zero(A) for A in A_2_vec] # should be native datastructure
         ΔA_2 = zero(A_2)
+
         ΔB = zero(B)
         ΔC_0 = zero(C_0)
         ΔC_1 = zero(C_1)
+        ΔC_2_vec = [zero(A) for A in C_2_vec] # should be native datastructure
         ΔC_2 = zero(C_2)
+
         Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
         Δu_f = [zero(prob.u0) for _ in 1:T]
         Δu_f_temp = [zero(prob.u0) for _ in 1:T]
-        ΔA_2_vec = [zero(A) for A in A_2_vec] # should be native datastructure
-        ΔC_2_vec = [zero(A) for A in C_2_vec] # should be native datastructure
         A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
-        @exfiltrate
 
         @views @inbounds for t in T:-1:2
             Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
-            tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
-            ΔC_2 += tmp1
-            Δu_f[t] .+= tmp2
-            quad_muladd_pb!(ΔC_2_vec, Δu_f_temp[t], Δz, C_2_vec_sum, u_f[t])
+            # tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
+            # ΔC_2 += tmp1
+            # Δu_f[t] .+= tmp2
+            quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
 
             mul!(Δu[t], C_1', Δz, 1, 1)
             tmp3, tmp4 = quad_pb(Δu[t], A_2, u_f[t - 1])
