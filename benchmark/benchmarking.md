@@ -22,6 +22,18 @@ One time setup:
 ```julia
 ] instantiate
 ```
+
+## Editing and Debugging Code
+
+If you open this folder in VS Code, the `Project.toml` at the root is activated rather than the one in the unit tests.
+- The `] test` should work without any chances,
+- But to step through individual unit tests which may have test-only dependencies, you can use the `TestEnv` package.  To do this, whenever starting the REPL do
+```julia
+using TestEnv; TestEnv.activate()
+```
+At that point, you should be able to edit as if the `test/Project.toml` package was activated.  For example, `include("test/runtests.jl")` should be roughly equivalent to `]test`.  
+
+A useful trick for debugging is with `Infiltrator.jl`. Put in a `@exfiltrate`  in the code, (e.g. inside of a DSSM function) and it pushes all local variables into a global associated with the module.
 # Benchmarking
 This assumes you are running as a package in VS Code.  If not, then you will need to activate project files more carefulluy.
 
