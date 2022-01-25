@@ -17,7 +17,7 @@ function quad_muladd!(y, A, x)
     return y
 end
 
-# quadratic form with inplace addition
+# quadratic form pullback
 function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::AbstractVector)
     ΔA = similar(A)
     Δx = zeros(length(x))
@@ -27,6 +27,16 @@ function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::Abstrac
         Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
     end
     return ΔA, Δx
+end
+
+# inplace version with accumulation and using the cache of A[i] + A[i]', etc.
+function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
+    tmp = x * x'
+    @views @inbounds for (i, A_sum) in enumerate(A_vec_sum)
+        ΔA_vec[i] .+= tmp .* Δres[i]
+        Δx .+= A_sum * x .* Δres[i]
+    end
+    return nothing
 end
 
 struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:AbstractArray,
@@ -192,22 +202,25 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         @views @inbounds for t in T:-1:2
             Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
             tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
-            mul!(Δu[t], C_1', Δz, 1, 1)
+            ΔC_2 += tmp1
             Δu_f[t] .+= tmp2
+
+            #quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
+
+            mul!(Δu[t], C_1', Δz, 1, 1)
             tmp3, tmp4 = quad_pb(Δu[t], A_2, u_f[t - 1])
+            ΔA_2 += tmp3
+            Δu_f[t - 1] .+= tmp4
             Δu[t - 1] .= A_1' * Δu[t]
             mul!(Δu_f[t - 1], A_1', Δu_f[t], 1, 1)
-            Δu_f[t - 1] .+= tmp4
             Δnoise[:, t - 1] = B' * (Δu[t] .+ Δu_f[t])
             # Now, deal with the coefficients
             ΔA_0 += Δu[t]
             mul!(ΔA_1, Δu[t], u[t - 1]', 1, 1)
             mul!(ΔA_1, Δu_f[t], u_f[t - 1]', 1, 1)
-            ΔA_2 += tmp3
             ΔB += (Δu[t] + Δu_f[t]) * prob.noise[:, t - 1]'
             ΔC_0 += Δz
             mul!(ΔC_1, Δz, u[t]', 1, 1)
-            ΔC_2 += tmp1
         end
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB, C_0 = ΔC_0,
