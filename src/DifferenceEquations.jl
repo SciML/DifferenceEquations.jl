@@ -8,22 +8,20 @@ using CommonSolve
 using Zygote
 using LoopVectorization
 using Parameters
+using Infiltrator # TEMP, REMOVE AFTER TESTING
 
-import SciMLBase
+using SciMLBase: SciMLBase
 import SciMLBase: SciMLProblem, solve
-import StatsBase
+using StatsBase: StatsBase
 
 abstract type DifferenceProblem <: SciMLProblem end
 abstract type AbstractStateSpaceProblem{isinplace} <: DifferenceProblem end
 
 # Wrapper struct, eventually needs to be a full cache
-struct StateSpaceCache{
-    probtype<:AbstractStateSpaceProblem, 
-    solvertype<:SciMLBase.SciMLAlgorithm
-}
+struct StateSpaceCache{probtype<:AbstractStateSpaceProblem,solvertype<:SciMLBase.SciMLAlgorithm}
     problem::probtype
     solver::solvertype
-end 
+end
 
 function StateSpaceCache(problem::AbstractStateSpaceProblem, solver::SciMLBase.SciMLAlgorithm)
     return StateSpaceCache(problem, solver)
@@ -31,11 +29,7 @@ end
 
 # Unpack the cache. In future, this unwrapping should be eliminated when the cache
 # actually does something more than just wrap around prob/solver.
-function CommonSolve.solve!(
-    cache::StateSpaceCache,
-    args...; 
-    kwargs...
-)
+function CommonSolve.solve!(cache::StateSpaceCache, args...; kwargs...)
     return _solve!(cache.problem, cache.solver, args...; kwargs...)
 end
 
@@ -54,12 +48,7 @@ include("nonlinear.jl")
 include("kalman.jl")
 
 # Exports
-export 
-    StateSpaceProblem,
-    NoiseConditionalFilter,
-    KalmanFilter,
-    LinearStateSpaceProblem,
-    QuadraticStateSpaceProblem,
-    solve
+export StateSpaceProblem, NoiseConditionalFilter, KalmanFilter, LinearStateSpaceProblem,
+       QuadraticStateSpaceProblem, solve
 
 end # module

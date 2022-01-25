@@ -32,9 +32,9 @@ end
 # inplace version with accumulation and using the cache of A[i] + A[i]', etc.
 function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     tmp = x * x'
-    @views @inbounds for (i, A_sum) in enumerate(A_vec_sum)
+    for (i, A_sum) in enumerate(A_vec_sum)  # @views @inbounds  ADD
         ΔA_vec[i] .+= tmp .* Δres[i]
-        Δx .+= A_sum * x .* Δres[i]
+        Δx += A_sum * x .* Δres[i]
     end
     return nothing
 end
@@ -194,21 +194,25 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
         Δu_f = [zero(prob.u0) for _ in 1:T]
-        ΔA_2_vec = [zero(A_2[1, :, :]) for _ in size(A_2, 1)] # should be native datastructure
-        ΔC_2_vec = [zero(C_2[1, :, :]) for _ in size(C_2, 1)] # should be native datastructure
+        Δu_f_temp = [zero(prob.u0) for _ in 1:T]
+        ΔA_2_vec = [zero(A) for A in A_2_vec] # should be native datastructure
+        ΔC_2_vec = [zero(A) for A in C_2_vec] # should be native datastructure
         A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
+        @exfiltrate
 
         @views @inbounds for t in T:-1:2
             Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
             tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
             ΔC_2 += tmp1
             Δu_f[t] .+= tmp2
-
-            #quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
+            quad_muladd_pb!(ΔC_2_vec, Δu_f_temp[t], Δz, C_2_vec_sum, u_f[t])
 
             mul!(Δu[t], C_1', Δz, 1, 1)
             tmp3, tmp4 = quad_pb(Δu[t], A_2, u_f[t - 1])
+
+            quad_muladd_pb!(ΔA_2_vec, Δu_f_temp[t - 1], Δu[t], A_2_vec_sum, u_f[t - 1])
+
             ΔA_2 += tmp3
             Δu_f[t - 1] .+= tmp4
             Δu[t - 1] .= A_1' * Δu[t]
@@ -222,6 +226,15 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             ΔC_0 += Δz
             mul!(ΔC_1, Δz, u[t]', 1, 1)
         end
+
+        # Remove once the vector of matrices or column-major organized 3-tensor is the native datastructure for C_2/A_2
+        for (i, ΔA_2_slice) in enumerate(ΔA_2_vec)
+            ΔA_2[i, :, :] .= ΔA_2_slice
+        end
+        for (i, ΔC_2_slice) in enumerate(ΔC_2_vec)
+            ΔC_2[i, :, :] .= ΔC_2_slice
+        end
+
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB, C_0 = ΔC_0,
                                       C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1], noise = Δnoise),
