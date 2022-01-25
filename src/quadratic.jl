@@ -4,9 +4,22 @@ u(t+1) = A_0 + A_1 u(t) + quad(A_2, u_f(t)) .+ B noise(t+1)
 z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
 z_tilde(t) = z(t) + v(t+1)
 """
-function quad(A::AbstractArray{<:Number,3}, x)
-    return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
-end
+
+# old quad and adjoint replaced by inplace accumulation versions.
+# function quad(A::AbstractArray{<:Number,3}, x)
+#     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
+# end
+# # quadratic form pullback
+# function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::AbstractVector)
+#     ΔA = similar(A)
+#     Δx = zeros(length(x))
+#     tmp = x * x'
+#     for i in 1:size(A, 1)
+#         ΔA[i, :, :] .= tmp .* Δres[i]
+#         Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
+#     end
+#     return ΔA, Δx
+# end
 
 # y += quad(A, x)
 # The quad_muladd! uses on a vector of matrices for A
@@ -17,24 +30,12 @@ function quad_muladd!(y, A, x)
     return y
 end
 
-# quadratic form pullback
-function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::AbstractVector)
-    ΔA = similar(A)
-    Δx = zeros(length(x))
-    tmp = x * x'
-    for i in 1:size(A, 1)
-        ΔA[i, :, :] .= tmp .* Δres[i]
-        Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
-    end
-    return ΔA, Δx
-end
-
 # inplace version with accumulation and using the cache of A[i] + A[i]', etc.
 function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     tmp = x * x'
-    for (i, A_sum) in enumerate(A_vec_sum)  # @views @inbounds  ADD
+    @inbounds for (i, A_sum) in enumerate(A_vec_sum)  # @views @inbounds  ADD
         ΔA_vec[i] .+= tmp .* Δres[i]
-        Δx += A_sum * x .* Δres[i]
+        Δx .+= A_sum * x .* Δres[i]
     end
     return nothing
 end
@@ -198,41 +199,35 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
         Δu_f = [zero(prob.u0) for _ in 1:T]
-        Δu_f_temp = [zero(prob.u0) for _ in 1:T]
         A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
 
         @views @inbounds for t in T:-1:2
             Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
-            # tmp1, tmp2 = quad_pb(Δz, C_2, u_f[t])
-            # ΔC_2 += tmp1
-            # Δu_f[t] .+= tmp2
+
+            # inplace adoint of quadratic form with accumulation
             quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
-
             mul!(Δu[t], C_1', Δz, 1, 1)
-            tmp3, tmp4 = quad_pb(Δu[t], A_2, u_f[t - 1])
 
-            quad_muladd_pb!(ΔA_2_vec, Δu_f_temp[t - 1], Δu[t], A_2_vec_sum, u_f[t - 1])
-
-            ΔA_2 += tmp3
-            Δu_f[t - 1] .+= tmp4
-            Δu[t - 1] .= A_1' * Δu[t]
+            quad_muladd_pb!(ΔA_2_vec, Δu_f[t - 1], Δu[t], A_2_vec_sum, u_f[t - 1])
+            mul!(Δu[t - 1], A_1', Δu[t])
             mul!(Δu_f[t - 1], A_1', Δu_f[t], 1, 1)
-            Δnoise[:, t - 1] = B' * (Δu[t] .+ Δu_f[t])
+            Δu_f_sum = Δu[t] .+ Δu_f[t]
+            mul!(Δnoise[:, t - 1], B', Δu_f_sum)
             # Now, deal with the coefficients
             ΔA_0 += Δu[t]
             mul!(ΔA_1, Δu[t], u[t - 1]', 1, 1)
             mul!(ΔA_1, Δu_f[t], u_f[t - 1]', 1, 1)
-            ΔB += (Δu[t] + Δu_f[t]) * prob.noise[:, t - 1]'
+            mul!(ΔB, Δu_f_sum, prob.noise[:, t - 1]', 1, 1)
             ΔC_0 += Δz
             mul!(ΔC_1, Δz, u[t]', 1, 1)
         end
 
         # Remove once the vector of matrices or column-major organized 3-tensor is the native datastructure for C_2/A_2
-        for (i, ΔA_2_slice) in enumerate(ΔA_2_vec)
+        @views @inbounds for (i, ΔA_2_slice) in enumerate(ΔA_2_vec)
             ΔA_2[i, :, :] .= ΔA_2_slice
         end
-        for (i, ΔC_2_slice) in enumerate(ΔC_2_vec)
+        @views @inbounds for (i, ΔC_2_slice) in enumerate(ΔC_2_vec)
             ΔC_2[i, :, :] .= ΔC_2_slice
         end
 
