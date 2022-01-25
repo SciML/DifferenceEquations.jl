@@ -8,7 +8,7 @@ using CommonSolve
 using Zygote
 using LoopVectorization
 using Parameters
-using Infiltrator # TEMP, REMOVE AFTER TESTING
+#using Infiltrator # TEMP Add or remove during testing
 
 using SciMLBase: SciMLBase
 import SciMLBase: SciMLProblem, solve
