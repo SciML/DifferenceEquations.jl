@@ -48,8 +48,6 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
                  kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
-    t_0 = 1 + prob.tspan[1]
-
     @unpack A, B, C = prob
 
     u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
@@ -81,8 +79,6 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     # Preallocate values
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
-    t_0 = 1 + prob.tspan[1]
-
     @unpack A, B, C = prob
 
     u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
