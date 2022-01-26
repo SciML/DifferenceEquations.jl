@@ -10,9 +10,7 @@ using LoopVectorization
 using Parameters
 #using Infiltrator # TEMP Add or remove during testing
 
-using SciMLBase: SciMLBase
-import SciMLBase: SciMLProblem, solve
-using StatsBase: StatsBase
+using SciMLBase: SciMLBase, SciMLProblem, solve
 
 abstract type DifferenceProblem <: SciMLProblem end
 abstract type AbstractStateSpaceProblem{isinplace} <: DifferenceProblem end
