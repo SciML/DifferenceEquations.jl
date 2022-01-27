@@ -28,7 +28,6 @@ function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observab
     problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2)); obs_noise = TuringDiagMvNormal(zeros(length(D)), D), noise, observables)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
-
 @testset "quadratic rbc joint likelihood" begin
     @test joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈ -690.81094364573
     @inferred joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
