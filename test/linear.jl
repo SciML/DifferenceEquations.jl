@@ -21,7 +21,7 @@ noise_rbc = noise[:, 1:T]
 
 # joint case
 function joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2)); obs_noise = TuringDiagMvNormal(zeros(length(D)), D), noise, observables)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2)); obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
 
