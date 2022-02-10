@@ -1,4 +1,4 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, DistributionsAD, LinearAlgebra, Test, Zygote
+using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
 using CSV, DataFrames
 using FiniteDiff: finite_difference_gradient
 
@@ -21,7 +21,7 @@ noise_rbc = noise[:, 1:T]
 
 # joint case
 function joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2)); obs_noise = TuringDiagMvNormal(zeros(length(D)), D), noise, observables)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2)); obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
 
@@ -40,14 +40,16 @@ end
 
 # Kalman only
 function kalman_likelihood(A, B, C, u0, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, TuringDenseMvNormal(zeros(length(u0)), cholesky(diagm(ones(length(u0))))), (0, size(observables, 2)); noise = nothing, obs_noise = TuringDiagMvNormal(zeros(length(D)), D), observables)
+    problem = LinearStateSpaceProblem(A, B, C, MvNormal(diagm(ones(length(u0)))), (0, size(observables, 2)); noise = nothing, obs_noise = MvNormal(Diagonal(abs2.(D))), observables)
     return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
 end
 
 @testset "linear rbc kalman likelihood" begin
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈ -607.3698273765538
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
-    test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+    # test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+    f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc; rrule_f = rrule_via_ad, check_inferred = false) # u0_rbc is skipped by default in test_rrule I think
 end
 
 # Load FVGQ data for checks
@@ -72,7 +74,8 @@ end
 @testset "linear FVGQ Kalman" begin
     # Note: set rtol to be higher than the default case because of huge gradient numbers
     @test kalman_likelihood(A, B, C, u0, observables, D) ≈ -108.52706300389917
-    # test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A, B, C, u0, observables, D; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
+    f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A, B, C, u0, observables, D)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5) 
     # res = gradient(kalman_likelihood, A, B, C, u0, observables, D)
     # @test finite_difference_gradient(A -> kalman_likelihood(A, B, C, u0, observables, D), A) ≈ res[1] rtol = 1e-3
     # @test finite_difference_gradient(B -> kalman_likelihood(A, B, C, u0, observables, D), B) ≈ res[2] rtol = 1e-3

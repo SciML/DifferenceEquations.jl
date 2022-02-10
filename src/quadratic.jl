@@ -201,7 +201,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
 
         @views @inbounds for t in T:-1:2
-            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
 
             # inplace adoint of quadratic form with accumulation
             quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
