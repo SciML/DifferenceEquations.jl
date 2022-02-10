@@ -112,7 +112,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
         for t in T:-1:2
-            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ abs2.(prob.obs_noise.σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
             mul!(Δu[t], C', Δz, 1, 1)
             mul!(Δu[t - 1], A', Δu[t])
             Δnoise[:, t - 1] = B' * Δu[t]

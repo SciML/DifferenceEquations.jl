@@ -1,4 +1,4 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, DistributionsAD, LinearAlgebra, Test, Zygote
+using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
 using CSV, DataFrames
 using FiniteDiff: finite_difference_gradient
 

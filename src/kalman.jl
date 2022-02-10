@@ -8,17 +8,17 @@ function _solve!(
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = Diagonal(abs2.(prob.obs_noise.σ)) # Extract covariance from noise distribution
+    R = prob.obs_noise.Σ # Extract covariance from noise distribution
     B_prod = B * B'
 
     # Gaussian Prior
     # u0 has to be a multivariate Normal distribution
-    u0_mean = prob.u0.m
-    u0_variance = prob.u0.C.U' * prob.u0.C.U
+    u0_mean = prob.u0.μ
+    u0_variance = prob.u0.Σ
 
-    u = Vector{typeof(u0_mean)}(undef, T) # Mean of Kalman filter inferred latent states
+    u = Vector{Vector{eltype(u0_mean)}}(undef, T) # Mean of Kalman filter inferred latent states
     P = Vector{Matrix{eltype(u0_mean)}}(undef, T) # Posterior variance of Kalman filter inferred latent states
-    z = Vector{typeof(u0_mean)}(undef, T) # Mean of observables, generated from mean of latent states
+    z = Vector{Vector{eltype(u0_mean)}}(undef, T) # Mean of observables, generated from mean of latent states
 
     u[1] = u0_mean
     P[1] = u0_variance
@@ -54,19 +54,19 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     T = prob.tspan[2] - prob.tspan[1] + 1
     A, B, C = prob.A, prob.B, prob.C
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = Diagonal(abs2.(prob.obs_noise.σ)) # Extract covariance from noise distribution
+    R = prob.obs_noise.Σ  # Extract covariance from noise distribution
     B_prod = B * B'
 
     # Gaussian Prior
     # u0 has to be a multivariate Normal distribution
-    u0_mean = prob.u0.m
-    u0_variance = prob.u0.C.U' * prob.u0.C.U
+    u0_mean = prob.u0.μ
+    u0_variance = prob.u0.Σ
 
-    u = Vector{typeof(u0_mean)}(undef, T) # Mean of Kalman filter inferred latent states
-    u_mid = Vector{typeof(u0_mean)}(undef, T)
+    u = Vector{Vector{eltype(u0_mean)}}(undef, T) # Mean of Kalman filter inferred latent states
+    u_mid = Vector{Vector{eltype(u0_mean)}}(undef, T)
     P = Vector{Matrix{eltype(u0_mean)}}(undef, T) # Posterior variance of Kalman filter inferred latent states
     P_mid = Vector{Matrix{eltype(u0_mean)}}(undef, T)
-    z = Vector{typeof(u0_mean)}(undef, T) # Mean of observables, generated from mean of latent states
+    z = Vector{Vector{eltype(u0_mean)}}(undef, T) # Mean of observables, generated from mean of latent states
 
     u[1] = u0_mean
     P[1] = u0_variance
@@ -131,7 +131,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             ΔA += Δu_mid * u[t - 1]'
             Δu = A' * Δu_mid
         end
-        return (NoTangent(), Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC), NoTangent(), map(_ -> NoTangent(), args)...)
+        ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP)
+        return (NoTangent(), Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Tangent{typeof(prob.u0)}(; μ = Δu, Σ = ΔΣ)), NoTangent(), map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end
