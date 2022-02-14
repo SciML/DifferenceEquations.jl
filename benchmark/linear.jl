@@ -1,6 +1,6 @@
 #Benchmarking of RBC and FVGQ variants
 using DifferenceEquations, BenchmarkTools
-using DelimitedFiles, Distributions, Zygote
+using DelimitedFiles, Distributions, Zygote, LinearAlgebra
 const LINEAR = BenchmarkGroup()
 
 # Matrices from RBC
@@ -12,8 +12,9 @@ const D_rbc = [0.1, 0.1]
 const u0_rbc = zeros(2)
 
 const observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
-                                         "test/data/RBC_observables.csv"), ',')
-const noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')
+                                         "test/data/RBC_observables.csv"), ',')' |> collect
+const noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |>
+                  collect
 # Matrices from FVGQ
 # Load FVGQ data for checks
 const A_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A.csv"), ',')
@@ -22,9 +23,10 @@ const C_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C
 const D_FVGQ = ones(6) * 1e-3
 
 const observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
-                                          "test/data/FVGQ20_observables.csv"), ',')
+                                          "test/data/FVGQ20_observables.csv"), ',')' |> collect
 
-const noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ',')
+const noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
+                           ',')' |> collect
 const u0_FVGQ = zeros(size(A_FVGQ, 1))
 
 # General likelihood calculation

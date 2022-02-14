@@ -17,8 +17,9 @@ const D_2_rbc = [0.1, 0.1]
 const u0_2_rbc = zeros(2)
 
 const observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
-                                           "test/data/RBC_observables.csv"), ',')
-const noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')'
+                                           "test/data/RBC_observables.csv"), ',')' |> collect
+const noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
+                            ',')' |> collect
 
 # Matrices from FVGQ
 # Load FVGQ data for checks
@@ -38,10 +39,10 @@ D_2_FVGQ = ones(6) * 1e-3
 u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
 
 const observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
-                                            "test/data/FVGQ20_observables.csv"), ',')
+                                            "test/data/FVGQ20_observables.csv"), ',')' |> collect
 
 const noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
-                             ',')
+                             ',')' |> collect
 
 # General likelihood calculation
 function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D)

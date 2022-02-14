@@ -5,7 +5,6 @@ using Distributions
 using LinearAlgebra
 using CommonSolve
 using Zygote
-using LoopVectorization
 using Parameters
 #using Infiltrator # TEMP Add or remove during testing
 
