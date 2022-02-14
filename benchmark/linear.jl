@@ -1,6 +1,6 @@
 #Benchmarking of RBC and FVGQ variants
 using DifferenceEquations, BenchmarkTools
-using CSV, DataFrames, DistributionsAD, Zygote
+using DelimitedFiles, Distributions, Zygote, LinearAlgebra
 const LINEAR = BenchmarkGroup()
 
 # Matrices from RBC
@@ -11,48 +11,36 @@ const C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 const D_rbc = [0.1, 0.1]
 const u0_rbc = zeros(2)
 
-const observables_rbc = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                           "test/data/RBC_observables.csv");
-                                                  header = false)))' |> collect
-const noise_rbc = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                     "test/data/RBC_noise.csv"); header = false)))' |>
+const observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
+                                         "test/data/RBC_observables.csv"), ',')' |> collect
+const noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |>
                   collect
-
 # Matrices from FVGQ
 # Load FVGQ data for checks
-const A_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                  "test/data/FVGQ20_A.csv"); header = false)))
-const B_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                  "test/data/FVGQ20_B.csv"); header = false)))
-const C_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                  "test/data/FVGQ20_C.csv"); header = false)))
+const A_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A.csv"), ',')
+const B_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_B.csv"), ',')
+const C_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C.csv"), ',')
 const D_FVGQ = ones(6) * 1e-3
 
-const observables_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                            "test/data/FVGQ20_observables.csv");
-                                                   header = false)))' |> collect
+const observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
+                                          "test/data/FVGQ20_observables.csv"), ',')' |> collect
 
-const noise_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                      "test/data/FVGQ20_noise.csv");
-                                             header = false)))' |> collect
+const noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
+                           ',')' |> collect
 const u0_FVGQ = zeros(size(A_FVGQ, 1))
 
 # General likelihood calculation
 function joint_likelihood_1(A, B, C, u0, noise, observables, D)
     problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2));
-                                      obs_noise = TuringDiagMvNormal(zeros(length(D)), D), noise,
-                                      observables)
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
 
 # Kalman only
 function kalman_likelihood(A, B, C, u0, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C,
-                                      TuringDenseMvNormal(zeros(length(u0)),
-                                                          cholesky(diagm(ones(length(u0))))),
+    problem = LinearStateSpaceProblem(A, B, C, MvNormal(diagm(ones(length(u0)))),
                                       (0, size(observables, 2)); noise = nothing,
-                                      obs_noise = TuringDiagMvNormal(zeros(length(D)), D),
-                                      observables)
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), observables)
     return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
 end
 

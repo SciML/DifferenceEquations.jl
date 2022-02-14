@@ -1,6 +1,5 @@
 [deps]
-CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DifferenceEquations = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
-DistributionsAD = "ced4e74d-a319-5a8a-b0ac-84af2272839c"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"

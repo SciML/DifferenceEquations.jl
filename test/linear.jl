@@ -1,5 +1,5 @@
 using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
-using CSV, DataFrames
+using DelimitedFiles
 using FiniteDiff: finite_difference_gradient
 
 # Matrices from RBC
@@ -11,8 +11,8 @@ u0_rbc = zeros(2)
 
 path = joinpath(pkgdir(DifferenceEquations), "test", "data")
 file_prefix = "RBC"
-observables = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_observables.csv"); header = false)))')
-noise = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_noise.csv"); header = false)))')
+observables = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
+noise = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
 
 # Data and Noise
 T = 5
@@ -21,61 +21,74 @@ noise_rbc = noise[:, 1:T]
 
 # joint case
 function joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2)); obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2));
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
 
 @testset "linear rbc joint likelihood" begin
-    @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈ -690.9407412360038
+    @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
+          -690.9407412360038
     @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
     # We only test A, B, C, and noise
-    f = (A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) -> joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+    f = (A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) -> joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc,
+                                                                       noise_rbc, observables_rbc,
+                                                                       D_rbc)
     @test f(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) ≈ -690.9407412360038
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc;
+               rrule_f = rrule_via_ad, check_inferred = false)
     # Redundant struct on those matrices
-    x = (; A = A_rbc, B = B_rbc, C = C_rbc, u0 = u0_rbc, noise = noise_rbc, observables = observables_rbc, D = D_rbc)
+    x = (; A = A_rbc, B = B_rbc, C = C_rbc, u0 = u0_rbc, noise = noise_rbc,
+         observables = observables_rbc, D = D_rbc)
     @test joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D) ≈ -690.9407412360038
-    @inferred joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D) 
+    @inferred joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D)
 end
 
 # Kalman only
 function kalman_likelihood(A, B, C, u0, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, MvNormal(diagm(ones(length(u0)))), (0, size(observables, 2)); noise = nothing, obs_noise = MvNormal(Diagonal(abs2.(D))), observables)
+    problem = LinearStateSpaceProblem(A, B, C, MvNormal(diagm(ones(length(u0)))),
+                                      (0, size(observables, 2)); noise = nothing,
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), observables)
     return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
 end
 
 @testset "linear rbc kalman likelihood" begin
-    @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈ -607.3698273765538
+    @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈
+          -607.3698273765538
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
     # test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; rrule_f = rrule_via_ad, check_inferred = false)
-    f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc; rrule_f = rrule_via_ad, check_inferred = false) # u0_rbc is skipped by default in test_rrule I think
+    f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc,
+                                                           observables_rbc, D_rbc)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc; rrule_f = rrule_via_ad,
+               check_inferred = false) # u0_rbc is skipped by default in test_rrule I think
 end
 
 # Load FVGQ data for checks
 path = joinpath(pkgdir(DifferenceEquations), "test", "data")
 file_prefix = "FVGQ20"
-A = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_A.csv"); header = false)))
-B = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_B.csv"); header = false)))
-C = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_C.csv"); header = false)))
-# D_raw = Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_D.csv"); header = false)))
+A = readdlm(joinpath(path, "$(file_prefix)_A.csv"), ',')
+B = readdlm(joinpath(path, "$(file_prefix)_B.csv"), ',')
+C = readdlm(joinpath(path, "$(file_prefix)_C.csv"), ',')
+# D_raw = readdlm(joinpath(path, "$(file_prefix)_D.csv"), ',')
 D = ones(6) * 1e-3
-observables = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_observables.csv"); header = false)))')
-noise = collect(Matrix(DataFrame(CSV.File(joinpath(path, "$(file_prefix)_noise.csv"); header = false)))')
+observables = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
+noise = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
 u0 = zeros(size(A, 1))
 
 @testset "linear FVGQ joint likelihood" begin
     @test joint_likelihood_1(A, B, C, u0, noise, observables, D) ≈ -1.4648817357717388e9
     @inferred joint_likelihood_1(A, B, C, u0, noise, observables, D)
     f = (A, B, C, u0, noise) -> joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0, noise; rrule_f = rrule_via_ad, check_inferred = false)
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0, noise; rrule_f = rrule_via_ad,
+               check_inferred = false)
 end
 
 @testset "linear FVGQ Kalman" begin
     # Note: set rtol to be higher than the default case because of huge gradient numbers
     @test kalman_likelihood(A, B, C, u0, observables, D) ≈ -108.52706300389917
     f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A, B, C, u0, observables, D)
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5) 
+    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0; rrule_f = rrule_via_ad,
+               check_inferred = false, rtol = 1e-5)
     # res = gradient(kalman_likelihood, A, B, C, u0, observables, D)
     # @test finite_difference_gradient(A -> kalman_likelihood(A, B, C, u0, observables, D), A) ≈ res[1] rtol = 1e-3
     # @test finite_difference_gradient(B -> kalman_likelihood(A, B, C, u0, observables, D), B) ≈ res[2] rtol = 1e-3
