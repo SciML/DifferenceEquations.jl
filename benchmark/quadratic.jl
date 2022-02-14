@@ -1,6 +1,6 @@
 #Benchmarking of RBC and FVGQ variants
 using DifferenceEquations, BenchmarkTools
-using CSV, DataFrames, DistributionsAD, Zygote
+using DelimitedFiles, Distributions, Zygote
 const QUADRATIC = BenchmarkGroup()
 
 # Matrices from RBC
@@ -16,49 +16,37 @@ const C_2_rbc = cat([-0.00018554166974717046 0.0025652363153049716; 0.0 0.0],
 const D_2_rbc = [0.1, 0.1]
 const u0_2_rbc = zeros(2)
 
-const observables_2_rbc = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                             "test/data/RBC_observables.csv");
-                                                    header = false)))' |> collect
-const noise_2_rbc = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                       "test/data/RBC_noise.csv"); header = false)))' |>
-                    collect
+const observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
+                                           "test/data/RBC_observables.csv"), ',')
+const noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')'
 
 # Matrices from FVGQ
 # Load FVGQ data for checks
-A_0_raw = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                             "test/data/FVGQ20_A_0.csv"); header = false)))
+A_0_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A_0.csv"), ',')
 const A_0_FVGQ = vec(A_0_raw)
-const A_1_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                    "test/data/FVGQ20_A_1.csv"); header = false)))
-A_2_raw = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                             "test/data/FVGQ20_A_2.csv"); header = false)))
+const A_1_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A_1.csv"), ',')
+A_2_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A_2.csv"), ',')
 const A_2_FVGQ = reshape(A_2_raw, length(A_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ))
-const B_2_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                    "test/data/FVGQ20_B.csv"); header = false)))
-C_0_raw = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                             "test/data/FVGQ20_C_0.csv"); header = false)))
+const B_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_B.csv"), ',')
+C_0_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_0.csv"), ',')
 const C_0_FVGQ = vec(C_0_raw)
-const C_1_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                    "test/data/FVGQ20_C_1.csv"); header = false)))
-C_2_raw = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                             "test/data/FVGQ20_C_2.csv"); header = false)))
+const C_1_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_1.csv"), ',')
+C_2_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_2.csv"), ',')
 const C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ))
-# D_raw = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations), "FVGQ_D.csv"); header = false)))
+# D_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "FVGQ_D.csv"); header = false)))
 D_2_FVGQ = ones(6) * 1e-3
 u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
 
-const observables_2_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                              "test/data/FVGQ20_observables.csv");
-                                                     header = false)))' |> collect
+const observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
+                                            "test/data/FVGQ20_observables.csv"), ',')
 
-const noise_2_FVGQ = Matrix(DataFrame(CSV.File(joinpath(pkgdir(DifferenceEquations),
-                                                        "test/data/FVGQ20_noise.csv");
-                                               header = false)))' |> collect
+const noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
+                             ',')
 
 # General likelihood calculation
 function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D)
     problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2));
-                                         obs_noise = TuringDiagMvNormal(zeros(length(D)), D), noise,
+                                         obs_noise = MvNormal(Diagonal(abs2.(D))), noise,
                                          observables)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
