@@ -191,36 +191,44 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         ΔC = zero(C)
         ΔK = zero(K[1])
         ΔP_mid = zero(ΔP)
+        ΔP_mid_sum = zero(ΔP)
         ΔCP = zero(CP[1])
         Δu_mid = zero(u_mid[1])
         Δz = zero(z[1])
         ΔV = zero(V[1].mat)
 
         for t in T:-1:2
-            # Generate some intermediate variables
-            inv_V = inv(V[t].chol)
+            # The inverse is used throughout, including in quadratic forms.  For large systems this might not be stable            
+            inv_V = Symmetric(inv(V[t].chol)) # use cholesky factorization to invert, and is symmetric
+
             # Sensitivity accumulation
             copy!(ΔP_mid, ΔP)
             mul!(ΔK, ΔP, CP[t]', -1, 0) # i.e. ΔK = -ΔP * CP[t]'
             mul!(ΔCP, K[t]', ΔP, -1, 0) # i.e. ΔCP = - K[t]' * ΔP
             copy!(Δu_mid, Δu)
-            ΔK += Δu * innovation[t]'
+            mul!(ΔK, Δu, innovation[t]', 1, 1) # ΔK += Δu * innovation[t]'
             mul!(Δz, K[t]', Δu, -1, 0)  # i.e, Δz = -K[t]'* Δu
-            ΔCP += inv_V * ΔK'
+            mul!(ΔCP, inv_V, ΔK', 1, 1) # ΔCP += inv_V * ΔK'
             ΔV .= -inv_V' * CP[t] * ΔK * inv_V'
-            ΔC += ΔCP * P_mid[t]'
-            ΔP_mid += C' * ΔCP
-            Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
+            mul!(ΔC, ΔCP, P_mid[t]', 1, 1) # ΔC += ΔCP * P_mid[t]'
+            mul!(ΔP_mid, C', ΔCP, 1, 1) # ΔP_mid += C' * ΔCP
+            mul!(Δz, inv_V, innovation[t], Δlogpdf, 1) # Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
             ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
             ΔC += ΔV * C * P_mid[t]' + ΔV' * C * P_mid[t]
             ΔP_mid += C' * ΔV * C
-            ΔC += Δz * u_mid[t]'
-            Δu_mid += C' * Δz
-            ΔA += (ΔP_mid + ΔP_mid') * A * P[t - 1]
+            mul!(ΔC, Δz, u_mid[t]', 1, 1) # ΔC += Δz * u_mid[t]'
+            mul!(Δu_mid, C', Δz, 1, 1) # Δu_mid += C' * Δz
+
+            # Calculates (ΔP_mid + ΔP_mid')
+            transpose!(ΔP_mid_sum, ΔP_mid)
+            ΔP_mid_sum .+= ΔP_mid
+
+            # ΔA += (ΔP_mid + ΔP_mid') * A * P[t - 1]
+            ΔA += ΔP_mid_sum * A * P[t - 1]
             ΔP .= A' * ΔP_mid * A # pass into next period
-            ΔB += (ΔP_mid + ΔP_mid') * B
-            ΔA += Δu_mid * u[t - 1]'
-            Δu .= A' * Δu_mid
+            mul!(ΔB, ΔP_mid_sum, B, 1, 1) # ΔB += ΔP_mid_sum * B
+            mul!(ΔA, Δu_mid, u[t - 1]', 1, 1) # ΔA += Δu_mid * u[t - 1]'
+            mul!(Δu, A', Δu_mid)
         end
         ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP)
         return (NoTangent(),
