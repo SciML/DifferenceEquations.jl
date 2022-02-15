@@ -36,6 +36,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     # temp buffers.  Could be moved into algorithm settings
     temp_N_N = Matrix{eltype(u0)}(undef, N, N)
     temp_M_M = Matrix{eltype(u0)}(undef, M, M)
+    temp_M_N = Matrix{eltype(u0)}(undef, M, N)
 
     @inbounds for t in 2:T
         # Kalman iteration
@@ -55,16 +56,25 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         V_t .+= R
 
         # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-        temp_M_M .= V_t'
+        transpose!(temp_M_M, V_t)
         V_t .+= temp_M_M
         lmul!(0.5, V_t)
 
         cholesky!(V_t, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t] is upper-triangular
         innovation[t] .= prob.observables[:, t - 1] - z[t]
         loglik += logpdf(MvNormal(PDMat(V[t])), innovation[t])
-        K[t] .= CP[t]' / V[t]  # Kalman gain
-        u[t] += K[t] * innovation[t]
-        P[t] -= K[t] * CP[t]
+
+        # K[t] .= CP[t]' / V[t]  # Kalman gain
+        # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
+        #K[t] .= CP[t]' / V[t]  # Kalman gain
+        ldiv!(temp_M_N, V[t], CP[t])
+        transpose!(K[t], temp_M_N)
+
+        #u[t] += K[t] * innovation[t]
+        mul!(u[t], K[t], innovation[t], 1, 1)
+
+        #P[t] -= K[t] * CP[t]
+        mul!(P[t], K[t], CP[t], -1, 1)
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
