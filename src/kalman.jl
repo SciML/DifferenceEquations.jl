@@ -7,6 +7,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
     N = length(u0)
+    M = size(C, 1)
 
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
     R = prob.obs_noise.Σ # Extract covariance from noise distribution
@@ -17,14 +18,13 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     u = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
     P = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
     z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
+
+    # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
     innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
-    K = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # Gain
-    V = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # V
-    CP = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # C * P[t]
-    V_chol = [Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef, N, N), 'U', 0)
-              for _ in 1:T]
-    #Cholesky{Float64,Matrix{Float64}}(Matrix{Float64}(undef, 2,2), 'U', 0)
-    # cholesky!(C_val, A, Val(false); check = false)
+    K = [Matrix{eltype(u0)}(undef, N, M) for _ in 1:T] # Gain
+    CP = [Matrix{eltype(u0)}(undef, M, N) for _ in 1:T] # C * P[t]
+    V = [Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef, M, M), 'U', 0)
+         for _ in 1:T]  # preallocated
 
     # Gaussian Prior
     u[1] .= mean(u0)
@@ -40,12 +40,13 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         z[t] .= C * u[t]
 
         CP[t] .= C * P[t]
-        V[t] .= CP[t] * C' + R
-        V[t] .= (V[t] + V[t]') / 2 # classic hack to deal with stability of not being quite symmetric
-        V_chol[t] = cholesky!(V[t], Val(false); check = false) # inplace uses V[t] with cholesky
+        V_t = V[t].factors # will build inplace of the cholesky and then decompose
+        V_t .= CP[t] * C' + R
+        V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
+        cholesky!(V_t, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t] is upper-triangular
         innovation[t] .= prob.observables[:, t - 1] - z[t]
-        loglik += logpdf(MvNormal(PDMat(V_chol[t])), innovation[t])
-        K[t] .= CP[t]' / V_chol[t]  # Kalman gain
+        loglik += logpdf(MvNormal(PDMat(V[t])), innovation[t])
+        K[t] .= CP[t]' / V[t]  # Kalman gain
         u[t] += K[t] * innovation[t]
         P[t] -= K[t] * CP[t]
     end
