@@ -23,8 +23,12 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
     K = [Matrix{eltype(u0)}(undef, N, M) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0)}(undef, M, N) for _ in 1:T] # C * P[t]
-    V = [Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef, M, M), 'U', 0)
-         for _ in 1:T]  # preallocated
+    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(M, Matrix{eltype(u0)}(undef, M, M),
+                                              Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef,
+                                                                                                         M,
+                                                                                                         M),
+                                                                                      'U', 0))
+         for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     # Gaussian Prior
     u[1] .= mean(u0)
@@ -49,7 +53,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         P[t] .+= B_prod
 
         mul!(CP[t], C, P[t]) # CP[t] = C * P[t]
-        V_t = V[t].factors # will build inplace of the cholesky and then decompose
+        V_t = V[t].mat # matrix in the posdef structure
 
         # V[t] = CP[t] * C' + R
         mul!(V_t, CP[t], C')
@@ -60,14 +64,14 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         V_t .+= temp_M_M
         lmul!(0.5, V_t)
 
-        cholesky!(V_t, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t] is upper-triangular
+        copy!(V[t].chol.factors, V_t) # copy over to the factors for the cholesky and do in place
+        cholesky!(V[t].chol.factors, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
         innovation[t] .= prob.observables[:, t - 1] - z[t]
-        loglik += logpdf(MvNormal(PDMat(V[t])), innovation[t])
+        loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
 
         # K[t] .= CP[t]' / V[t]  # Kalman gain
         # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
-        #K[t] .= CP[t]' / V[t]  # Kalman gain
-        ldiv!(temp_M_N, V[t], CP[t])
+        ldiv!(temp_M_N, V[t].chol, CP[t])
         transpose!(K[t], temp_M_N)
 
         #u[t] += K[t] * innovation[t]
