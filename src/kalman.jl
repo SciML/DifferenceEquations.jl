@@ -199,7 +199,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
         for t in T:-1:2
             # The inverse is used throughout, including in quadratic forms.  For large systems this might not be stable            
-            inv_V = Symmetric(inv(V[t].chol)) # use cholesky factorization to invert, and is symmetric
+            inv_V = Symmetric(inv(V[t].chol)) # use cholesky factorization to invert.  Symmetric
 
             # Sensitivity accumulation
             copy!(ΔP_mid, ΔP)
@@ -209,13 +209,17 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(ΔK, Δu, innovation[t]', 1, 1) # ΔK += Δu * innovation[t]'
             mul!(Δz, K[t]', Δu, -1, 0)  # i.e, Δz = -K[t]'* Δu
             mul!(ΔCP, inv_V, ΔK', 1, 1) # ΔCP += inv_V * ΔK'
-            ΔV .= -inv_V' * CP[t] * ΔK * inv_V'
+            ΔV .= -inv_V * CP[t] * ΔK * inv_V
             mul!(ΔC, ΔCP, P_mid[t]', 1, 1) # ΔC += ΔCP * P_mid[t]'
             mul!(ΔP_mid, C', ΔCP, 1, 1) # ΔP_mid += C' * ΔCP
             mul!(Δz, inv_V, innovation[t], Δlogpdf, 1) # Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
             ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
             ΔC += ΔV * C * P_mid[t]' + ΔV' * C * P_mid[t]
-            ΔP_mid += C' * ΔV * C
+
+            # ΔP_mid += C' * ΔV * C
+            mul!(temp_M_N, ΔV, C)
+            mul!(ΔP_mid, C', temp_M_N, 1, 1)
+
             mul!(ΔC, Δz, u_mid[t]', 1, 1) # ΔC += Δz * u_mid[t]'
             mul!(Δu_mid, C', Δz, 1, 1) # Δu_mid += C' * Δz
 
@@ -224,13 +228,18 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             ΔP_mid_sum .+= ΔP_mid
 
             # ΔA += (ΔP_mid + ΔP_mid') * A * P[t - 1]
-            ΔA += ΔP_mid_sum * A * P[t - 1]
-            ΔP .= A' * ΔP_mid * A # pass into next period
+            mul!(temp_N_N, A, P[t - 1])
+            mul!(ΔA, ΔP_mid_sum, temp_N_N, 1, 1)
+
+            # ΔP .= A' * ΔP_mid * A # pass into next period
+            mul!(temp_N_N, ΔP_mid, A)
+            mul!(ΔP, A', temp_N_N)
+
             mul!(ΔB, ΔP_mid_sum, B, 1, 1) # ΔB += ΔP_mid_sum * B
             mul!(ΔA, Δu_mid, u[t - 1]', 1, 1) # ΔA += Δu_mid * u[t - 1]'
             mul!(Δu, A', Δu_mid)
         end
-        ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP)
+        ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC,
                                       u0 = Tangent{typeof(prob.u0)}(; μ = Δu, Σ = ΔΣ)), NoTangent(),
