@@ -20,6 +20,9 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
 
     # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
+    # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
+    u_mid = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # intermediate in u calculation
+    P_mid = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
     innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
     K = [Matrix{eltype(u0)}(undef, N, M) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0)}(undef, M, N) for _ in 1:T] # C * P[t]
@@ -44,27 +47,26 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
     @inbounds for t in 2:T
         # Kalman iteration
-        mul!(u[t], A, u[t - 1]) # u[t] = A u[t-1]
-        mul!(z[t], C, u[t]) # z[t] = C u[t]
+        mul!(u_mid[t], A, u[t - 1]) # u[t] = A u[t-1]
+        mul!(z[t], C, u_mid[t]) # z[t] = C u[t]
 
         # P[t] = A * P[t - 1] * A' + B * B'
         mul!(temp_N_N, P[t - 1], A')
-        mul!(P[t], A, temp_N_N)
-        P[t] .+= B_prod
+        mul!(P_mid[t], A, temp_N_N)
+        P_mid[t] .+= B_prod
 
-        mul!(CP[t], C, P[t]) # CP[t] = C * P[t]
-        V_t = V[t].mat # matrix in the posdef structure
+        mul!(CP[t], C, P_mid[t]) # CP[t] = C * P[t]
 
         # V[t] = CP[t] * C' + R
-        mul!(V_t, CP[t], C')
-        V_t .+= R
+        mul!(V[t].mat, CP[t], C')
+        V[t].mat .+= R
 
         # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-        transpose!(temp_M_M, V_t)
-        V_t .+= temp_M_M
-        lmul!(0.5, V_t)
+        transpose!(temp_M_M, V[t].mat)
+        V[t].mat .+= temp_M_M
+        lmul!(0.5, V[t].mat)
 
-        copy!(V[t].chol.factors, V_t) # copy over to the factors for the cholesky and do in place
+        copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
         cholesky!(V[t].chol.factors, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
         innovation[t] .= prob.observables[:, t - 1] - z[t]
         loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
@@ -75,9 +77,11 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         transpose!(K[t], temp_M_N)
 
         #u[t] += K[t] * innovation[t]
+        copy!(u[t], u_mid[t])
         mul!(u[t], K[t], innovation[t], 1, 1)
 
         #P[t] -= K[t] * CP[t]
+        copy!(P[t], P_mid[t])
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
