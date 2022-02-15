@@ -183,47 +183,44 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
                     map(_ -> NoTangent(), args)...)
         end
-        # A bunch of initializations here
-        ΔP = zero(cov(u0))
-        Δu = zero(mean(u0))
+        # Buffers
+        ΔP = zero(P[1])
+        Δu = zero(u[1])
         ΔA = zero(A)
         ΔB = zero(B)
         ΔC = zero(C)
+        ΔK = zero(K[1])
+        ΔP_mid = zero(ΔP)
+        ΔCP = zero(CP[1])
+        Δu_mid = zero(u_mid[1])
+        Δz = zero(z[1])
+        ΔV = zero(V[1].mat)
+
         for t in T:-1:2
-            t_n = t - 1 + prob.tspan[1]
             # Generate some intermediate variables
-            CP_t = C * P_mid[t]
-            V = Symmetric(CP_t * C' + R)
-            inv_V = inv(V)
-            K = CP_t' / V
+            inv_V = inv(V[t].chol)
             # Sensitivity accumulation
-            ΔP_mid = copy(ΔP)
-            ΔK = -ΔP * CP_t'
-            ΔCP_t = -K' * ΔP
-            Δu_mid = copy(Δu)
-            ΔK += Δu * (prob.observables[:, t_n] - z[t])'
-            Δz = -K' * Δu
-            ΔCP_t += inv_V * ΔK'
-            ΔV = -inv_V' * CP_t * ΔK * inv_V'
-            ΔC += ΔCP_t * P_mid[t]'
-            ΔP_mid += C' * ΔCP_t
-            Δz += Δlogpdf * inv_V * (prob.observables[:, t_n] - z[t]) # Σ^-1 * (z_obs - z)
-            ΔV -= Δlogpdf *
-                  0.5 *
-                  (inv_V -
-                   inv_V *
-                   (prob.observables[:, t_n] - z[t]) *
-                   (prob.observables[:, t_n] - z[t])' *
-                   inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
+            copy!(ΔP_mid, ΔP)
+            mul!(ΔK, ΔP, CP[t]', -1, 0) # i.e. ΔK = -ΔP * CP[t]'
+            mul!(ΔCP, K[t]', ΔP, -1, 0) # i.e. ΔCP = - K[t]' * ΔP
+            copy!(Δu_mid, Δu)
+            ΔK += Δu * innovation[t]'
+            mul!(Δz, K[t]', Δu, -1, 0)  # i.e, Δz = -K[t]'* Δu
+            ΔCP += inv_V * ΔK'
+            ΔV .= -inv_V' * CP[t] * ΔK * inv_V'
+            ΔC += ΔCP * P_mid[t]'
+            ΔP_mid += C' * ΔCP
+            Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
+            ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
             ΔC += ΔV * C * P_mid[t]' + ΔV' * C * P_mid[t]
             ΔP_mid += C' * ΔV * C
             ΔC += Δz * u_mid[t]'
             Δu_mid += C' * Δz
             ΔA += (ΔP_mid + ΔP_mid') * A * P[t - 1]
-            ΔP = A' * ΔP_mid * A # pass into next period
+            ΔP .= A' * ΔP_mid * A # pass into next period
             ΔB += (ΔP_mid + ΔP_mid') * B
             ΔA += Δu_mid * u[t - 1]'
-            Δu = A' * Δu_mid
+            Δu .= A' * Δu_mid
         end
         ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP)
         return (NoTangent(),
