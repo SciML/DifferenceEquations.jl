@@ -13,7 +13,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     B_prod = B * B'
 
     # TODO: move to internal algorithm cache
-    # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of zeros
+    # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
     u = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
     P = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
     z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
@@ -42,7 +42,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         CP[t] .= C * P[t]
         V[t] .= CP[t] * C' + R
         V[t] .= (V[t] + V[t]') / 2 # classic hack to deal with stability of not being quite symmetric
-        V_chol[t] = cholesky(V[t], Val(false); check = false)
+        V_chol[t] = cholesky!(V[t], Val(false); check = false) # inplace uses V[t] with cholesky
         innovation[t] .= prob.observables[:, t - 1] - z[t]
         loglik += logpdf(MvNormal(PDMat(V_chol[t])), innovation[t])
         K[t] .= CP[t]' / V_chol[t]  # Kalman gain
