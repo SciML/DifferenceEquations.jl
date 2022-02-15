@@ -33,16 +33,32 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
     loglik = 0.0
 
+    # temp buffers.  Could be moved into algorithm settings
+    temp_N_N = Matrix{eltype(u0)}(undef, N, N)
+    temp_M_M = Matrix{eltype(u0)}(undef, M, M)
+
     @inbounds for t in 2:T
         # Kalman iteration
-        u[t] .= A * u[t - 1]
-        P[t] .= A * P[t - 1] * A' + B_prod
-        z[t] .= C * u[t]
+        mul!(u[t], A, u[t - 1]) # u[t] = A u[t-1]
+        mul!(z[t], C, u[t]) # z[t] = C u[t]
 
-        CP[t] .= C * P[t]
+        # P[t] = A * P[t - 1] * A' + B * B'
+        mul!(temp_N_N, P[t - 1], A')
+        mul!(P[t], A, temp_N_N)
+        P[t] .+= B_prod
+
+        mul!(CP[t], C, P[t]) # CP[t] = C * P[t]
         V_t = V[t].factors # will build inplace of the cholesky and then decompose
-        V_t .= CP[t] * C' + R
-        V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
+
+        # V[t] = CP[t] * C' + R
+        mul!(V_t, CP[t], C')
+        V_t .+= R
+
+        # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
+        temp_M_M .= V_t'
+        V_t .+= temp_M_M
+        lmul!(0.5, V_t)
+
         cholesky!(V_t, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t] is upper-triangular
         innovation[t] .= prob.observables[:, t - 1] - z[t]
         loglik += logpdf(MvNormal(PDMat(V[t])), innovation[t])
