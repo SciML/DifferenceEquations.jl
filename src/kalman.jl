@@ -6,29 +6,11 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
+    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_M_M, temp_M_N, temp_N_M = prob.cache
+    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
+
     N = length(u0)
     M = size(C, 1)
-
-    # TODO: move to internal algorithm cache
-    # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
-    u = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
-    P = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
-    z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
-
-    # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
-    # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
-    B_prod = Matrix{eltype(u0)}(undef, N, N)
-    u_mid = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # intermediate in u calculation
-    P_mid = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
-    K = [Matrix{eltype(u0)}(undef, N, M) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0)}(undef, M, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(M, Matrix{eltype(u0)}(undef, M, M),
-                                              Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef,
-                                                                                                         M,
-                                                                                                         M),
-                                                                                      'U', 0))
-         for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
     R = prob.obs_noise.Σ # Extract covariance from noise distribution
@@ -41,22 +23,17 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
     loglik = 0.0
 
-    # temp buffers.  Could be moved into algorithm settings
-    temp_N_N = Matrix{eltype(u0)}(undef, N, N)
-    temp_M_M = Matrix{eltype(u0)}(undef, M, M)
-    temp_M_N = Matrix{eltype(u0)}(undef, M, N)
-
     @inbounds for t in 2:T
         # Kalman iteration
-        mul!(u_mid[t], A, u[t - 1]) # u[t] = A u[t-1]
-        mul!(z[t], C, u_mid[t]) # z[t] = C u[t]
+        mul!(u_temp[t], A, u[t - 1]) # u[t] = A u[t-1]
+        mul!(z[t], C, u_temp[t]) # z[t] = C u[t]
 
         # P[t] = A * P[t - 1] * A' + B * B'
         mul!(temp_N_N, P[t - 1], A')
-        mul!(P_mid[t], A, temp_N_N)
-        P_mid[t] .+= B_prod
+        mul!(P_temp[t], A, temp_N_N)
+        P_temp[t] .+= B_prod
 
-        mul!(CP[t], C, P_mid[t]) # CP[t] = C * P[t]
+        mul!(CP[t], C, P_temp[t]) # CP[t] = C * P[t]
 
         # V[t] = CP[t] * C' + R
         mul!(V[t].mat, CP[t], C')
@@ -78,11 +55,11 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         transpose!(K[t], temp_M_N)
 
         #u[t] += K[t] * innovation[t]
-        copy!(u[t], u_mid[t])
+        copy!(u[t], u_temp[t])
         mul!(u[t], K[t], innovation[t], 1, 1)
 
         #P[t] -= K[t] * CP[t]
-        copy!(P[t], P_mid[t])
+        copy!(P[t], P_temp[t])
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
@@ -95,63 +72,38 @@ function ChainRulesCore.rrule(::typeof(_solve!),
                               args...;
                               kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
                                                 otype}
+
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
+    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_M_M, temp_M_N, temp_N_M, temp_M, temp_N = prob.cache
+    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
+
     N = length(u0)
     M = size(C, 1)
 
-    # TODO: move to internal algorithm cache
-    # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
-    B_prod = Matrix{eltype(u0)}(undef, N, N)
-    u = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
-    P = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
-    z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
-
-    # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
-    # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
-    u_mid = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # intermediate in u calculation
-    P_mid = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
-    K = [Matrix{eltype(u0)}(undef, N, M) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0)}(undef, M, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(M, Matrix{eltype(u0)}(undef, M, M),
-                                              Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef,
-                                                                                                         M,
-                                                                                                         M),
-                                                                                      'U', 0))
-         for _ in 1:T] # preallocated buffers for cholesky and matrix itself
-
-    # Gaussian Prior
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
     R = prob.obs_noise.Σ # Extract covariance from noise distribution
     mul!(B_prod, B, B')
 
+    # Gaussian Prior
     u[1] .= mean(u0)
     P[1] .= cov(u0)
     z[1] .= C * u[1]
 
     loglik = 0.0
 
-    # temp buffers.  Could be moved into algorithm settings
-    temp_N_N = Matrix{eltype(u0)}(undef, N, N)
-    temp_M_M = Matrix{eltype(u0)}(undef, M, M)
-    temp_M_N = Matrix{eltype(u0)}(undef, M, N)
-    temp_N_M = Matrix{eltype(u0)}(undef, N, M)
-    temp_M = Vector{eltype(u0)}(undef, M)
-    temp_N = Vector{eltype(u0)}(undef, N)
-
     @inbounds for t in 2:T
         # Kalman iteration
-        mul!(u_mid[t], A, u[t - 1]) # u[t] = A u[t-1]
-        mul!(z[t], C, u_mid[t]) # z[t] = C u[t]
+        mul!(u_temp[t], A, u[t - 1]) # u[t] = A u[t-1]
+        mul!(z[t], C, u_temp[t]) # z[t] = C u[t]
 
         # P[t] = A * P[t - 1] * A' + B * B'
         mul!(temp_N_N, P[t - 1], A')
-        mul!(P_mid[t], A, temp_N_N)
-        P_mid[t] .+= B_prod
+        mul!(P_temp[t], A, temp_N_N)
+        P_temp[t] .+= B_prod
 
-        mul!(CP[t], C, P_mid[t]) # CP[t] = C * P[t]
+        mul!(CP[t], C, P_temp[t]) # CP[t] = C * P[t]
 
         # V[t] = CP[t] * C' + R
         mul!(V[t].mat, CP[t], C')
@@ -173,11 +125,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         transpose!(K[t], temp_M_N)
 
         #u[t] += K[t] * innovation[t]
-        copy!(u[t], u_mid[t])
+        copy!(u[t], u_temp[t])
         mul!(u[t], K[t], innovation[t], 1, 1)
 
         #P[t] -= K[t] * CP[t]
-        copy!(P[t], P_mid[t])
+        copy!(P[t], P_temp[t])
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
@@ -195,10 +147,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         ΔB = zero(B)
         ΔC = zero(C)
         ΔK = zero(K[1])
-        ΔP_mid = zero(ΔP)
-        ΔP_mid_sum = zero(ΔP)
+        ΔP_temp = zero(ΔP)
+        ΔP_temp_sum = zero(ΔP)
         ΔCP = zero(CP[1])
-        Δu_mid = zero(u_mid[1])
+        Δu_temp = zero(u_temp[1])
         Δz = zero(z[1])
         ΔV = zero(V[1].mat)
 
@@ -207,10 +159,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             inv_V = Symmetric(inv(V[t].chol)) # use cholesky factorization to invert.  Symmetric
 
             # Sensitivity accumulation
-            copy!(ΔP_mid, ΔP)
+            copy!(ΔP_temp, ΔP)
             mul!(ΔK, ΔP, CP[t]', -1, 0) # i.e. ΔK = -ΔP * CP[t]'
             mul!(ΔCP, K[t]', ΔP, -1, 0) # i.e. ΔCP = - K[t]' * ΔP
-            copy!(Δu_mid, Δu)
+            copy!(Δu_temp, Δu)
             mul!(ΔK, Δu, innovation[t]', 1, 1) # ΔK += Δu * innovation[t]'
             mul!(Δz, K[t]', Δu, -1, 0)  # i.e, Δz = -K[t]'* Δu
             mul!(ΔCP, inv_V, ΔK', 1, 1) # ΔCP += inv_V * ΔK'
@@ -220,8 +172,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(temp_N_M, ΔK, inv_V)
             mul!(ΔV, temp_M_N, temp_N_M, -1, 0)
 
-            mul!(ΔC, ΔCP, P_mid[t]', 1, 1) # ΔC += ΔCP * P_mid[t]'
-            mul!(ΔP_mid, C', ΔCP, 1, 1) # ΔP_mid += C' * ΔCP
+            mul!(ΔC, ΔCP, P_temp[t]', 1, 1) # ΔC += ΔCP * P_temp[t]'
+            mul!(ΔP_temp, C', ΔCP, 1, 1) # ΔP_temp += C' * ΔCP
             mul!(Δz, inv_V, innovation[t], Δlogpdf, 1) # Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
 
             #ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
@@ -231,34 +183,34 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             rmul!(temp_M_M, Δlogpdf * 0.5)
             ΔV += temp_M_M
 
-            #ΔC += ΔV * C * P_mid[t]' + ΔV' * C * P_mid[t]
-            mul!(temp_M_N, C, P_mid[t])
+            #ΔC += ΔV * C * P_temp[t]' + ΔV' * C * P_temp[t]
+            mul!(temp_M_N, C, P_temp[t])
             transpose!(temp_M_M, ΔV)
             temp_M_M .+= ΔV
             mul!(ΔC, temp_M_M, temp_M_N, 1, 1)
 
-            # ΔP_mid += C' * ΔV * C
+            # ΔP_temp += C' * ΔV * C
             mul!(temp_M_N, ΔV, C)
-            mul!(ΔP_mid, C', temp_M_N, 1, 1)
+            mul!(ΔP_temp, C', temp_M_N, 1, 1)
 
-            mul!(ΔC, Δz, u_mid[t]', 1, 1) # ΔC += Δz * u_mid[t]'
-            mul!(Δu_mid, C', Δz, 1, 1) # Δu_mid += C' * Δz
+            mul!(ΔC, Δz, u_temp[t]', 1, 1) # ΔC += Δz * u_temp[t]'
+            mul!(Δu_temp, C', Δz, 1, 1) # Δu_temp += C' * Δz
 
-            # Calculates (ΔP_mid + ΔP_mid')
-            transpose!(ΔP_mid_sum, ΔP_mid)
-            ΔP_mid_sum .+= ΔP_mid
+            # Calculates (ΔP_temp + ΔP_temp')
+            transpose!(ΔP_temp_sum, ΔP_temp)
+            ΔP_temp_sum .+= ΔP_temp
 
-            # ΔA += (ΔP_mid + ΔP_mid') * A * P[t - 1]
+            # ΔA += (ΔP_temp + ΔP_temp') * A * P[t - 1]
             mul!(temp_N_N, A, P[t - 1])
-            mul!(ΔA, ΔP_mid_sum, temp_N_N, 1, 1)
+            mul!(ΔA, ΔP_temp_sum, temp_N_N, 1, 1)
 
-            # ΔP .= A' * ΔP_mid * A # pass into next period
-            mul!(temp_N_N, ΔP_mid, A)
+            # ΔP .= A' * ΔP_temp * A # pass into next period
+            mul!(temp_N_N, ΔP_temp, A)
             mul!(ΔP, A', temp_N_N)
 
-            mul!(ΔB, ΔP_mid_sum, B, 1, 1) # ΔB += ΔP_mid_sum * B
-            mul!(ΔA, Δu_mid, u[t - 1]', 1, 1) # ΔA += Δu_mid * u[t - 1]'
-            mul!(Δu, A', Δu_mid)
+            mul!(ΔB, ΔP_temp_sum, B, 1, 1) # ΔB += ΔP_temp_sum * B
+            mul!(ΔA, Δu_temp, u[t - 1]', 1, 1) # ΔA += Δu_temp * u[t - 1]'
+            mul!(Δu, A', Δu_temp)
         end
         ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),

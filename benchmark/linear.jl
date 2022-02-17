@@ -15,6 +15,9 @@ const observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
                                          "test/data/RBC_observables.csv"), ',')' |> collect
 const noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |>
                   collect
+const cache_rbc_1 = LinearStateSpaceProblemCache{Float64}(size(A_rbc, 1), size(C_rbc, 2),
+                                                          size(observables_rbc, 1),
+                                                          size(observables_rbc, 2) + 1)
 # Matrices from FVGQ
 # Load FVGQ data for checks
 const A_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A.csv"), ',')
@@ -28,19 +31,24 @@ const observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
 const noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
                            ',')' |> collect
 const u0_FVGQ = zeros(size(A_FVGQ, 1))
+const cache_FVGQ_1 = LinearStateSpaceProblemCache{Float64}(size(A_FVGQ, 1), size(C_FVGQ, 2),
+                                                           size(observables_FVGQ, 1),
+                                                           size(observables_FVGQ, 2) + 1)
 
 # General likelihood calculation
-function joint_likelihood_1(A, B, C, u0, noise, observables, D)
+function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2));
-                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables,
+                                      kwargs...)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
 
 # Kalman only
-function kalman_likelihood(A, B, C, u0, observables, D)
+function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, MvNormal(diagm(ones(length(u0)))),
                                       (0, size(observables, 2)); noise = nothing,
-                                      obs_noise = MvNormal(Diagonal(abs2.(D))), observables)
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), observables,
+                                      kwargs...)
     return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
 end
 
@@ -50,6 +58,15 @@ gradient(joint_likelihood_1, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables
 gradient(kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
 gradient(joint_likelihood_1, A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ)
 gradient(kalman_likelihood, A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, D_FVGQ)
+
+gradient((args...) -> joint_likelihood_1(args...; cache = cache_rbc_1), A_rbc, B_rbc, C_rbc, u0_rbc,
+         noise_rbc, observables_rbc, D_rbc)
+gradient((args...) -> kalman_likelihood(args...; cache = cache_rbc_1), A_rbc, B_rbc, C_rbc, u0_rbc,
+         observables_rbc, D_rbc)
+gradient((args...) -> joint_likelihood_1(args...; cache = cache_FVGQ_1), A_FVGQ, B_FVGQ, C_FVGQ,
+         u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ)
+gradient((args...) -> kalman_likelihood(args...; cache = cache_FVGQ_1), A_FVGQ, B_FVGQ, C_FVGQ,
+         u0_FVGQ, observables_FVGQ, D_FVGQ)
 
 const LINEAR["rbc"] = BenchmarkGroup()
 const LINEAR["rbc"]["joint_1"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc, $u0_rbc,

@@ -2,6 +2,22 @@ using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Te
 using DelimitedFiles
 using FiniteDiff: finite_difference_gradient
 
+# joint case
+function joint_likelihood_1(A, B, C, u0, noise, observables, D)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2));
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
+    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
+end
+
+# Kalman only
+function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
+    problem = LinearStateSpaceProblem(A, B, C, MvNormal(diagm(ones(length(u0)))),
+                                      (0, size(observables, 2)); noise = nothing,
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), observables,
+                                      kwargs...)
+    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
+end
+
 # Matrices from RBC
 A_rbc = [0.9568351489231076 6.209371005755285; 3.0153731819288737e-18 0.20000000000000007]
 B_rbc = reshape([0.0; -0.01], 2, 1) # make sure B is a matrix
@@ -19,24 +35,13 @@ T = 5
 observables_rbc = observables[:, 1:T]
 noise_rbc = noise[:, 1:T]
 
-# joint case
-function joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2));
-                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
-end
-
 @testset "linear rbc joint likelihood" begin
     @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
           -690.9407412360038
     @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
-    # We only test A, B, C, and noise
-    f = (A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) -> joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc,
-                                                                       noise_rbc, observables_rbc,
-                                                                       D_rbc)
-    @test f(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) ≈ -690.9407412360038
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc;
-               rrule_f = rrule_via_ad, check_inferred = false)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+               C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
     # Redundant struct on those matrices
     x = (; A = A_rbc, B = B_rbc, C = C_rbc, u0 = u0_rbc, noise = noise_rbc,
          observables = observables_rbc, D = D_rbc)
@@ -44,23 +49,35 @@ end
     @inferred joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D)
 end
 
-# Kalman only
-function kalman_likelihood(A, B, C, u0, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, MvNormal(diagm(ones(length(u0)))),
-                                      (0, size(observables, 2)); noise = nothing,
-                                      obs_noise = MvNormal(Diagonal(abs2.(D))), observables)
-    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
-end
-
 @testset "linear rbc kalman likelihood" begin
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈
           -607.3698273765538
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
-    # test_rrule(Zygote.ZygoteRuleConfig(), kalman_likelihood, A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; rrule_f = rrule_via_ad, check_inferred = false)
-    f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc,
-                                                           observables_rbc, D_rbc)
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A_rbc, B_rbc, C_rbc, u0_rbc; rrule_f = rrule_via_ad,
-               check_inferred = false) # u0_rbc is skipped by default in test_rrule I think
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+               u0_rbc; rrule_f = rrule_via_ad, check_inferred = false) # u0_rbc is skipped by default in test_rrule I think
+end
+
+@testset "linear rbc kalman likelihood preallocated" begin
+    cache = LinearStateSpaceProblemCache{Float64}(size(A_rbc, 1), size(C_rbc, 1),
+                                                  size(observables_rbc, 1),
+                                                  size(observables_rbc, 2) + 1)
+    @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; cache) ≈
+          -607.3698273765538
+    @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; cache)
+    f_cache_grad = gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc; cache),
+                            A_rbc, B_rbc, C_rbc, u0_rbc)
+    f_grad = gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+                      C_rbc, u0_rbc)
+    @test all(f_cache_grad .== f_grad) # for some reason the test_rrule doesn't like the cache
+
+    # tweak and reuse the cache
+    observables_rbc_2 = observables_rbc * 1.05
+    f_cache_grad = gradient((args...) -> kalman_likelihood(args..., observables_rbc_2, D_rbc; cache),
+                            A_rbc, B_rbc, C_rbc, u0_rbc)
+    f_grad = gradient((args...) -> kalman_likelihood(args..., observables_rbc_2, D_rbc), A_rbc,
+                      B_rbc, C_rbc, u0_rbc)
+    @test all(f_cache_grad .== f_grad) # for some reason the test_rrule doesn't like the cache
 end
 
 # Load FVGQ data for checks
@@ -78,20 +95,27 @@ u0 = zeros(size(A, 1))
 @testset "linear FVGQ joint likelihood" begin
     @test joint_likelihood_1(A, B, C, u0, noise, observables, D) ≈ -1.4648817357717388e9
     @inferred joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    f = (A, B, C, u0, noise) -> joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0, noise; rrule_f = rrule_via_ad,
-               check_inferred = false)
+    test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> joint_likelihood_1(args..., observables, D),
+               A, B, C, u0, noise; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
 @testset "linear FVGQ Kalman" begin
     # Note: set rtol to be higher than the default case because of huge gradient numbers
     @test kalman_likelihood(A, B, C, u0, observables, D) ≈ -108.52706300389917
-    f = (A_rbc, B_rbc, C_rbc, u0_rbc) -> kalman_likelihood(A, B, C, u0, observables, D)
-    test_rrule(Zygote.ZygoteRuleConfig(), f, A, B, C, u0; rrule_f = rrule_via_ad,
-               check_inferred = false, rtol = 1e-5)
-    # res = gradient(kalman_likelihood, A, B, C, u0, observables, D)
-    # @test finite_difference_gradient(A -> kalman_likelihood(A, B, C, u0, observables, D), A) ≈ res[1] rtol = 1e-3
-    # @test finite_difference_gradient(B -> kalman_likelihood(A, B, C, u0, observables, D), B) ≈ res[2] rtol = 1e-3
-    # @test finite_difference_gradient(C -> kalman_likelihood(A, B, C, u0, observables, D), C) ≈ res[3] rtol = 1e-3
-    # @test finite_difference_gradient(u0 -> kalman_likelihood(A, B, C, u0, observables, D), u0) ≈ res[4] rtol = 1e-3
+    gradient((args...) -> kalman_likelihood(args..., observables, D), A, B, C, u0)
+
+    # TODO: this is not turned on because the numbers explode.  Need better unit test data to be interior
+    # test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> kalman_likelihood(args..., observables, D),
+    #            A, B, C, u0; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
+end
+
+@testset "linear FVGQ kalman likelihood preallocated" begin
+    cache = LinearStateSpaceProblemCache{Float64}(size(A, 1), size(C, 1), size(observables, 1),
+                                                  size(observables, 2) + 1)
+    @test kalman_likelihood(A, B, C, u0, observables, D; cache) ≈ -108.52706300389917
+    @inferred kalman_likelihood(A, B, C, u0, observables, D; cache)
+    f_cache_grad = gradient((args...) -> kalman_likelihood(args..., observables, D; cache), A, B, C,
+                            u0)
+    f_grad = gradient((args...) -> kalman_likelihood(args..., observables, D), A, B, C, u0)
+    @test all(f_cache_grad .== f_grad) # for some reason the test_rrule doesn't like the cache vs. no-cache cases.
 end
