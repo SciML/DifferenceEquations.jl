@@ -115,7 +115,8 @@ function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B:
                                                  MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
                                     observables = nothing, noise = nothing,
                                     cache = QuadraticStateSpaceProblemCache{eltype(u0)}(length(u0),
-                                                                                        length(obs_noise),
+                                                                                        size(obs_noise,
+                                                                                             1),
                                                                                         size(observables,
                                                                                              1),
                                                                                         size(observables,
@@ -160,13 +161,16 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
+    @unpack u, u_f, z, innovation, C_2_vec, A_2_vec = prob.cache  # problem cache
+    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
 
-    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)] # should be the native datastructure
-    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)] # should be the native datastructure
-
-    u_f = [zero(prob.u0) for _ in 1:T]  # TODO: move to internal algorithm cache
-    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
-    z = [zero(C_0) for _ in 1:T] # TODO: move to internal algorithm cache
+    # TODO: This should be the native datastrcture of A_2 and C_2.  Remove when it is
+    for i in 1:size(C_2, 1)
+        C_2_vec[i] .= C_2[i, :, :]
+    end
+    for i in 1:size(A_2, 1)
+        A_2_vec[i] .= A_2[i, :, :]
+    end
 
     u[1] .= prob.u0
     u_f[1] .= prob.u0
@@ -187,11 +191,15 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        innovation[t] .= prob.observables[:, t - 1] - z[t]
+        loglik += logpdf(prob.obs_noise, innovation[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end
+
+#utility to fill matrix with zeros inplace
+fill_zero!(mat) = fill!(mat, 0.0) #fill with zeros
 
 function ChainRulesCore.rrule(::typeof(_solve!),
                               prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2type,
@@ -203,13 +211,16 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
+    @unpack u, u_f, z, innovation, C_2_vec, A_2_vec = prob.cache  # problem cache
+    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
 
-    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)] # should be the native datastructure
-    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)] # should be the native datastructure
-
-    u_f = [zero(prob.u0) for _ in 1:T]  # TODO: move to internal algorithm cache
-    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
-    z = [zero(C_0) for _ in 1:T] # TODO: move to internal algorithm cache
+    # TODO: This should be the native datastrcture of A_2 and C_2.  Remove when it is
+    for i in 1:size(C_2, 1)
+        C_2_vec[i] .= C_2[i, :, :]
+    end
+    for i in 1:size(A_2, 1)
+        A_2_vec[i] .= A_2[i, :, :]
+    end
 
     u[1] .= prob.u0
     u_f[1] .= prob.u0
@@ -220,22 +231,25 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     loglik = 0.0
     @inbounds @views for t in 2:T
         mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u_f[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         u[t] .= A_0
         mul!(u[t], A_1, u[t - 1], 1, 1)
         quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        innovation[t] .= prob.observables[:, t - 1] - z[t]
+        loglik += logpdf(prob.obs_noise, innovation[t])
     end
 
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 
     function solve_pb(Δsol)
+        @unpack ΔA_2_vec, ΔC_2_vec, Δnoise, Δu, Δu_f = prob.cache  # problem cache
+
         Δlogpdf = Δsol.loglikelihood
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
@@ -243,18 +257,27 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         end
         ΔA_0 = zero(A_0)
         ΔA_1 = zero(A_1)
-        ΔA_2_vec = [zero(A) for A in A_2_vec] # should be native datastructure
+
+        # zero out anything in the cache
+        foreach(fill_zero!, ΔA_2_vec)  # goes through the matrices in the vector and results them
+        foreach(fill_zero!, ΔC_2_vec)  # goes through the matrices in the vector and results them
+        foreach(fill_zero!, Δu)
+        foreach(fill_zero!, Δu_f)
+        fill_zero!(Δnoise)
+
+        # ΔA_2_vec = [zero(A) for A in A_2_vec] # should be native datastructure
         ΔA_2 = zero(A_2)
 
         ΔB = zero(B)
         ΔC_0 = zero(C_0)
         ΔC_1 = zero(C_1)
-        ΔC_2_vec = [zero(A) for A in C_2_vec] # should be native datastructure
         ΔC_2 = zero(C_2)
 
-        Δnoise = similar(prob.noise)
-        Δu = [zero(prob.u0) for _ in 1:T]
-        Δu_f = [zero(prob.u0) for _ in 1:T]
+        # Δnoise = similar(prob.noise)
+        @show size(Δnoise), size(prob.noise)
+        @assert size(Δnoise) == size(prob.noise)
+        # Δu = [zero(prob.u0) for _ in 1:T]
+        # Δu_f = [zero(prob.u0) for _ in 1:T]
         A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
 
