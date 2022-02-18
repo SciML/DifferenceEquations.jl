@@ -3,9 +3,10 @@ using DelimitedFiles
 using FiniteDiff: finite_difference_gradient
 
 # joint case
-function joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2));
-                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables)
+function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(noise, 2)), Val(false); # doesn't allocate buffers for kalman filter
+                                      obs_noise = MvNormal(Diagonal(abs2.(D))), noise, observables,
+                                      kwargs...)
     return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
 end
 
@@ -42,6 +43,21 @@ noise_rbc = noise_rbc[:, 1:T]
     test_rrule(Zygote.ZygoteRuleConfig(),
                (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+end
+
+@testset "linear rbc joint likelihood preallocated" begin
+    cache = LinearStateSpaceProblemCache{Float64}(size(A_rbc, 1), size(B_rbc, 2),
+                                                  size(observables_rbc, 1),
+                                                  size(observables_rbc, 2) + 1, Val(false)) # do not allocate for kalman
+    @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc;
+                             cache) ≈ -690.9407412360038
+    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc;
+                                 cache)
+    f_cache_grad = gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc; cache),
+                            A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc)
+    f_grad = gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc,
+                      B_rbc, C_rbc, u0_rbc, noise_rbc)
+    @test all(f_cache_grad .== f_grad) # for some reason the test_rrule doesn't like the cache
 end
 
 @testset "linear rbc kalman likelihood" begin

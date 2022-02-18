@@ -80,7 +80,8 @@ struct LinearStateSpaceProblem{isinplace,Atype<:AbstractArray,Btype<:AbstractArr
     cache::ctype # cache
 end
 
-function LinearStateSpaceProblem(A::Atype, B::Btype, C::Ctype, u0::utype, tspan::ttype;
+function LinearStateSpaceProblem(A::Atype, B::Btype, C::Ctype, u0::utype, tspan::ttype,
+                                 ::Val{AllocateKalman} = Val(true);
                                  obs_noise = (h0 = C * u0;
                                               MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
                                  observables = nothing, noise = nothing,
@@ -89,11 +90,13 @@ function LinearStateSpaceProblem(A::Atype, B::Btype, C::Ctype, u0::utype, tspan:
                                                                                   size(observables,
                                                                                        1),
                                                                                   size(observables,
-                                                                                       2) + 1)) where {Atype<:AbstractArray,
-                                                                                                       Btype<:AbstractArray,
-                                                                                                       Ctype<:AbstractArray,
-                                                                                                       utype,
-                                                                                                       ttype}
+                                                                                       2) + 1,
+                                                                                  Val(AllocateKalman))) where {Atype<:AbstractArray,
+                                                                                                               Btype<:AbstractArray,
+                                                                                                               Ctype<:AbstractArray,
+                                                                                                               utype,
+                                                                                                               ttype,
+                                                                                                               AllocateKalman}
     return LinearStateSpaceProblem{Val(false),Atype,Btype,Ctype,typeof(noise),typeof(obs_noise),
                                    utype,ttype,typeof(observables),typeof(cache)}(A, # Evolution matrix
                                                                                   B, # Noise matrix
