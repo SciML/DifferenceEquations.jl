@@ -218,7 +218,9 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC,
-                                      u0 = Tangent{typeof(prob.u0)}(; μ = Δu, Σ = ΔΣ)), NoTangent(),
+                                      u0 = Tangent{typeof(prob.u0)}(; μ = Δu, Σ = ΔΣ),
+                                      cache = NoTangent(), observables = NoTangent(),
+                                      obs_noise = NoTangent()), NoTangent(),
                 map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb

@@ -56,6 +56,10 @@ function QuadraticStateSpaceProblemCache{DT}(N, M, L, T,
                                                       nothing)
 end
 
+# The cache is never differentiable
+@non_differentiable QuadraticStateSpaceProblemCache(args...)
+@non_differentiable QuadraticStateSpaceProblemCache(::Any, ::Any, ::Any, ::Any, ::Any)
+
 struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:AbstractArray,
                                   A_2type<:AbstractArray,Btype<:AbstractArray,
                                   C_0type<:AbstractArray,C_1type<:AbstractArray,
@@ -78,9 +82,7 @@ end
 
 function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B::Btype,
                                     C_0::C_0type, C_1::C_1type, C_2::C_2type, u0::utype,
-                                    tspan::ttype;
-                                    obs_noise = (h0 = C_1 * u0;
-                                                 MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
+                                    tspan::ttype; obs_noise, # Assume the default measurement error is MvNormal with identity covariance
                                     observables = nothing, noise = nothing,
                                     cache = QuadraticStateSpaceProblemCache{eltype(u0)}(length(u0),
                                                                                         size(B, 2),
@@ -284,8 +286,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB, C_0 = ΔC_0,
-                                      C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1], noise = Δnoise),
-                NoTangent(), map(_ -> NoTangent(), args)...)
+                                      C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1], noise = Δnoise,
+                                      cache = NoTangent(), observables = NoTangent(),
+                                      obs_noise = NoTangent()), NoTangent(),
+                map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end
