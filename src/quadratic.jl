@@ -40,7 +40,8 @@ function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     return nothing
 end
 
-Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13}
+Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,
+                                                   T15,T16,T17,T18,T19}
     u::T1
     z::T2
     innovation::T3
@@ -56,6 +57,12 @@ Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T1
     Δnoise::T11
     ΔA_2_vec::T12
     ΔC_2_vec::T13
+    temp_N_N::T14
+    temp_M_M::T15
+    temp_M_N::T16
+    temp_N_M::T17
+    temp_M::T18
+    temp_N::T19
 end
 
 function QuadraticStateSpaceProblemCache{DT}(N, M, N_z, T,
@@ -85,7 +92,17 @@ function QuadraticStateSpaceProblemCache{DT}(N, M, N_z, T,
                                                       nothing,
                                            ΔC_2_vec = AllocateAD ?
                                                       [Matrix{DT}(undef, N, N) for _ in 1:N_z] :
-                                                      nothing)
+                                                      nothing,
+                                           temp_N_N = AllocateAD ? Matrix{DT}(undef, N, N) :
+                                                      nothing,
+                                           temp_M_M = AllocateAD ? Matrix{DT}(undef, M, M) :
+                                                      nothing,
+                                           temp_M_N = AllocateAD ? Matrix{DT}(undef, M, N) :
+                                                      nothing,
+                                           temp_N_M = AllocateAD ? Matrix{DT}(undef, N, M) :
+                                                      nothing,
+                                           temp_M = AllocateAD ? Vector{DT}(undef, M) : nothing,
+                                           temp_N = AllocateAD ? Vector{DT}(undef, N) : nothing)
 end
 
 struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:AbstractArray,
@@ -115,8 +132,7 @@ function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B:
                                                  MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
                                     observables = nothing, noise = nothing,
                                     cache = QuadraticStateSpaceProblemCache{eltype(u0)}(length(u0),
-                                                                                        size(obs_noise,
-                                                                                             1),
+                                                                                        length(obs_noise),
                                                                                         size(observables,
                                                                                              1),
                                                                                         size(observables,
@@ -198,9 +214,6 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 end
 
-#utility to fill matrix with zeros inplace
-fill_zero!(mat) = fill!(mat, 0.0) #fill with zeros
-
 function ChainRulesCore.rrule(::typeof(_solve!),
                               prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2type,
                                                                Btype,C_0type,C_1type,C_2type,wtype,
@@ -248,26 +261,39 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 
     function solve_pb(Δsol)
-        @unpack ΔA_2_vec, ΔC_2_vec, Δnoise, Δu, Δu_f = prob.cache  # problem cache
-
+        #@unpack Δnoise,  = prob.cache  # problem cache
+        @unpack ΔA_2_vec, ΔC_2_vec, Δu, Δu_f, temp_N_N, A_2_vec_sum, C_2_vec_sum = prob.cache  # problem cache
         Δlogpdf = Δsol.loglikelihood
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
                     map(_ -> NoTangent(), args)...)
         end
-        ΔA_0 = zero(A_0)
-        ΔA_1 = zero(A_1)
 
-        # zero out anything in the cache
-        foreach(fill_zero!, ΔA_2_vec)  # goes through the matrices in the vector and results them
-        foreach(fill_zero!, ΔC_2_vec)  # goes through the matrices in the vector and results them
+        # zero out anything in the cache just in case.  Check if necessary
+        foreach(fill_zero!, ΔA_2_vec)
+        foreach(fill_zero!, ΔC_2_vec)
         foreach(fill_zero!, Δu)
         foreach(fill_zero!, Δu_f)
-        fill_zero!(Δnoise)
+        # fill_zero!(Δnoise)
 
-        # ΔA_2_vec = [zero(A) for A in A_2_vec] # should be native datastructure
+        # prep sum since used repeatedly
+        for (i, A) in enumerate(A_2_vec)
+            copy!(A_2_vec_sum[i], A)
+            transpose!(temp_N_N, A)
+            A_2_vec_sum[i] .+= temp_N_N
+        end
+        for (i, C) in enumerate(C_2_vec)
+            copy!(C_2_vec_sum[i], C)
+            transpose!(temp_N_N, C)
+            C_2_vec_sum[i] .+= temp_N_N
+        end
+
+        Δnoise = similar(prob.noise)
+
+        # Could move into cache later for huge problems
+        ΔA_0 = zero(A_0)
+        ΔA_1 = zero(A_1)
         ΔA_2 = zero(A_2)
-
         ΔB = zero(B)
         ΔC_0 = zero(C_0)
         ΔC_1 = zero(C_1)
@@ -276,13 +302,9 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         # Δnoise = similar(prob.noise)
         @show size(Δnoise), size(prob.noise)
         @assert size(Δnoise) == size(prob.noise)
-        # Δu = [zero(prob.u0) for _ in 1:T]
-        # Δu_f = [zero(prob.u0) for _ in 1:T]
-        A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
-        C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
 
         @views @inbounds for t in T:-1:2
-            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz = Δlogpdf * innovation[t] ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
 
             # inplace adoint of quadratic form with accumulation
             quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])

@@ -36,6 +36,7 @@ promote_noise(x, y::AbstractArray) = [x], y
 promote_noise(x::AbstractArray, y) = x, [y]
 promote_noise(x::AbstractArray, y::AbstractArray) = x, y
 
+include("utilities.jl")
 include("noise.jl")
 include("alg.jl")
 include("linear.jl")

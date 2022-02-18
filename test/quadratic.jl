@@ -2,6 +2,14 @@ using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Te
 using DelimitedFiles
 using FiniteDiff: finite_difference_gradient
 
+# joint case
+function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D; kwargs...)
+    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2));
+                                         obs_noise = MvNormal(Diagonal(abs2.(D))), noise,
+                                         observables, kwargs...)
+    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
+end
+
 # Matrices from RBC
 A_0_rbc = [-7.824904812740593e-5, 0.0]
 A_1_rbc = [0.9568351489231076 6.209371005755285; 3.0153731819288737e-18 0.20000000000000007]
@@ -25,19 +33,13 @@ T = 5
 observables_rbc = observables[:, 1:T]
 noise_rbc = noise[:, 1:T]
 
-# joint case
-function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D; kwargs...)
-    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2));
-                                         obs_noise = MvNormal(Diagonal(abs2.(D))), noise,
-                                         observables, kwargs...)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
-end
 @testset "quadratic rbc joint likelihood" begin
     @test joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc,
                              noise_rbc, observables_rbc, D_rbc) ≈ -690.81094364573
     @inferred joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc,
                                  u0_rbc, noise_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
-
+    gradient((args...) -> joint_likelihood_2(args..., observables_rbc, D_rbc), A_0_rbc, A_1_rbc,
+             A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc, noise_rbc)
     test_rrule(Zygote.ZygoteRuleConfig(),
                (args...) -> joint_likelihood_2(args..., observables_rbc, D_rbc), A_0_rbc, A_1_rbc,
                A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad,
@@ -48,28 +50,30 @@ end
 path = joinpath(pkgdir(DifferenceEquations), "test", "data")
 file_prefix = "FVGQ20"
 A_0_raw = readdlm(joinpath(path, "$(file_prefix)_A_0.csv"), ',')
-A_0 = vec(A_0_raw)
-A_1 = readdlm(joinpath(path, "$(file_prefix)_A_1.csv"), ',')
+A_0_FVGQ = vec(A_0_raw)
+A_1_FVGQ = readdlm(joinpath(path, "$(file_prefix)_A_1.csv"), ',')
 A_2_raw = readdlm(joinpath(path, "$(file_prefix)_A_2.csv"), ',')
-A_2 = reshape(A_2_raw, length(A_0), length(A_0), length(A_0))
-B = readdlm(joinpath(path, "$(file_prefix)_B.csv"), ',')
+A_2_FVGQ = reshape(A_2_raw, length(A_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ))
+B_FVGQ = readdlm(joinpath(path, "$(file_prefix)_B.csv"), ',')
 C_0_raw = readdlm(joinpath(path, "$(file_prefix)_C_0.csv"), ',')
-C_0 = vec(C_0_raw)
-C_1 = readdlm(joinpath(path, "$(file_prefix)_C_1.csv"), ',')
+C_0_FVGQ = vec(C_0_raw)
+C_1_FVGQ = readdlm(joinpath(path, "$(file_prefix)_C_1.csv"), ',')
 C_2_raw = readdlm(joinpath(path, "$(file_prefix)_C_2.csv"), ',')
-C_2 = reshape(C_2_raw, length(C_0), length(A_0), length(A_0))
+C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ))
 # D_raw = readdlm(joinpath(path, "$(file_prefix)_D.csv"); header = false)))
-D = ones(6) * 1e-3
-observables = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
-noise = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
-u0 = zeros(size(A_1, 1))
+D_FVGQ = ones(6) * 1e-3
+observables_FVGQ = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
+noise_FVGQ = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
+u0_FVGQ = zeros(size(A_1_FVGQ, 1))
 
 @testset "quadratic FVGQ joint likelihood" begin
-    @test joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D) ≈
-          -1.473244794713955e10
-    @inferred joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D)
-
-    test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> joint_likelihood_2(args..., observables, D),
-               A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise; rrule_f = rrule_via_ad,
-               check_inferred = false)
+    @test joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
+                             u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ) ≈ -1.473244794713955e10
+    @inferred joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
+                                 u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ)
+    gradient((args...) -> joint_likelihood_2(args..., observables_FVGQ, D_FVGQ), A_0_FVGQ, A_1_FVGQ,
+             A_2_FVGQ, B_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_FVGQ, noise_FVGQ)
+    #test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> joint_likelihood_2(args..., observables, D),
+    #    A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise; rrule_f = rrule_via_ad,
+    #    check_inferred = false)
 end
