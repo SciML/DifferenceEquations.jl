@@ -5,8 +5,7 @@ z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
 z_tilde(t) = z(t) + v(t+1)
 """
 
-Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,
-                                                   T15,T16,T17,T18,T19}
+Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14}
     u::T1
     z::T2
     innovation::T3
@@ -23,28 +22,23 @@ Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T1
     ΔA_2_vec::T12
     ΔC_2_vec::T13
     temp_N_N::T14
-    temp_M_M::T15
-    temp_M_N::T16
-    temp_N_M::T17
-    temp_M::T18
-    temp_N::T19
 end
 
-function QuadraticStateSpaceProblemCache{DT}(N, M, N_z, T,
+function QuadraticStateSpaceProblemCache{DT}(N, M, L, T,
                                              ::Val{AllocateAD} = Val(true)) where {DT,AllocateAD}
     return QuadraticStateSpaceProblemCache(; u = [Vector{DT}(undef, N) for _ in 1:T],
                                            u_f = [Vector{DT}(undef, N) for _ in 1:T],
-                                           z = [Vector{DT}(undef, N_z) for _ in 1:T],
-                                           innovation = [Vector{DT}(undef, N_z) for _ in 1:T],
+                                           z = [Vector{DT}(undef, L) for _ in 1:T],
+                                           innovation = [Vector{DT}(undef, L) for _ in 1:T],
                                            A_2_vec = [Matrix{DT}(undef, N, N) for _ in 1:N],
-                                           C_2_vec = [Matrix{DT}(undef, N, N) for _ in 1:N_z],
+                                           C_2_vec = [Matrix{DT}(undef, N, N) for _ in 1:L],
 
                                            # Only on the rrule
                                            A_2_vec_sum = AllocateAD ?
                                                          [Matrix{DT}(undef, N, N) for _ in 1:N] :
                                                          nothing,
                                            C_2_vec_sum = AllocateAD ?
-                                                         [Matrix{DT}(undef, N, N) for _ in 1:N_z] :
+                                                         [Matrix{DT}(undef, N, N) for _ in 1:L] :
                                                          nothing,
                                            Δu = AllocateAD ? [Vector{DT}(undef, N) for _ in 1:T] :
                                                 nothing,
@@ -56,18 +50,10 @@ function QuadraticStateSpaceProblemCache{DT}(N, M, N_z, T,
                                                       [Matrix{DT}(undef, N, N) for _ in 1:N] :
                                                       nothing,
                                            ΔC_2_vec = AllocateAD ?
-                                                      [Matrix{DT}(undef, N, N) for _ in 1:N_z] :
+                                                      [Matrix{DT}(undef, N, N) for _ in 1:L] :
                                                       nothing,
                                            temp_N_N = AllocateAD ? Matrix{DT}(undef, N, N) :
-                                                      nothing,
-                                           temp_M_M = AllocateAD ? Matrix{DT}(undef, M, M) :
-                                                      nothing,
-                                           temp_M_N = AllocateAD ? Matrix{DT}(undef, M, N) :
-                                                      nothing,
-                                           temp_N_M = AllocateAD ? Matrix{DT}(undef, N, M) :
-                                                      nothing,
-                                           temp_M = AllocateAD ? Vector{DT}(undef, M) : nothing,
-                                           temp_N = AllocateAD ? Vector{DT}(undef, N) : nothing)
+                                                      nothing)
 end
 
 struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:AbstractArray,
