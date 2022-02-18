@@ -15,7 +15,7 @@ const observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
                                          "test/data/RBC_observables.csv"), ',')' |> collect
 const noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |>
                   collect
-const cache_rbc_1 = LinearStateSpaceProblemCache{Float64}(size(A_rbc, 1), size(C_rbc, 2),
+const cache_rbc_1 = LinearStateSpaceProblemCache{Float64}(size(A_rbc, 1), size(C_rbc, 1),
                                                           size(observables_rbc, 1),
                                                           size(observables_rbc, 2) + 1)
 # Matrices from FVGQ
@@ -31,7 +31,7 @@ const observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
 const noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
                            ',')' |> collect
 const u0_FVGQ = zeros(size(A_FVGQ, 1))
-const cache_FVGQ_1 = LinearStateSpaceProblemCache{Float64}(size(A_FVGQ, 1), size(C_FVGQ, 2),
+const cache_FVGQ_1 = LinearStateSpaceProblemCache{Float64}(size(A_FVGQ, 1), size(C_FVGQ, 1),
                                                            size(observables_FVGQ, 1),
                                                            size(observables_FVGQ, 2) + 1)
 
@@ -76,19 +76,28 @@ const LINEAR["rbc"]["joint_1_gradient"] = @benchmarkable gradient(joint_likeliho
                                                                   $B_rbc, $C_rbc, $u0_rbc,
                                                                   $noise_rbc, $observables_rbc,
                                                                   $D_rbc)
-const LINEAR["rbc"] = BenchmarkGroup()
-const LINEAR["rbc"]["joint_1"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc, $u0_rbc,
-                                                                   $noise_rbc, $observables_rbc,
-                                                                   $D_rbc)
-const LINEAR["rbc"]["joint_1_gradient"] = @benchmarkable gradient(joint_likelihood_1, $A_rbc,
-                                                                  $B_rbc, $C_rbc, $u0_rbc,
-                                                                  $noise_rbc, $observables_rbc,
-                                                                  $D_rbc)
 const LINEAR["rbc"]["kalman"] = @benchmarkable kalman_likelihood($A_rbc, $B_rbc, $C_rbc, $u0_rbc,
                                                                  $observables_rbc, $D_rbc)
 const LINEAR["rbc"]["kalman_gradient"] = @benchmarkable gradient(kalman_likelihood, $A_rbc, $B_rbc,
                                                                  $C_rbc, $u0_rbc, $observables_rbc,
                                                                  $D_rbc)
+const LINEAR["rbc"]["joint_1_cache"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc,
+                                                                         $u0_rbc, $noise_rbc,
+                                                                         $observables_rbc, $D_rbc;
+                                                                         cache = $cache_rbc_1)
+const LINEAR["rbc"]["joint_1_gradient_cache"] = @benchmarkable gradient((args...) -> joint_likelihood_1(args...;
+                                                                                                        cache = $cache_rbc_1),
+                                                                        $A_rbc, $B_rbc, $C_rbc,
+                                                                        $u0_rbc, $noise_rbc,
+                                                                        $observables_rbc, $D_rbc)
+const LINEAR["rbc"]["kalman_cache"] = @benchmarkable kalman_likelihood($A_rbc, $B_rbc, $C_rbc,
+                                                                       $u0_rbc, $observables_rbc,
+                                                                       $D_rbc; cache = $cache_rbc_1)
+const LINEAR["rbc"]["kalman_gradient_cache"] = @benchmarkable gradient((args...) -> kalman_likelihood(args...;
+                                                                                                      cache = $cache_rbc_1),
+                                                                       $A_rbc, $B_rbc, $C_rbc,
+                                                                       $u0_rbc, $observables_rbc,
+                                                                       $D_rbc)
 
 # FVGQ sized specific test
 const LINEAR["FVGQ"] = BenchmarkGroup()
@@ -105,6 +114,25 @@ const LINEAR["FVGQ"]["kalman"] = @benchmarkable kalman_likelihood($A_FVGQ, $B_FV
 const LINEAR["FVGQ"]["kalman_gradient"] = @benchmarkable gradient(kalman_likelihood, $A_FVGQ,
                                                                   $B_FVGQ, $C_FVGQ, $u0_FVGQ,
                                                                   $observables_FVGQ, $D_FVGQ)
+const LINEAR["FVGQ"]["joint_1_cache"] = @benchmarkable joint_likelihood_1($A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                          $u0_FVGQ, $noise_FVGQ,
+                                                                          $observables_FVGQ,
+                                                                          $D_FVGQ;
+                                                                          cache = $cache_FVGQ_1)
+const LINEAR["FVGQ"]["joint_1_gradient_cache"] = @benchmarkable gradient((args...) -> joint_likelihood_1(args...;
+                                                                                                         cache = $cache_FVGQ_1),
+                                                                         $A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                         $u0_FVGQ, $noise_FVGQ,
+                                                                         $observables_FVGQ, $D_FVGQ)
+const LINEAR["FVGQ"]["kalman_cache"] = @benchmarkable kalman_likelihood($A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                        $u0_FVGQ, $observables_FVGQ,
+                                                                        $D_FVGQ;
+                                                                        cache = $cache_FVGQ_1)
+const LINEAR["FVGQ"]["kalman_gradient_cache"] = @benchmarkable gradient((args...) -> kalman_likelihood(args...;
+                                                                                                       cache = $cache_FVGQ_1),
+                                                                        $A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                        $u0_FVGQ, $observables_FVGQ,
+                                                                        $D_FVGQ)
 
 # return for the test suite
 LINEAR
