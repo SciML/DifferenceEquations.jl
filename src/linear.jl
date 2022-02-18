@@ -84,7 +84,7 @@ function LinearStateSpaceProblem(A::Atype, B::Btype, C::Ctype, u0::utype, tspan:
                                               MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
                                  observables = nothing, noise = nothing,
                                  cache = LinearStateSpaceProblemCache{eltype(u0)}(length(u0),
-                                                                                  length(obs_noise),
+                                                                                  size(B, 2),
                                                                                   size(observables,
                                                                                        1),
                                                                                   size(observables,

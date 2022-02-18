@@ -47,6 +47,7 @@ include("kalman.jl")
 
 # Exports
 export StateSpaceProblem, NoiseConditionalFilter, KalmanFilter, LinearStateSpaceProblem,
-       QuadraticStateSpaceProblem, solve, LinearStateSpaceProblemCache
+       QuadraticStateSpaceProblem, solve, LinearStateSpaceProblemCache,
+       QuadraticStateSpaceProblemCache
 
 end # module

@@ -27,13 +27,13 @@ u0_rbc = zeros(2)
 
 path = joinpath(pkgdir(DifferenceEquations), "test", "data")
 file_prefix = "RBC"
-observables = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
-noise = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
+observables_rbc = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
+noise_rbc = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
 
 # Data and Noise
 T = 5
-observables_rbc = observables[:, 1:T]
-noise_rbc = noise[:, 1:T]
+observables_rbc = observables_rbc[:, 1:T]
+noise_rbc = noise_rbc[:, 1:T]
 
 @testset "linear rbc joint likelihood" begin
     @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
@@ -59,7 +59,7 @@ end
 end
 
 @testset "linear rbc kalman likelihood preallocated" begin
-    cache = LinearStateSpaceProblemCache{Float64}(size(A_rbc, 1), size(C_rbc, 1),
+    cache = LinearStateSpaceProblemCache{Float64}(size(A_rbc, 1), size(B_rbc, 2),
                                                   size(observables_rbc, 1),
                                                   size(observables_rbc, 2) + 1)
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc; cache) ≈
@@ -83,26 +83,31 @@ end
 # Load FVGQ data for checks
 path = joinpath(pkgdir(DifferenceEquations), "test", "data")
 file_prefix = "FVGQ20"
-A = readdlm(joinpath(path, "$(file_prefix)_A.csv"), ',')
-B = readdlm(joinpath(path, "$(file_prefix)_B.csv"), ',')
-C = readdlm(joinpath(path, "$(file_prefix)_C.csv"), ',')
+A_FVGQ = readdlm(joinpath(path, "$(file_prefix)_A.csv"), ',')
+B_FVGQ = readdlm(joinpath(path, "$(file_prefix)_B.csv"), ',')
+C_FVGQ = readdlm(joinpath(path, "$(file_prefix)_C.csv"), ',')
 # D_raw = readdlm(joinpath(path, "$(file_prefix)_D.csv"), ',')
-D = ones(6) * 1e-3
-observables = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
-noise = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
-u0 = zeros(size(A, 1))
+D_FVGQ = ones(6) * 1e-3
+observables_FVGQ = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
+noise_FVGQ = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
+u0_FVGQ = zeros(size(A, 1))
 
 @testset "linear FVGQ joint likelihood" begin
-    @test joint_likelihood_1(A, B, C, u0, noise, observables, D) ≈ -1.4648817357717388e9
-    @inferred joint_likelihood_1(A, B, C, u0, noise, observables, D)
-    test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> joint_likelihood_1(args..., observables, D),
-               A, B, C, u0, noise; rrule_f = rrule_via_ad, check_inferred = false)
+    @test joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ,
+                             D_FVGQ) ≈ -1.4648817357717388e9
+    @inferred joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ,
+                                 D_FVGQ)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> joint_likelihood_1(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ,
+               C_FVGQ, u0_FVGQ, noise_FVGQ; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
 @testset "linear FVGQ Kalman" begin
     # Note: set rtol to be higher than the default case because of huge gradient numbers
-    @test kalman_likelihood(A, B, C, u0, observables, D) ≈ -108.52706300389917
-    gradient((args...) -> kalman_likelihood(args..., observables, D), A, B, C, u0)
+    @test kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, D_FVGQ) ≈
+          -108.52706300389917
+    gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ,
+             C_FVGQ, u0_FVGQ)
 
     # TODO: this is not turned on because the numbers explode.  Need better unit test data to be interior
     # test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> kalman_likelihood(args..., observables, D),
@@ -110,12 +115,15 @@ end
 end
 
 @testset "linear FVGQ kalman likelihood preallocated" begin
-    cache = LinearStateSpaceProblemCache{Float64}(size(A, 1), size(C, 1), size(observables, 1),
-                                                  size(observables, 2) + 1)
-    @test kalman_likelihood(A, B, C, u0, observables, D; cache) ≈ -108.52706300389917
-    @inferred kalman_likelihood(A, B, C, u0, observables, D; cache)
-    f_cache_grad = gradient((args...) -> kalman_likelihood(args..., observables, D; cache), A, B, C,
-                            u0)
-    f_grad = gradient((args...) -> kalman_likelihood(args..., observables, D), A, B, C, u0)
+    cache = LinearStateSpaceProblemCache{Float64}(size(A_FVGQ, 1), size(B_FVGQ, 2),
+                                                  size(observables_FVGQ, 1),
+                                                  size(observables_FVGQ, 2) + 1)
+    @test kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, D_FVGQ; cache) ≈
+          -108.52706300389917
+    @inferred kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, D_FVGQ; cache)
+    f_cache_grad = gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ; cache),
+                            A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ)
+    f_grad = gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ,
+                      B_FVGQ, C_FVGQ, u0_FVGQ)
     @test all(f_cache_grad .== f_grad) # for some reason the test_rrule doesn't like the cache vs. no-cache cases.
 end

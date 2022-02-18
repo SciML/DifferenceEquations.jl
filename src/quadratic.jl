@@ -5,41 +5,6 @@ z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
 z_tilde(t) = z(t) + v(t+1)
 """
 
-# old quad and adjoint replaced by inplace accumulation versions.
-# function quad(A::AbstractArray{<:Number,3}, x)
-#     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
-# end
-# # quadratic form pullback
-# function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::AbstractVector)
-#     ΔA = similar(A)
-#     Δx = zeros(length(x))
-#     tmp = x * x'
-#     for i in 1:size(A, 1)
-#         ΔA[i, :, :] .= tmp .* Δres[i]
-#         Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
-#     end
-#     return ΔA, Δx
-# end
-
-# y += quad(A, x)
-# The quad_muladd! uses on a vector of matrices for A
-function quad_muladd!(y, A, x)
-    @inbounds for j in 1:size(A, 1)
-        @views y[j] += dot(x, A[j], x)
-    end
-    return y
-end
-
-# inplace version with accumulation and using the cache of A[i] + A[i]', etc.
-function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
-    tmp = x * x'
-    @inbounds for (i, A_sum) in enumerate(A_vec_sum)  # @views @inbounds  ADD
-        ΔA_vec[i] .+= tmp .* Δres[i]
-        Δx .+= A_sum * x .* Δres[i]
-    end
-    return nothing
-end
-
 Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14,
                                                    T15,T16,T17,T18,T19}
     u::T1
@@ -132,7 +97,7 @@ function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B:
                                                  MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
                                     observables = nothing, noise = nothing,
                                     cache = QuadraticStateSpaceProblemCache{eltype(u0)}(length(u0),
-                                                                                        length(obs_noise),
+                                                                                        size(B, 2),
                                                                                         size(observables,
                                                                                              1),
                                                                                         size(observables,
@@ -261,8 +226,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
 
     function solve_pb(Δsol)
-        #@unpack Δnoise,  = prob.cache  # problem cache
-        @unpack ΔA_2_vec, ΔC_2_vec, Δu, Δu_f, temp_N_N, A_2_vec_sum, C_2_vec_sum = prob.cache  # problem cache
+        @unpack Δnoise, ΔA_2_vec, ΔC_2_vec, Δu, Δu_f, temp_N_N, A_2_vec_sum, C_2_vec_sum = prob.cache  # problem cache
         Δlogpdf = Δsol.loglikelihood
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
@@ -274,7 +238,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         foreach(fill_zero!, ΔC_2_vec)
         foreach(fill_zero!, Δu)
         foreach(fill_zero!, Δu_f)
-        # fill_zero!(Δnoise)
+        fill_zero!(Δnoise)
 
         # prep sum since used repeatedly
         for (i, A) in enumerate(A_2_vec)
@@ -288,9 +252,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             C_2_vec_sum[i] .+= temp_N_N
         end
 
-        Δnoise = similar(prob.noise)
-
-        # Could move into cache later for huge problems
+        # TODO: move into cache later for large problems
         ΔA_0 = zero(A_0)
         ΔA_1 = zero(A_1)
         ΔA_2 = zero(A_2)
@@ -298,22 +260,24 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         ΔC_0 = zero(C_0)
         ΔC_1 = zero(C_1)
         ΔC_2 = zero(C_2)
-
-        # Δnoise = similar(prob.noise)
-        @show size(Δnoise), size(prob.noise)
-        @assert size(Δnoise) == size(prob.noise)
+        Δz = zero(z[1])
+        Δu_f_sum = zero(u[1])
 
         @views @inbounds for t in T:-1:2
-            Δz = Δlogpdf * innovation[t] ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz .= Δlogpdf * innovation[t] ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
 
             # inplace adoint of quadratic form with accumulation
-            quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
+            quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t], temp_N_N)
             mul!(Δu[t], C_1', Δz, 1, 1)
 
-            quad_muladd_pb!(ΔA_2_vec, Δu_f[t - 1], Δu[t], A_2_vec_sum, u_f[t - 1])
+            quad_muladd_pb!(ΔA_2_vec, Δu_f[t - 1], Δu[t], A_2_vec_sum, u_f[t - 1], temp_N_N)
             mul!(Δu[t - 1], A_1', Δu[t])
             mul!(Δu_f[t - 1], A_1', Δu_f[t], 1, 1)
-            Δu_f_sum = Δu[t] .+ Δu_f[t]
+
+            # Δu_f_sum = Δu[t] .+ Δu_f[t]
+            copy!(Δu_f_sum, Δu[t])
+            Δu_f_sum .+= Δu_f[t]
+
             mul!(Δnoise[:, t - 1], B', Δu_f_sum)
             # Now, deal with the coefficients
             ΔA_0 += Δu[t]

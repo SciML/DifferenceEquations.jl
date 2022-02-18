@@ -25,13 +25,13 @@ u0_rbc = zeros(2)
 
 path = joinpath(pkgdir(DifferenceEquations), "test", "data")
 file_prefix = "RBC"
-observables = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
-noise = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
+observables_rbc = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
+noise_rbc = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
 
 # Data and Noise
 T = 5
-observables_rbc = observables[:, 1:T]
-noise_rbc = noise[:, 1:T]
+observables_rbc = observables_rbc[:, 1:T]
+noise_rbc = noise_rbc[:, 1:T]
 
 @testset "quadratic rbc joint likelihood" begin
     @test joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc,
@@ -44,6 +44,22 @@ noise_rbc = noise[:, 1:T]
                (args...) -> joint_likelihood_2(args..., observables_rbc, D_rbc), A_0_rbc, A_1_rbc,
                A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad,
                check_inferred = false)
+end
+
+@testset "quadratic rbc joint likelihood preallocated" begin
+    cache = QuadraticStateSpaceProblemCache{Float64}(size(A_1_rbc, 1), size(B_rbc, 2),
+                                                     size(observables_rbc, 1),
+                                                     size(observables_rbc, 2) + 1)
+    @test joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc,
+                             noise_rbc, observables_rbc, D_rbc; cache) ≈ -690.81094364573
+    @inferred joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc,
+                                 u0_rbc, noise_rbc, observables_rbc, D_rbc; cache) # would this catch inference problems in the solve?
+    f_cache_grad = gradient((args...) -> joint_likelihood_2(args..., observables_rbc, D_rbc; cache),
+                            A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc,
+                            noise_rbc)
+    f_grad = gradient((args...) -> joint_likelihood_2(args..., observables_rbc, D_rbc), A_0_rbc,
+                      A_1_rbc, A_2_rbc, B_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_rbc, noise_rbc)
+    @test all(f_cache_grad .== f_grad) # for some reason the test_rrule doesn't like the cache             
 end
 
 # Load FVGQ data for checks
@@ -76,4 +92,21 @@ u0_FVGQ = zeros(size(A_1_FVGQ, 1))
     #test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> joint_likelihood_2(args..., observables, D),
     #    A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise; rrule_f = rrule_via_ad,
     #    check_inferred = false)
+end
+
+@testset "quadratic FVGQ joint likelihood preallocated" begin
+    cache = QuadraticStateSpaceProblemCache{Float64}(size(A_1_FVGQ, 1), size(B_FVGQ, 2),
+                                                     size(observables_FVGQ, 1),
+                                                     size(observables_FVGQ, 2) + 1)
+    @test joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
+                             u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ; cache) ≈
+          -1.473244794713955e10
+    @inferred joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
+                                 u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ; cache) # would this catch inference problems in the solve?
+    f_cache_grad = gradient((args...) -> joint_likelihood_2(args..., observables_FVGQ, D_FVGQ;
+                                                            cache), A_0_FVGQ, A_1_FVGQ, A_2_FVGQ,
+                            B_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_FVGQ, noise_FVGQ)
+    f_grad = gradient((args...) -> joint_likelihood_2(args..., observables_FVGQ, D_FVGQ), A_0_FVGQ,
+                      A_1_FVGQ, A_2_FVGQ, B_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_FVGQ, noise_FVGQ)
+    @test all(f_cache_grad .== f_grad) # for some reason the test_rrule doesn't like the cache             
 end
