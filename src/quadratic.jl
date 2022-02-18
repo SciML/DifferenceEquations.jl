@@ -40,11 +40,59 @@ function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     return nothing
 end
 
+Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13}
+    u::T1
+    z::T2
+    innovation::T3
+    u_f::T4
+    A_2_vec::T5 # remove after native datastructure
+    C_2_vec::T6 # remove after native datastructure
+
+    # Only for rrule
+    A_2_vec_sum::T7
+    C_2_vec_sum::T8
+    Δu::T9
+    Δu_f::T10
+    Δnoise::T11
+    ΔA_2_vec::T12
+    ΔC_2_vec::T13
+end
+
+function QuadraticStateSpaceProblemCache{DT}(N, M, N_z, T,
+                                             ::Val{AllocateAD} = Val(true)) where {DT,AllocateAD}
+    return QuadraticStateSpaceProblemCache(; u = [Vector{DT}(undef, N) for _ in 1:T],
+                                           u_f = [Vector{DT}(undef, N) for _ in 1:T],
+                                           z = [Vector{DT}(undef, N_z) for _ in 1:T],
+                                           innovation = [Vector{DT}(undef, N_z) for _ in 1:T],
+                                           A_2_vec = [Matrix{DT}(undef, N, N) for _ in 1:N],
+                                           C_2_vec = [Matrix{DT}(undef, N, N) for _ in 1:N_z],
+
+                                           # Only on the rrule
+                                           A_2_vec_sum = AllocateAD ?
+                                                         [Matrix{DT}(undef, N, N) for _ in 1:N] :
+                                                         nothing,
+                                           C_2_vec_sum = AllocateAD ?
+                                                         [Matrix{DT}(undef, N, N) for _ in 1:N_z] :
+                                                         nothing,
+                                           Δu = AllocateAD ? [Vector{DT}(undef, N) for _ in 1:T] :
+                                                nothing,
+                                           Δu_f = AllocateAD ? [Vector{DT}(undef, N) for _ in 1:T] :
+                                                  nothing,
+                                           Δnoise = AllocateAD ? Matrix{DT}(undef, M, T - 1) :
+                                                    nothing,
+                                           ΔA_2_vec = AllocateAD ?
+                                                      [Matrix{DT}(undef, N, N) for _ in 1:N] :
+                                                      nothing,
+                                           ΔC_2_vec = AllocateAD ?
+                                                      [Matrix{DT}(undef, N, N) for _ in 1:N_z] :
+                                                      nothing)
+end
+
 struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:AbstractArray,
                                   A_2type<:AbstractArray,Btype<:AbstractArray,
                                   C_0type<:AbstractArray,C_1type<:AbstractArray,
                                   C_2type<:AbstractArray,wtype,Rtype, # Distributions only
-                                  utype,ttype,otype} <: AbstractStateSpaceProblem{isinplace}
+                                  utype,ttype,otype,ctype} <: AbstractStateSpaceProblem{isinplace}
     A_0::A_0type
     A_1::A_1type
     A_2::A_2type # Evolution matrix
@@ -57,6 +105,7 @@ struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:Abst
     u0::utype # Initial condition
     tspan::ttype # Timespan to use
     observables::otype # Observed data to use, if any
+    cache::ctype # cache    
 end
 
 function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B::Btype,
@@ -64,24 +113,33 @@ function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B:
                                     tspan::ttype;
                                     obs_noise = (h0 = C_1 * u0;
                                                  MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
-                                    observables = nothing,
-                                    noise = nothing) where {A_0type<:AbstractArray,
-                                                            A_1type<:AbstractArray,
-                                                            A_2type<:AbstractArray,
-                                                            Btype<:AbstractArray,
-                                                            C_0type<:AbstractArray,
-                                                            C_1type<:AbstractArray,
-                                                            C_2type<:AbstractArray,utype,ttype}
+                                    observables = nothing, noise = nothing,
+                                    cache = QuadraticStateSpaceProblemCache{eltype(u0)}(length(u0),
+                                                                                        length(obs_noise),
+                                                                                        size(observables,
+                                                                                             1),
+                                                                                        size(observables,
+                                                                                             2) + 1)) where {A_0type<:AbstractArray,
+                                                                                                             A_1type<:AbstractArray,
+                                                                                                             A_2type<:AbstractArray,
+                                                                                                             Btype<:AbstractArray,
+                                                                                                             C_0type<:AbstractArray,
+                                                                                                             C_1type<:AbstractArray,
+                                                                                                             C_2type<:AbstractArray,
+                                                                                                             utype,
+                                                                                                             ttype}
     return QuadraticStateSpaceProblem{Val(false),A_0type,A_1type,A_2type,Btype,C_0type,C_1type,
                                       C_2type,typeof(noise),typeof(obs_noise),utype,ttype,
-                                      typeof(observables)}(A_0::A_0type, A_1::A_1type, A_2::A_2type, # Evolution matrix
-                                                           B::Btype, # Noise matrix
-                                                           C_0::C_0type, C_1::C_1type, C_2::C_2type, # Observation matrix
-                                                           noise, # Latent noise distribution
-                                                           obs_noise, # Observation noise matrix
-                                                           u0, # Initial condition
-                                                           tspan, # Timespan to use
-                                                           observables)
+                                      typeof(observables),typeof(cache)}(A_0::A_0type, A_1::A_1type,
+                                                                         A_2::A_2type, # Evolution matrix
+                                                                         B::Btype, # Noise matrix
+                                                                         C_0::C_0type, C_1::C_1type,
+                                                                         C_2::C_2type, # Observation matrix
+                                                                         noise, # Latent noise distribution
+                                                                         obs_noise, # Observation noise matrix
+                                                                         u0, # Initial condition
+                                                                         tspan, # Timespan to use
+                                                                         observables, cache)
 end
 
 # Default is NoiseConditionalFilter
@@ -119,12 +177,12 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
     loglik = 0.0
     @inbounds @views for t in 2:T
         mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u_f[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         u[t] .= A_0
         mul!(u[t], A_1, u[t - 1], 1, 1)
         quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
