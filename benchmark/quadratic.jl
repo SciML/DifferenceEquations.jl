@@ -1,6 +1,14 @@
 #Benchmarking of RBC and FVGQ variants
-using DifferenceEquations, BenchmarkTools
+using DifferenceEquations, BenchmarkTools, LinearAlgebra
 using DelimitedFiles, Distributions, Zygote
+# General likelihood calculation
+function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D; kwargs...)
+    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2));
+                                         obs_noise = MvNormal(Diagonal(abs2.(D))), noise,
+                                         observables, kwargs...)
+    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
+end
+
 const QUADRATIC = BenchmarkGroup()
 
 # Matrices from RBC
@@ -20,6 +28,9 @@ const observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
                                            "test/data/RBC_observables.csv"), ',')' |> collect
 const noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
                             ',')' |> collect
+const cache_2_rbc = QuadraticStateSpaceProblemCache{Float64}(size(A_2_rbc, 1), size(B_2_rbc, 2),
+                                                             size(observables_2_rbc, 1),
+                                                             size(observables_2_rbc, 2) + 1)
 
 # Matrices from FVGQ
 # Load FVGQ data for checks
@@ -43,22 +54,24 @@ const observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
 
 const noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
                              ',')' |> collect
-
-# General likelihood calculation
-function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D)
-    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2));
-                                         obs_noise = MvNormal(Diagonal(abs2.(D))), noise,
-                                         observables)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
-end
+const cache_2_FVGQ = QuadraticStateSpaceProblemCache{Float64}(size(A_2_FVGQ, 1), size(B_2_FVGQ, 2),
+                                                              size(observables_2_FVGQ, 1),
+                                                              size(observables_2_FVGQ, 2) + 1)
 
 # RBC sized specific tests
 # Verifying code prior to benchmark
 # executing gradients once to avoid compilation time in benchmarking
+joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc,
+                   noise_2_rbc, observables_2_rbc, D_2_rbc)
 gradient(joint_likelihood_2, A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc,
          u0_2_rbc, noise_2_rbc, observables_2_rbc, D_2_rbc)
 gradient(joint_likelihood_2, A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
          u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ)
+gradient((args...) -> joint_likelihood_2(args...; cache = cache_2_rbc), A_0_rbc, A_1_rbc, A_2_rbc,
+         B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc, noise_2_rbc, observables_2_rbc, D_2_rbc)
+gradient((args...) -> joint_likelihood_2(args...; cache = cache_2_FVGQ), A_0_FVGQ, A_1_FVGQ,
+         A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ,
+         observables_2_FVGQ, D_2_FVGQ)
 
 const QUADRATIC["rbc"] = BenchmarkGroup()
 const QUADRATIC["rbc"]["joint_2"] = @benchmarkable joint_likelihood_2($A_0_rbc, $A_1_rbc, $A_2_rbc,
@@ -71,6 +84,23 @@ const QUADRATIC["rbc"]["joint_2_gradient"] = @benchmarkable gradient(joint_likel
                                                                      $C_0_rbc, $C_1_rbc, $C_2_rbc,
                                                                      $u0_2_rbc, $noise_2_rbc,
                                                                      $observables_2_rbc, $D_2_rbc)
+const QUADRATIC["rbc"]["joint_2_cache"] = @benchmarkable joint_likelihood_2($A_0_rbc, $A_1_rbc,
+                                                                            $A_2_rbc, $B_2_rbc,
+                                                                            $C_0_rbc, $C_1_rbc,
+                                                                            $C_2_rbc, $u0_2_rbc,
+                                                                            $noise_2_rbc,
+                                                                            $observables_2_rbc,
+                                                                            $D_2_rbc;
+                                                                            cache = $cache_2_rbc)
+const QUADRATIC["rbc"]["joint_2_gradient_cache"] = @benchmarkable gradient((args...) -> joint_likelihood_2(args...;
+                                                                                                           cache = $cache_2_rbc),
+                                                                           $A_0_rbc, $A_1_rbc,
+                                                                           $A_2_rbc, $B_2_rbc,
+                                                                           $C_0_rbc, $C_1_rbc,
+                                                                           $C_2_rbc, $u0_2_rbc,
+                                                                           $noise_2_rbc,
+                                                                           $observables_2_rbc,
+                                                                           $D_2_rbc)
 
 # FVGQ sized specific test
 const QUADRATIC["FVGQ"] = BenchmarkGroup()
@@ -88,5 +118,22 @@ const QUADRATIC["FVGQ"]["joint_2_gradient"] = @benchmarkable gradient(joint_like
                                                                       $u0_2_FVGQ, $noise_2_FVGQ,
                                                                       $observables_2_FVGQ,
                                                                       $D_2_FVGQ)
+const QUADRATIC["FVGQ"]["joint_2_cache"] = @benchmarkable joint_likelihood_2($A_0_FVGQ, $A_1_FVGQ,
+                                                                             $A_2_FVGQ, $B_2_FVGQ,
+                                                                             $C_0_FVGQ, $C_1_FVGQ,
+                                                                             $C_2_FVGQ, $u0_2_FVGQ,
+                                                                             $noise_2_FVGQ,
+                                                                             $observables_2_FVGQ,
+                                                                             $D_2_FVGQ;
+                                                                             cache = $cache_2_FVGQ)
+const QUADRATIC["FVGQ"]["joint_2_gradient_cache"] = @benchmarkable gradient((args...) -> joint_likelihood_2(args...;
+                                                                                                            cache = $cache_2_FVGQ),
+                                                                            $A_0_FVGQ, $A_1_FVGQ,
+                                                                            $A_2_FVGQ, $B_2_FVGQ,
+                                                                            $C_0_FVGQ, $C_1_FVGQ,
+                                                                            $C_2_FVGQ, $u0_2_FVGQ,
+                                                                            $noise_2_FVGQ,
+                                                                            $observables_2_FVGQ,
+                                                                            $D_2_FVGQ)
 # return for the test suite
 QUADRATIC
