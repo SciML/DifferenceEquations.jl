@@ -42,11 +42,6 @@ noise_rbc = noise_rbc[:, 1:T]
     test_rrule(Zygote.ZygoteRuleConfig(),
                (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
-    # Redundant struct on those matrices
-    x = (; A = A_rbc, B = B_rbc, C = C_rbc, u0 = u0_rbc, noise = noise_rbc,
-         observables = observables_rbc, D = D_rbc)
-    @test joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D) ≈ -690.9407412360038
-    @inferred joint_likelihood_1(x.A, x.B, x.C, x.u0, x.noise, x.observables, x.D)
 end
 
 @testset "linear rbc kalman likelihood" begin
@@ -55,7 +50,7 @@ end
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
     test_rrule(Zygote.ZygoteRuleConfig(),
                (args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
-               u0_rbc; rrule_f = rrule_via_ad, check_inferred = false) # u0_rbc is skipped by default in test_rrule I think
+               u0_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
 @testset "linear rbc kalman likelihood preallocated" begin
@@ -90,7 +85,7 @@ C_FVGQ = readdlm(joinpath(path, "$(file_prefix)_C.csv"), ',')
 D_FVGQ = ones(6) * 1e-3
 observables_FVGQ = readdlm(joinpath(path, "$(file_prefix)_observables.csv"), ',')' |> collect
 noise_FVGQ = readdlm(joinpath(path, "$(file_prefix)_noise.csv"), ',')' |> collect
-u0_FVGQ = zeros(size(A, 1))
+u0_FVGQ = zeros(size(A_FVGQ, 1))
 
 @testset "linear FVGQ joint likelihood" begin
     @test joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ,

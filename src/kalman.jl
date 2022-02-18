@@ -6,11 +6,12 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
-    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_M_M, temp_M_N, temp_N_M = prob.cache
+    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_L_L, temp_L_N, temp_N_L = prob.cache
     @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
 
-    N = length(u0)
-    M = size(C, 1)
+    N = length(u0) # number of states
+    M = size(B, 2) # number of shocks on evolution matrix
+    L = size(C, 1) # number of observables
 
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
     R = prob.obs_noise.Σ # Extract covariance from noise distribution
@@ -40,8 +41,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         V[t].mat .+= R
 
         # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-        transpose!(temp_M_M, V[t].mat)
-        V[t].mat .+= temp_M_M
+        transpose!(temp_L_L, V[t].mat)
+        V[t].mat .+= temp_L_L
         lmul!(0.5, V[t].mat)
 
         copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
@@ -51,8 +52,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
         # K[t] .= CP[t]' / V[t]  # Kalman gain
         # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
-        ldiv!(temp_M_N, V[t].chol, CP[t])
-        transpose!(K[t], temp_M_N)
+        ldiv!(temp_L_N, V[t].chol, CP[t])
+        transpose!(K[t], temp_L_N)
 
         #u[t] += K[t] * innovation[t]
         copy!(u[t], u_temp[t])
@@ -76,11 +77,12 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
-    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_M_M, temp_M_N, temp_N_M, temp_M, temp_N = prob.cache
+    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_L_L, temp_L_N, temp_N_L = prob.cache
     @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
 
-    N = length(u0)
-    M = size(C, 1)
+    N = length(u0) # number of states
+    M = size(B, 2) # number of shocks on evolution matrix
+    L = size(C, 1) # number of observables
 
     # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
     R = prob.obs_noise.Σ # Extract covariance from noise distribution
@@ -110,8 +112,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         V[t].mat .+= R
 
         # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-        transpose!(temp_M_M, V[t].mat)
-        V[t].mat .+= temp_M_M
+        transpose!(temp_L_L, V[t].mat)
+        V[t].mat .+= temp_L_L
         lmul!(0.5, V[t].mat)
 
         copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
@@ -121,8 +123,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
         # K[t] .= CP[t]' / V[t]  # Kalman gain
         # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
-        ldiv!(temp_M_N, V[t].chol, CP[t])
-        transpose!(K[t], temp_M_N)
+        ldiv!(temp_L_N, V[t].chol, CP[t])
+        transpose!(K[t], temp_L_N)
 
         #u[t] += K[t] * innovation[t]
         copy!(u[t], u_temp[t])
@@ -132,15 +134,16 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         copy!(P[t], P_temp[t])
         mul!(P[t], K[t], CP[t], -1, 1)
     end
-
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
     function solve_pb(Δsol)
+        @unpack temp_L, temp_N = prob.cache
+
         Δlogpdf = Δsol.loglikelihood
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
                     map(_ -> NoTangent(), args)...)
         end
-        # Buffers
+        # Buffers.  Could move to cache for big problems
         ΔP = zero(P[1])
         Δu = zero(u[1])
         ΔA = zero(A)
@@ -168,30 +171,30 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(ΔCP, inv_V, ΔK', 1, 1) # ΔCP += inv_V * ΔK'
 
             # ΔV .= -inv_V * CP[t] * ΔK * inv_V
-            mul!(temp_M_N, inv_V, CP[t])
-            mul!(temp_N_M, ΔK, inv_V)
-            mul!(ΔV, temp_M_N, temp_N_M, -1, 0)
+            mul!(temp_L_N, inv_V, CP[t])
+            mul!(temp_N_L, ΔK, inv_V)
+            mul!(ΔV, temp_L_N, temp_N_L, -1, 0)
 
             mul!(ΔC, ΔCP, P_temp[t]', 1, 1) # ΔC += ΔCP * P_temp[t]'
             mul!(ΔP_temp, C', ΔCP, 1, 1) # ΔP_temp += C' * ΔCP
             mul!(Δz, inv_V, innovation[t], Δlogpdf, 1) # Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
 
             #ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
-            mul!(temp_M, inv_V, innovation[t])
-            mul!(temp_M_M, temp_M, temp_M')
-            temp_M_M .-= inv_V
-            rmul!(temp_M_M, Δlogpdf * 0.5)
-            ΔV += temp_M_M
+            mul!(temp_L, inv_V, innovation[t])
+            mul!(temp_L_L, temp_L, temp_L')
+            temp_L_L .-= inv_V
+            rmul!(temp_L_L, Δlogpdf * 0.5)
+            ΔV += temp_L_L
 
             #ΔC += ΔV * C * P_temp[t]' + ΔV' * C * P_temp[t]
-            mul!(temp_M_N, C, P_temp[t])
-            transpose!(temp_M_M, ΔV)
-            temp_M_M .+= ΔV
-            mul!(ΔC, temp_M_M, temp_M_N, 1, 1)
+            mul!(temp_L_N, C, P_temp[t])
+            transpose!(temp_L_L, ΔV)
+            temp_L_L .+= ΔV
+            mul!(ΔC, temp_L_L, temp_L_N, 1, 1)
 
             # ΔP_temp += C' * ΔV * C
-            mul!(temp_M_N, ΔV, C)
-            mul!(ΔP_temp, C', temp_M_N, 1, 1)
+            mul!(temp_L_N, ΔV, C)
+            mul!(ΔP_temp, C', temp_L_N, 1, 1)
 
             mul!(ΔC, Δz, u_temp[t]', 1, 1) # ΔC += Δz * u_temp[t]'
             mul!(Δu_temp, C', Δz, 1, 1) # Δu_temp += C' * Δz

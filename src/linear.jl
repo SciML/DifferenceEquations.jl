@@ -20,20 +20,21 @@ Base.@kwdef struct LinearStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T
     CP::T9
     V::T10
     temp_N_N::T11
-    temp_M_M::T12
-    temp_M_N::T13
-    temp_N_M::T14
-    temp_M::T15
+    temp_L_L::T12
+    temp_L_N::T13
+    temp_N_L::T14
+    temp_L::T15
     temp_N::T16
 end
 # Not setup to support staticarrays/etc. at this point
 # Maintaining allocations for some intermediates is necessary for the rrule, but not for forward only.  Could be refactored later
-function LinearStateSpaceProblemCache{DT}(N, M, N_z, T,
+# N states, M shocks, L observables
+function LinearStateSpaceProblemCache{DT}(N, M, L, T,
                                           ::Val{AllocateKalman} = Val(true)) where {DT,
                                                                                     AllocateKalman}
     return LinearStateSpaceProblemCache(; u = [Vector{DT}(undef, N) for _ in 1:T],
-                                        z = [Vector{DT}(undef, N_z) for _ in 1:T],
-                                        innovation = [Vector{DT}(undef, N_z) for _ in 1:T],
+                                        z = [Vector{DT}(undef, L) for _ in 1:T],
+                                        innovation = [Vector{DT}(undef, L) for _ in 1:T],
                                         # kalman filter cache
                                         B_prod = AllocateKalman ? Matrix{DT}(undef, N, N) : nothing,
                                         P = AllocateKalman ?
@@ -43,25 +44,25 @@ function LinearStateSpaceProblemCache{DT}(N, M, N_z, T,
                                         P_temp = AllocateKalman ?
                                                  [Matrix{DT}(undef, N, N) for _ in 1:T] : nothing,
                                         K = AllocateKalman ?
-                                            [Matrix{DT}(undef, N, M) for _ in 1:T] : nothing,
+                                            [Matrix{DT}(undef, N, L) for _ in 1:T] : nothing,
                                         CP = AllocateKalman ?
-                                             [Matrix{DT}(undef, M, N) for _ in 1:T] : nothing,
+                                             [Matrix{DT}(undef, L, N) for _ in 1:T] : nothing,
                                         V = AllocateKalman ?
-                                            [PDMat{DT,Matrix{DT}}(M, Matrix{DT}(undef, M, M),
+                                            [PDMat{DT,Matrix{DT}}(L, Matrix{DT}(undef, L, L),
                                                                   Cholesky{DT,Matrix{DT}}(Matrix{DT}(undef,
-                                                                                                     M,
-                                                                                                     M),
+                                                                                                     L,
+                                                                                                     L),
                                                                                           'U', 0))
                                              for _ in 1:T] : nothing,# caches for cholesky and matrix itself
                                         temp_N_N = AllocateKalman ? Matrix{DT}(undef, N, N) :
                                                    nothing,
-                                        temp_M_M = AllocateKalman ? Matrix{DT}(undef, M, M) :
+                                        temp_L_L = AllocateKalman ? Matrix{DT}(undef, L, L) :
                                                    nothing,
-                                        temp_M_N = AllocateKalman ? Matrix{DT}(undef, M, N) :
+                                        temp_L_N = AllocateKalman ? Matrix{DT}(undef, L, N) :
                                                    nothing,
-                                        temp_N_M = AllocateKalman ? Matrix{DT}(undef, N, M) :
+                                        temp_N_L = AllocateKalman ? Matrix{DT}(undef, N, L) :
                                                    nothing,
-                                        temp_M = AllocateKalman ? Vector{DT}(undef, M) : nothing,
+                                        temp_L = AllocateKalman ? Vector{DT}(undef, L) : nothing,
                                         temp_N = AllocateKalman ? Vector{DT}(undef, N) : nothing)
 end
 
