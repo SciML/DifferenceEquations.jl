@@ -6,8 +6,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
-    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_L_L, temp_L_N, temp_N_L = prob.cache
-    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
+    @unpack u, z, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_L_L, temp_L_N, temp_N_L = prob.cache
+    @assert length(u) >= T && length(z) >= T
 
     N = length(u0) # number of states
     M = size(B, 2) # number of shocks on evolution matrix
@@ -24,7 +24,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
     loglik = 0.0
 
-    @inbounds for t in 2:T
+    @views @inbounds for t in 2:T
         # Kalman iteration
         mul!(u_temp[t], A, u[t - 1]) # u[t] = A u[t-1]
         mul!(z[t], C, u_temp[t]) # z[t] = C u[t]
@@ -47,8 +47,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
         copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
         cholesky!(V[t].chol.factors, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
-        innovation[t] .= prob.observables[:, t - 1] - z[t]
-        loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
+        innovation = view(prob.observables, :, t - 1) - z[t]
+        loglik += logpdf(MvNormal(V[t]), innovation)  # no allocations since V[t] is a PDMat
 
         # K[t] .= CP[t]' / V[t]  # Kalman gain
         # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
@@ -57,7 +57,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
         #u[t] += K[t] * innovation[t]
         copy!(u[t], u_temp[t])
-        mul!(u[t], K[t], innovation[t], 1, 1)
+        mul!(u[t], K[t], innovation, 1, 1)
 
         #P[t] -= K[t] * CP[t]
         copy!(P[t], P_temp[t])
@@ -77,8 +77,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
-    @unpack u, z, innovation, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_L_L, temp_L_N, temp_N_L = prob.cache
-    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
+    @unpack u, z, P, B_prod, u_temp, P_temp, K, CP, V, temp_N_N, temp_L_L, temp_L_N, temp_N_L = prob.cache
+    @assert length(u) >= T && length(z) >= T
 
     N = length(u0) # number of states
     M = size(B, 2) # number of shocks on evolution matrix
@@ -95,7 +95,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
     loglik = 0.0
 
-    @inbounds for t in 2:T
+    @views @inbounds for t in 2:T
         # Kalman iteration
         mul!(u_temp[t], A, u[t - 1]) # u[t] = A u[t-1]
         mul!(z[t], C, u_temp[t]) # z[t] = C u[t]
@@ -118,8 +118,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
         copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
         cholesky!(V[t].chol.factors, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
-        innovation[t] .= prob.observables[:, t - 1] - z[t]
-        loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
+        innovation = view(prob.observables, :, t - 1) - z[t]
+        loglik += logpdf(MvNormal(V[t]), innovation)  # no allocations since V[t] is a PDMat
 
         # K[t] .= CP[t]' / V[t]  # Kalman gain
         # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
@@ -128,7 +128,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
         #u[t] += K[t] * innovation[t]
         copy!(u[t], u_temp[t])
-        mul!(u[t], K[t], innovation[t], 1, 1)
+        mul!(u[t], K[t], innovation, 1, 1)
 
         #P[t] -= K[t] * CP[t]
         copy!(P[t], P_temp[t])
@@ -166,7 +166,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(ΔK, ΔP, CP[t]', -1, 0) # i.e. ΔK = -ΔP * CP[t]'
             mul!(ΔCP, K[t]', ΔP, -1, 0) # i.e. ΔCP = - K[t]' * ΔP
             copy!(Δu_temp, Δu)
-            mul!(ΔK, Δu, innovation[t]', 1, 1) # ΔK += Δu * innovation[t]'
+            innovation = view(prob.observables, :, t - 1) - z[t]
+            mul!(ΔK, Δu, innovation', 1, 1) # ΔK += Δu * innovation[t]'
             mul!(Δz, K[t]', Δu, -1, 0)  # i.e, Δz = -K[t]'* Δu
             mul!(ΔCP, inv_V, ΔK', 1, 1) # ΔCP += inv_V * ΔK'
 
@@ -177,10 +178,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
             mul!(ΔC, ΔCP, P_temp[t]', 1, 1) # ΔC += ΔCP * P_temp[t]'
             mul!(ΔP_temp, C', ΔCP, 1, 1) # ΔP_temp += C' * ΔCP
-            mul!(Δz, inv_V, innovation[t], Δlogpdf, 1) # Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
+            mul!(Δz, inv_V, innovation, Δlogpdf, 1) # Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
 
             #ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
-            mul!(temp_L, inv_V, innovation[t])
+            mul!(temp_L, inv_V, innovation)
             mul!(temp_L_L, temp_L, temp_L')
             temp_L_L .-= inv_V
             rmul!(temp_L_L, Δlogpdf * 0.5)

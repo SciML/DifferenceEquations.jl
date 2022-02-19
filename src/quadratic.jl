@@ -5,10 +5,9 @@ z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
 z_tilde(t) = z(t) + v(t+1)
 """
 
-Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14}
+Base.@kwdef struct QuadraticStateSpaceProblemCache{T1,T2,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14}
     u::T1
     z::T2
-    innovation::T3
     u_f::T4
     A_2_vec::T5 # remove after native datastructure
     C_2_vec::T6 # remove after native datastructure
@@ -29,7 +28,6 @@ function QuadraticStateSpaceProblemCache{DT}(N, M, L, T,
     return QuadraticStateSpaceProblemCache(; u = [Vector{DT}(undef, N) for _ in 1:T],
                                            u_f = [Vector{DT}(undef, N) for _ in 1:T],
                                            z = [Vector{DT}(undef, L) for _ in 1:T],
-                                           innovation = [Vector{DT}(undef, L) for _ in 1:T],
                                            A_2_vec = [Matrix{DT}(undef, N, N) for _ in 1:N],
                                            C_2_vec = [Matrix{DT}(undef, N, N) for _ in 1:L],
 
@@ -130,8 +128,8 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
-    @unpack u, u_f, z, innovation, C_2_vec, A_2_vec = prob.cache  # problem cache
-    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
+    @unpack u, u_f, z, C_2_vec, A_2_vec = prob.cache  # problem cache
+    @assert length(u) >= T && length(z) >= T# ensure enough space allocated
 
     # TODO: This should be the native datastrcture of A_2 and C_2.  Remove when it is
     for i in 1:size(C_2, 1)
@@ -160,8 +158,7 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        innovation[t] .= prob.observables[:, t - 1] - z[t]
-        loglik += logpdf(prob.obs_noise, innovation[t])
+        loglik += logpdf(prob.obs_noise, (view(prob.observables, :, t - 1) - z[t]))
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -177,8 +174,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
-    @unpack u, u_f, z, innovation, C_2_vec, A_2_vec = prob.cache  # problem cache
-    @assert length(u) >= T && length(z) >= T && length(innovation) >= T # ensure enough space allocated
+    @unpack u, u_f, z, C_2_vec, A_2_vec = prob.cache  # problem cache
+    @assert length(u) >= T && length(z) >= T
 
     # TODO: This should be the native datastrcture of A_2 and C_2.  Remove when it is
     for i in 1:size(C_2, 1)
@@ -207,8 +204,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        innovation[t] .= prob.observables[:, t - 1] - z[t]
-        loglik += logpdf(prob.obs_noise, innovation[t])
+        loglik += logpdf(prob.obs_noise, (view(prob.observables, :, t - 1) - z[t]))
     end
 
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -252,7 +248,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δu_f_sum = zero(u[1])
 
         @views @inbounds for t in T:-1:2
-            Δz .= Δlogpdf * innovation[t] ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
 
             # inplace adoint of quadratic form with accumulation
             quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t], temp_N_N)
