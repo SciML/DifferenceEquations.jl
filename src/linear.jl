@@ -64,7 +64,6 @@ end
 
 # The cache is never differentiable
 @non_differentiable LinearStateSpaceProblemCache(args...)
-@non_differentiable LinearStateSpaceProblemCache(::Any, ::Any, ::Any, ::Any, ::Any)
 struct LinearStateSpaceProblem{isinplace,Atype<:AbstractArray,Btype<:AbstractArray,
                                Ctype<:AbstractArray,wtype,Rtype, # Distributions only
                                utype,ttype,otype,ctype} <: AbstractStateSpaceProblem{isinplace}

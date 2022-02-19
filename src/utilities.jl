@@ -23,7 +23,7 @@ fill_zero!(mat) = fill!(mat, 0.0)
 # Note this does not zero the y
 function quad_muladd!(y, A, x)
     @inbounds for j in 1:size(A, 1)
-        @views y[j] += dot(x, A[j], x)
+        y[j] += dot(x, A[j], x)
     end
     return y
 end

@@ -30,14 +30,7 @@ function CommonSolve.solve!(cache::StateSpaceCache, args...; kwargs...)
     return _solve!(cache.problem, cache.solver, args...; kwargs...)
 end
 
-# Yuck hate this so much
-promote_noise(x, y) = [x], [y]
-promote_noise(x, y::AbstractArray) = [x], y
-promote_noise(x::AbstractArray, y) = x, [y]
-promote_noise(x::AbstractArray, y::AbstractArray) = x, y
-
 include("utilities.jl")
-include("noise.jl")
 include("alg.jl")
 include("linear.jl")
 include("quadratic.jl")

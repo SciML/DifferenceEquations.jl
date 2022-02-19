@@ -56,7 +56,6 @@ end
 
 # The cache is never differentiable
 @non_differentiable QuadraticStateSpaceProblemCache(args...)
-@non_differentiable QuadraticStateSpaceProblemCache(::Any, ::Any, ::Any, ::Any, ::Any)
 
 struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:AbstractArray,
                                   A_2type<:AbstractArray,Btype<:AbstractArray,
