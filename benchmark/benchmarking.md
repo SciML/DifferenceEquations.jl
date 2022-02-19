@@ -44,6 +44,7 @@ Or start julia in the `DifferenceEquations/benchmark` folder with the  `--projec
 Always start with the benchmarks activated, i.e. `] activate benchmark`
 A few utilities
 ```julia
+using DifferenceEquations, PkgBenchmark
 save_benchmark(results_file = "baseline") = benchmarkpkg(DifferenceEquations; resultfile = joinpath(pkgdir(DifferenceEquations),"benchmark/$results_file.json"))
 function generate_judgement(new_results, old_results = "baseline", judge_file = "judge")
     return export_markdown(joinpath(pkgdir(DifferenceEquations), "benchmark/$judge_file.md"),
@@ -52,11 +53,10 @@ function generate_judgement(new_results, old_results = "baseline", judge_file = 
                                  PkgBenchmark.readresults(joinpath(pkgdir(DifferenceEquations),
                                                                    "benchmark/$old_results.json"))))
 end
+
 ```
 In your terminal
 ```julia
-generate_judgement(new_results, old_results, judge_file = "judge.md") = export_markdown(joinpath(pkgdir(DifferenceEquations),"benchmark/$judge_file.md"), judge(data_2, data))
-
 using DifferenceEquations, PkgBenchmark
 data = benchmarkpkg(DifferenceEquations; resultfile = joinpath(pkgdir(DifferenceEquations),"benchmark/baseline.json"))
 export_markdown(joinpath(pkgdir(DifferenceEquations),"benchmark/trial.md"), data) # can export as markdown

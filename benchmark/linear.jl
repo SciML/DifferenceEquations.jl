@@ -2,7 +2,16 @@
 using DifferenceEquations, BenchmarkTools
 using DelimitedFiles, Distributions, Zygote, LinearAlgebra
 
-const LINEAR = BenchmarkGroup()
+function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables, 2)), Val(false);
+                                      obs_noise = D, noise, observables, kwargs...)
+    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
+end
+function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
+    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables, 2)), Val(true);
+                                      obs_noise = D, noise = nothing, observables, kwargs...)
+    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
+end
 
 # Matrices from RBC
 const A_rbc = [0.9568351489231076 6.209371005755285;
@@ -37,116 +46,120 @@ const u0_prior_FVGQ = MvNormal(diagm(ones(length(u0_FVGQ))))
 const cache_1_FVGQ = LinearStateSpaceProblemCache{Float64}(size(A_FVGQ, 1), size(B_FVGQ, 2),
                                                            size(observables_FVGQ, 1),
                                                            size(observables_FVGQ, 2) + 1)
-
-# Specific tests with const arguments bound 
-function kalman_rbc(A, B, C, u0_prior)
-    problem = LinearStateSpaceProblem(A, B, C, u0_prior, (0, size(observables_rbc, 2), Val(true));
-                                      noise = nothing, obs_noise = D_rbc,
-                                      observables = observables_rbc)
-    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
-end
-function joint_1_rbc(A, B, C, u0, noise)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables_rbc, 2), Val(false)); noise,
-                                      obs_noise = D_rbc, observables = observables_rbc)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
-end
-function kalman_rbc(A, B, C, u0_prior)
-    problem = LinearStateSpaceProblem(A, B, C, u0_prior, (0, size(observables_rbc, 2), Val(true));
-                                      noise = nothing, obs_noise = D_rbc,
-                                      observables = observables_rbc, cache = cache_1_rbc)
-    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
-end
-function joint_1_rbc(A, B, C, u0, noise)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables_rbc, 2), Val(false)); noise,
-                                      obs_noise = D_rbc, observables = observables_rbc,
-                                      cache = cache_1_rbc)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
-end
 # executing gradients once to avoid compilation time in benchmarking
-kalman_rbc(A_rbc, B_rbc, C_rbc, u0_prior_rbc)
-gradient(kalman_rbc, A_rbc, B_rbc, C_rbc, u0_prior_rbc)
-kalman_rbc(A_rbc, B_rbc, C_rbc, u0_prior_rbc)
-gradient(kalman_rbc, A_rbc, B_rbc, C_rbc, u0_prior_rbc)
-joint_1_rbc(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc)
-gradient(joint_1_rbc, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc)
-joint_1_rbc(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc)
-gradient(joint_1_rbc, A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc)
+kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_prior_rbc, observables_rbc, D_rbc)
+gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+         u0_prior_rbc)
+kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_prior_rbc, observables_rbc, D_rbc; cache = cache_1_rbc)
+gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc; cache = cache_1_rbc),
+         A_rbc, B_rbc, C_rbc, u0_prior_rbc)
+joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+         u0_rbc, noise_rbc)
+joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc;
+                   cache = cache_1_rbc)
+gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc; cache = cache_1_rbc),
+         A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc)
 
-function kalman_FVGQ(A, B, C, u0_prior)
-    problem = LinearStateSpaceProblem(A, B, C, u0_prior, (0, size(observables_FVGQ, 2), Val(true));
-                                      noise = nothing, obs_noise = D_FVGQ,
-                                      observables = observables_FVGQ)
-    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
-end
-function joint_1_FVGQ(A, B, C, u0, noise)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables_FVGQ, 2), Val(false));
-                                      noise, obs_noise = D_FVGQ, observables = observables_FVGQ)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
-end
-function kalman_FVGQ(A, B, C, u0_prior)
-    problem = LinearStateSpaceProblem(A, B, C, u0_prior, (0, size(observables_FVGQ, 2), Val(true));
-                                      noise = nothing, obs_noise = D_FVGQ,
-                                      observables = observables_FVGQ, cache = cache_1_FVGQ)
-    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
-end
-function joint_1_FVGQ(A, B, C, u0, noise)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables_FVGQ, 2), Val(false));
-                                      noise, obs_noise = D_FVGQ, observables = observables_FVGQ,
-                                      cache = cache_1_FVGQ)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
-end
-# executing gradients once to avoid compilation time in benchmarking
-kalman_FVGQ(A_FVGQ, B_FVGQ, C_FVGQ, u0_prior_FVGQ)
-gradient(kalman_FVGQ, A_FVGQ, B_FVGQ, C_FVGQ, u0_prior_FVGQ)
-kalman_FVGQ(A_FVGQ, B_FVGQ, C_FVGQ, u0_prior_FVGQ)
-gradient(kalman_FVGQ, A_FVGQ, B_FVGQ, C_FVGQ, u0_prior_FVGQ)
-joint_1_FVGQ(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ)
-gradient(joint_1_FVGQ, A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ)
-joint_1_FVGQ(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ)
-gradient(joint_1_FVGQ, A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ)
+kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_prior_FVGQ, observables_FVGQ, D_FVGQ)
+gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ, C_FVGQ,
+         u0_prior_FVGQ)
+kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_prior_FVGQ, observables_FVGQ, D_FVGQ;
+                  cache = cache_1_FVGQ)
+gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ; cache = cache_1_FVGQ),
+         A_FVGQ, B_FVGQ, C_FVGQ, u0_prior_FVGQ)
+joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ)
+gradient((args...) -> joint_likelihood_1(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ, C_FVGQ,
+         u0_FVGQ, noise_FVGQ)
+joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ, D_FVGQ;
+                   cache = cache_1_FVGQ)
+gradient((args...) -> joint_likelihood_1(args..., observables_FVGQ, D_FVGQ; cache = cache_1_FVGQ),
+         A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ)
 
-####### Tests
+####### Becnmarks
+
+const LINEAR = BenchmarkGroup()
 
 const LINEAR["rbc"] = BenchmarkGroup()
 
-const LINEAR["rbc"]["joint_1_no_cache"] = @benchmarkable joint_1_rbc($A_rbc, $B_rbc, $C_rbc,
-                                                                     $u0_rbc, $noise_rbc)
-const LINEAR["rbc"]["joint_1_gradient_no_cache"] = @benchmarkable gradient(joint_1_rbc, $A_rbc,
-                                                                           $B_rbc, $C_rbc, $u0_rbc,
-                                                                           $noise_rbc)
-const LINEAR["rbc"]["kalman_no_cache"] = @benchmarkable kalman_rbc($A_rbc, $B_rbc, $C_rbc,
-                                                                   $u0_prior_rbc)
-const LINEAR["rbc"]["kalman_gradient_no_cache"] = @benchmarkable gradient(kalman_rbc, $A_rbc,
-                                                                          $B_rbc, $C_rbc,
+const LINEAR["rbc"]["joint_1_no_cache"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc,
+                                                                            $u0_rbc, $noise_rbc,
+                                                                            $observables_rbc,
+                                                                            $D_rbc)
+const LINEAR["rbc"]["joint_1_gradient_no_cache"] = @benchmarkable gradient((args...) -> joint_likelihood_1(args...,
+                                                                                                           $observables_rbc,
+                                                                                                           $D_rbc),
+                                                                           $A_rbc, $B_rbc, $C_rbc,
+                                                                           $u0_rbc, $noise_rbc)
+const LINEAR["rbc"]["kalman_no_cache"] = @benchmarkable kalman_likelihood($A_rbc, $B_rbc, $C_rbc,
+                                                                          $u0_prior_rbc,
+                                                                          $observables_rbc, $D_rbc)
+const LINEAR["rbc"]["kalman_gradient_no_cache"] = @benchmarkable gradient((args...) -> kalman_likelihood(args...,
+                                                                                                         $observables_rbc,
+                                                                                                         $D_rbc),
+                                                                          $A_rbc, $B_rbc, $C_rbc,
                                                                           $u0_prior_rbc)
-const LINEAR["rbc"]["joint_1"] = @benchmarkable joint_1_rbc($A_rbc, $B_rbc, $C_rbc, $u0_rbc,
-                                                            $noise_rbc)
-const LINEAR["rbc"]["joint_1_gradient"] = @benchmarkable gradient(joint_1_rbc, $A_rbc, $B_rbc,
-                                                                  $C_rbc, $u0_rbc, $noise_rbc)
-const LINEAR["rbc"]["kalman"] = @benchmarkable kalman_rbc($A_rbc, $B_rbc, $C_rbc, $u0_prior_rbc)
-const LINEAR["rbc"]["kalman_gradient"] = @benchmarkable gradient(kalman_rbc, $A_rbc, $B_rbc, $C_rbc,
+const LINEAR["rbc"]["joint_1"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc, $u0_rbc,
+                                                                   $noise_rbc, $observables_rbc,
+                                                                   $D_rbc; cache = $cache_1_rbc)
+const LINEAR["rbc"]["joint_1_gradient"] = @benchmarkable gradient((args...) -> joint_likelihood_1(args...,
+                                                                                                  $observables_rbc,
+                                                                                                  $D_rbc;
+                                                                                                  cache = $cache_1_rbc),
+                                                                  $A_rbc, $B_rbc, $C_rbc, $u0_rbc,
+                                                                  $noise_rbc)
+const LINEAR["rbc"]["kalman"] = @benchmarkable kalman_likelihood($A_rbc, $B_rbc, $C_rbc,
+                                                                 $u0_prior_rbc, $observables_rbc,
+                                                                 $D_rbc; cache = $cache_1_rbc)
+const LINEAR["rbc"]["kalman_gradient"] = @benchmarkable gradient((args...) -> kalman_likelihood(args...,
+                                                                                                $observables_rbc,
+                                                                                                $D_rbc;
+                                                                                                cache = $cache_1_rbc),
+                                                                 $A_rbc, $B_rbc, $C_rbc,
                                                                  $u0_prior_rbc)
 
-# FVGQ sized specific test
+# FVGQ
 const LINEAR["FVGQ"] = BenchmarkGroup()
-const LINEAR["FVGQ"]["joint_1_no_cache"] = @benchmarkable joint_1_FVGQ($A_FVGQ, $B_FVGQ, $C_FVGQ,
-                                                                       $u0_FVGQ, $noise_FVGQ)
-const LINEAR["FVGQ"]["joint_1_gradient_no_cache"] = @benchmarkable gradient(joint_1_FVGQ, $A_FVGQ,
-                                                                            $B_FVGQ, $C_FVGQ,
-                                                                            $u0_FVGQ, $noise_FVGQ)
-const LINEAR["FVGQ"]["kalman_no_cache"] = @benchmarkable kalman_FVGQ($A_FVGQ, $B_FVGQ, $C_FVGQ,
-                                                                     $u0_prior_FVGQ)
-const LINEAR["FVGQ"]["kalman_gradient_no_cache"] = @benchmarkable gradient(kalman_FVGQ, $A_FVGQ,
-                                                                           $B_FVGQ, $C_FVGQ,
-                                                                           $u0_prior_FVGQ)
-const LINEAR["FVGQ"]["joint_1"] = @benchmarkable joint_1_FVGQ($A_FVGQ, $B_FVGQ, $C_FVGQ, $u0_FVGQ,
-                                                              $noise_FVGQ)
-const LINEAR["FVGQ"]["joint_1_gradient"] = @benchmarkable gradient(joint_1_FVGQ, $A_FVGQ, $B_FVGQ,
-                                                                   $C_FVGQ, $u0_FVGQ, $noise_FVGQ)
-const LINEAR["FVGQ"]["kalman"] = @benchmarkable kalman_FVGQ($A_FVGQ, $B_FVGQ, $C_FVGQ,
-                                                            $u0_prior_FVGQ)
-const LINEAR["FVGQ"]["kalman_gradient"] = @benchmarkable gradient(kalman_FVGQ, $A_FVGQ, $B_FVGQ,
-                                                                  $C_FVGQ, $u0_prior_FVGQ)
+
+const LINEAR["FVGQ"]["joint_1_no_cache"] = @benchmarkable joint_likelihood_1($A_FVGQ, $B_FVGQ,
+                                                                             $C_FVGQ, $u0_FVGQ,
+                                                                             $noise_FVGQ,
+                                                                             $observables_FVGQ,
+                                                                             $D_FVGQ)
+const LINEAR["FVGQ"]["joint_1_gradient_no_cache"] = @benchmarkable gradient((args...) -> joint_likelihood_1(args...,
+                                                                                                            $observables_FVGQ,
+                                                                                                            $D_FVGQ),
+                                                                            $A_FVGQ, $B_FVGQ,
+                                                                            $C_FVGQ, $u0_FVGQ,
+                                                                            $noise_FVGQ)
+const LINEAR["FVGQ"]["kalman_no_cache"] = @benchmarkable kalman_likelihood($A_FVGQ, $B_FVGQ,
+                                                                           $C_FVGQ, $u0_prior_FVGQ,
+                                                                           $observables_FVGQ,
+                                                                           $D_FVGQ)
+const LINEAR["FVGQ"]["kalman_gradient_no_cache"] = @benchmarkable gradient((args...) -> kalman_likelihood(args...,
+                                                                                                          $observables_FVGQ,
+                                                                                                          $D_FVGQ),
+                                                                           $A_FVGQ, $B_FVGQ,
+                                                                           $C_FVGQ, $u0_prior_FVGQ)
+const LINEAR["FVGQ"]["joint_1"] = @benchmarkable joint_likelihood_1($A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                    $u0_FVGQ, $noise_FVGQ,
+                                                                    $observables_FVGQ, $D_FVGQ;
+                                                                    cache = $cache_1_FVGQ)
+const LINEAR["FVGQ"]["joint_1_gradient"] = @benchmarkable gradient((args...) -> joint_likelihood_1(args...,
+                                                                                                   $observables_FVGQ,
+                                                                                                   $D_FVGQ;
+                                                                                                   cache = $cache_1_FVGQ),
+                                                                   $A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                   $u0_FVGQ, $noise_FVGQ)
+const LINEAR["FVGQ"]["kalman"] = @benchmarkable kalman_likelihood($A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                  $u0_prior_FVGQ, $observables_FVGQ,
+                                                                  $D_FVGQ; cache = $cache_1_FVGQ)
+const LINEAR["FVGQ"]["kalman_gradient"] = @benchmarkable gradient((args...) -> kalman_likelihood(args...,
+                                                                                                 $observables_FVGQ,
+                                                                                                 $D_FVGQ;
+                                                                                                 cache = $cache_1_FVGQ),
+                                                                  $A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                  $u0_prior_FVGQ)
 
 # return for the test suite
 LINEAR
