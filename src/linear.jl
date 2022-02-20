@@ -201,9 +201,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         end
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
-                                      cache = NoTangent(), observables = NoTangent(),
-                                      obs_noise = NoTangent()), NoTangent(),
-                map(_ -> NoTangent(), args)...)
+                                      cache = NoTangent(),
+                                      observables = @not_implemented("Not currently supported, but feasible with @thunk"),
+                                      obs_noise = @not_implemented("Not currently supported, but feasible")),
+                NoTangent(), map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end
