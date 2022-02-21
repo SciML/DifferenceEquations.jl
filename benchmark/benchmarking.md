@@ -42,24 +42,41 @@ Or start julia in the `DifferenceEquations/benchmark` folder with the  `--projec
 ### Running the Full Benchmarks
 
 Always start with the benchmarks activated, i.e. `] activate benchmark`
-
-In your terminal
-```julia 
+A few utilities
+```julia
 using DifferenceEquations, PkgBenchmark
-data = benchmarkpkg(DifferenceEquations; resultfile = joinpath(pkgdir(DifferenceEquations),"benchmark/baseline.json"))
-export_markdown(joinpath(pkgdir(DifferenceEquations),"benchmark/trial.md"), data) # can export as markdown
-```
+function save_benchmark(results_file = "baseline")
+    data = benchmarkpkg(DifferenceEquations; resultfile = joinpath(pkgdir(DifferenceEquations),"benchmark/$results_file.json"))
+    export_markdown(joinpath(pkgdir(DifferenceEquations),"benchmark/trial_$results_file.md"), data)
+end
+function generate_judgement(new_results, old_results = "baseline", judge_file = "judge")
+    return export_markdown(joinpath(pkgdir(DifferenceEquations), "benchmark/$judge_file.md"),
+                           judge(PkgBenchmark.readresults(joinpath(pkgdir(DifferenceEquations),
+                                                                   "benchmark/$new_results.json")),
+                                 PkgBenchmark.readresults(joinpath(pkgdir(DifferenceEquations),
+                                                                   "benchmark/$old_results.json"))))
+end
 
+```
+In your terminal
+```julia
+save_benchmark("test") # default is "baseline"
+
+# Or manually:
+# data = benchmarkpkg(DifferenceEquations; resultfile = joinpath(pkgdir(DifferenceEquations),"benchmark/baseline.json"))
+# export_markdown(joinpath(pkgdir(DifferenceEquations),"benchmark/trial.md"), data) # can export as markdown
+```
 
 To compare against different parameters or after modifications, load the existing baseline and use the `judge` function to compare
 
 ```julia
-data = PkgBenchmark.readresults(joinpath(pkgdir(DifferenceEquations),"benchmark/baseline.json"))
-data_2 = benchmarkpkg(DifferenceEquations, BenchmarkConfig(
-                                            env = Dict("JULIA_NUM_THREADS" => 4, "OPENBLAS_NUM_THREADS" => 1),
-                                            juliacmd = `julia -O3`))
-data_judge = judge(data_2, data)  # compare data_2 vs. data baseline
-export_markdown(joinpath(pkgdir(DifferenceEquations),"benchmark/judge.md"), data_judge)
+generate_judgement("test") # defaults to generate_judgement("test", "baseline", "judge")
+# Or manually
+# data = PkgBenchmark.readresults(joinpath(pkgdir(DifferenceEquations),"benchmark/baseline.json"))
+# data_2 = benchmarkpkg(DifferenceEquations, BenchmarkConfig(
+#                                             env = Dict("JULIA_NUM_THREADS" => 4, "OPENBLAS_NUM_THREADS" => 1),
+#                                             juliacmd = `julia -O3`))
+# export_markdown(joinpath(pkgdir(DifferenceEquations),"benchmark/judge.md"), judge(data_2, data))
 ```
 
 ### Running Portions of the Benchmarks During Development
