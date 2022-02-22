@@ -1,15 +1,8 @@
-struct StateSpaceProblem{
-    isinplace, 
-    ftype, # TODO: Replace with LinearOperator 
-    gtype, # TODO: Replace with LinearOperator 
-    htype, # TODO: Replace with LinearOperator 
-    wtype, 
-    vtype, # We assume for vtype <: Distribution
-    utype,
-    ttype,
-    otype,
-    ptype
-} <: AbstractStateSpaceProblem{isinplace}
+struct StateSpaceProblem{isinplace,ftype, # TODO: Replace with LinearOperator 
+                         gtype, # TODO: Replace with LinearOperator 
+                         htype, # TODO: Replace with LinearOperator 
+                         wtype,vtype, # We assume for vtype <: Distribution
+                         utype,ttype,otype,ptype} <: AbstractStateSpaceProblem{isinplace}
     f::ftype # Evolution function
     g::gtype # Noise function
     h::htype # Observation function
@@ -21,72 +14,36 @@ struct StateSpaceProblem{
     params::ptype # Parameters, if any
 end
 
-function StateSpaceProblem(
-    f::ftype, 
-    g::gtype, 
-    h::htype,
-    u0::utype,
-    tspan::ttype,
-    params = nothing;
-    obs_noise = (h0 = h(u0, params, tspan[1]); MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
-    observables = nothing,
-    noise = nothing,
-) where {
-    ftype, 
-    gtype, 
-    htype, 
-    utype,
-    ttype,
-}
-
-    return StateSpaceProblem{
-        Val(false), 
-        ftype, 
-        gtype, 
-        htype, 
-        typeof(noise), 
-        typeof(obs_noise),
-        utype,
-        ttype,
-        typeof(observables),
-        typeof(params)
-    }(
-        f, # Evolution function
-        g, # Noise function
-        h, # Observation function
-        noise, # Latent noises
-        obs_noise, # Observation noise distribution
-        u0, # Initial condition
-        tspan, # Timespan to use
-        observables, # Observed data to use, if any
-        params
-    )
+function StateSpaceProblem(f::ftype, g::gtype, h::htype, u0::utype, tspan::ttype, params = nothing;
+                           obs_noise = nothing, # Assume the default measurement error is MvNormal with identity covariance
+                           observables = nothing,
+                           noise = nothing) where {ftype,gtype,htype,utype,ttype}
+    return StateSpaceProblem{Val(false),ftype,gtype,htype,typeof(noise),typeof(obs_noise),utype,
+                             ttype,typeof(observables),typeof(params)}(f, # Evolution function
+                                                                       g, # Noise function
+                                                                       h, # Observation function
+                                                                       noise, # Latent noises
+                                                                       obs_noise, # Observation noise distribution
+                                                                       u0, # Initial condition
+                                                                       tspan, # Timespan to use
+                                                                       observables, # Observed data to use, if any
+                                                                       params)
 end
 
 # Default is NoiseConditionalFilter
-function CommonSolve.init(
-    prob::StateSpaceProblem, 
-    args...; 
-    kwargs...
-)
+function CommonSolve.init(prob::StateSpaceProblem, args...; kwargs...)
     return StateSpaceCache(prob, NoiseConditionalFilter())
 end
 
-function CommonSolve.init(
-    prob::StateSpaceProblem,
-    solver::SciMLBase.SciMLAlgorithm,
-    args...;
-    kwargs...
-) 
+function CommonSolve.init(prob::StateSpaceProblem, solver::SciMLBase.SciMLAlgorithm, args...;
+                          kwargs...)
     return StateSpaceCache(prob, solver)
 end
 
-function _solve!(
-    prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype},
-    solver::NoiseConditionalFilter,
-    args...;
-    kwargs...
-) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype<:Nothing}
+function _solve!(prob::StateSpaceProblem{isinplace,ftype,gtype,htype,wtype,vtype,utype,ttype,otype},
+                 solver::NoiseConditionalFilter, args...;
+                 kwargs...) where {isinplace,ftype,gtype,htype,wtype,vtype,utype,ttype,
+                                   otype<:Nothing}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
 
@@ -103,19 +60,17 @@ function _solve!(
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
         n[t] = prob.noise[t_n]
-        u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
+        u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+
+               prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
         z[t] = prob.h(u[t], prob.params, t_n)
     end
 
     return StateSpaceSolution(copy(z), copy(u), copy(n), nothing, nothing)
 end
 
-function _solve!(
-    prob::StateSpaceProblem{isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}, 
-    solver::NoiseConditionalFilter,
-    args...;
-    kwargs...
-) where {isinplace, ftype, gtype, htype, wtype, vtype, utype, ttype, otype}
+function _solve!(prob::StateSpaceProblem{isinplace,ftype,gtype,htype,wtype,vtype,utype,ttype,otype},
+                 solver::NoiseConditionalFilter, args...;
+                 kwargs...) where {isinplace,ftype,gtype,htype,wtype,vtype,utype,ttype,otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
 
@@ -133,7 +88,8 @@ function _solve!(
     for t in 2:T
         t_n = t - 1 + prob.tspan[1]
         n[t] = prob.noise[t_n]
-        u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+ prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
+        u[t] = prob.f(u[t - 1], prob.params, t_n - 1) .+
+               prob.g(u[t - 1], prob.params, t_n - 1) * n[t]
         z[t] = prob.h(u[t], prob.params, t_n)
         # Likelihood accumulation when data observations are provided
         loglik += logpdf(prob.obs_noise, prob.observables[t_n] - z[t])
