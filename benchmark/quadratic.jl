@@ -57,12 +57,12 @@ const noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FV
 # executing gradients once to avoid compilation time in benchmarking
 joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc,
                    noise_2_rbc, observables_2_rbc, D_2_rbc)
-gradient(joint_likelihood_2, A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc,
-         u0_2_rbc, noise_2_rbc, observables_2_rbc, D_2_rbc)
+gradient((args...) -> joint_likelihood_2(args..., observables_2_rbc, D_2_rbc), A_0_rbc, A_1_rbc,
+         A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc, noise_2_rbc)
 joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ,
                    noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ)
-gradient(joint_likelihood_2, A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
-         u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ)
+gradient((args...) -> joint_likelihood_2(args..., observables_2_FVGQ, D_2_FVGQ), A_0_FVGQ, A_1_FVGQ,
+         A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ)
 
 const QUADRATIC["rbc"] = BenchmarkGroup()
 const QUADRATIC["rbc"]["joint_2"] = @benchmarkable joint_likelihood_2($A_0_rbc, $A_1_rbc, $A_2_rbc,

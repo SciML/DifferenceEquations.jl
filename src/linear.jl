@@ -60,10 +60,10 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     loglik = 0.0
     @inbounds for t in 2:T
         mul!(u[t], A, u[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -91,10 +91,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     loglik = 0.0
     @inbounds for t in 2:T
         mul!(u[t], A, u[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -111,18 +111,20 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
         for t in T:-1:2
-            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz = Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
             mul!(Δu[t], C', Δz, 1, 1)
             mul!(Δu[t - 1], A', Δu[t])
             Δnoise[:, t - 1] = B' * Δu[t]
             # Now, deal with the coefficients
             mul!(ΔA, Δu[t], u[t - 1]', 1, 1)
-            mul!(ΔB, Δu[t], prob.noise[:, t - 1]', 1, 1)
+            mul!(ΔB, Δu[t], view(prob.noise, :, t - 1)', 1, 1)
             mul!(ΔC, Δz, u[t]', 1, 1)
         end
         return (NoTangent(),
-                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu[1], noise = Δnoise),
-                NoTangent(), map(_ -> NoTangent(), args)...)
+                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu[1], noise = Δnoise,
+                                      observables = NoTangent(), # not implemented
+                                      obs_noise = NoTangent()), NoTangent(),
+                map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end

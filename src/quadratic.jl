@@ -25,10 +25,7 @@ end
 
 function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B::Btype,
                                     C_0::C_0type, C_1::C_1type, C_2::C_2type, u0::utype,
-                                    tspan::ttype;
-                                    obs_noise = (h0 = C_1 * u0;
-                                                 MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
-                                    observables = nothing,
+                                    tspan::ttype; obs_noise = nothing, observables = nothing,
                                     noise = nothing) where {A_0type<:AbstractArray,
                                                             A_1type<:AbstractArray,
                                                             A_2type<:AbstractArray,
@@ -83,17 +80,17 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
     loglik = 0.0
     @inbounds @views for t in 2:T
         mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u_f[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         u[t] .= A_0
         mul!(u[t], A_1, u[t - 1], 1, 1)
         quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -126,17 +123,17 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     loglik = 0.0
     @inbounds @views for t in 2:T
         mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u_f[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         u[t] .= A_0
         mul!(u[t], A_1, u[t - 1], 1, 1)
         quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -165,7 +162,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
 
         @views @inbounds for t in T:-1:2
-            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz = Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
 
             # inplace adoint of quadratic form with accumulation
             quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
@@ -175,12 +172,12 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(Δu[t - 1], A_1', Δu[t])
             mul!(Δu_f[t - 1], A_1', Δu_f[t], 1, 1)
             Δu_f_sum = Δu[t] .+ Δu_f[t]
-            mul!(Δnoise[:, t - 1], B', Δu_f_sum)
+            mul!(view(Δnoise, :, t - 1), B', Δu_f_sum)
             # Now, deal with the coefficients
             ΔA_0 += Δu[t]
             mul!(ΔA_1, Δu[t], u[t - 1]', 1, 1)
             mul!(ΔA_1, Δu_f[t], u_f[t - 1]', 1, 1)
-            mul!(ΔB, Δu_f_sum, prob.noise[:, t - 1]', 1, 1)
+            mul!(ΔB, Δu_f_sum, view(prob.noise, :, t - 1)', 1, 1)
             ΔC_0 += Δz
             mul!(ΔC_1, Δz, u[t]', 1, 1)
         end
@@ -195,8 +192,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB, C_0 = ΔC_0,
-                                      C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1], noise = Δnoise),
-                NoTangent(), map(_ -> NoTangent(), args)...)
+                                      C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1], noise = Δnoise,
+                                      observables = NoTangent(), # not implemented
+                                      obs_noise = NoTangent()), NoTangent(),
+                map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end
