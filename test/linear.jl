@@ -36,7 +36,10 @@ noise_rbc = noise_rbc[:, 1:T]
 @testset "linear rbc joint likelihood" begin
     @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
           -690.9407412360038
-    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
+    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # 
+    gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+             u0_rbc, noise_rbc)
+
     test_rrule(Zygote.ZygoteRuleConfig(),
                (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)

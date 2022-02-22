@@ -154,6 +154,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         ΔC_1 = zero(C_1)
         ΔC_2_vec = [zero(A) for A in C_2_vec] # should be native datastructure
         ΔC_2 = zero(C_2)
+        Δu_f_sum = zero(u[1])
 
         Δnoise = similar(prob.noise)
         Δu = [zero(prob.u0) for _ in 1:T]
@@ -171,7 +172,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             quad_muladd_pb!(ΔA_2_vec, Δu_f[t - 1], Δu[t], A_2_vec_sum, u_f[t - 1])
             mul!(Δu[t - 1], A_1', Δu[t])
             mul!(Δu_f[t - 1], A_1', Δu_f[t], 1, 1)
-            Δu_f_sum = Δu[t] .+ Δu_f[t]
+
+            # Δu_f_sum = Δu[t] .+ Δu_f[t]
+            copy!(Δu_f_sum, Δu[t])
+            Δu_f_sum .+= Δu_f[t]
+
             mul!(view(Δnoise, :, t - 1), B', Δu_f_sum)
             # Now, deal with the coefficients
             ΔA_0 += Δu[t]
