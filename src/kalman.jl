@@ -7,7 +7,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
     N = length(u0)
-    M = size(C, 1)
+    L = size(C, 1)
 
     # TODO: move to internal algorithm cache
     # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
@@ -21,12 +21,12 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     u_mid = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # intermediate in u calculation
     P_mid = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
     innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
-    K = [Matrix{eltype(u0)}(undef, N, M) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0)}(undef, M, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(M, Matrix{eltype(u0)}(undef, M, M),
+    K = [Matrix{eltype(u0)}(undef, N, L) for _ in 1:T] # Gain
+    CP = [Matrix{eltype(u0)}(undef, L, N) for _ in 1:T] # C * P[t]
+    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(L, Matrix{eltype(u0)}(undef, L, L),
                                               Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef,
-                                                                                                         M,
-                                                                                                         M),
+                                                                                                         L,
+                                                                                                         L),
                                                                                       'U', 0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
@@ -43,8 +43,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
     # temp buffers.  Could be moved into algorithm settings
     temp_N_N = Matrix{eltype(u0)}(undef, N, N)
-    temp_M_M = Matrix{eltype(u0)}(undef, M, M)
-    temp_M_N = Matrix{eltype(u0)}(undef, M, N)
+    temp_L_L = Matrix{eltype(u0)}(undef, L, L)
+    temp_L_N = Matrix{eltype(u0)}(undef, L, N)
 
     @inbounds for t in 2:T
         # Kalman iteration
@@ -63,8 +63,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         V[t].mat .+= R
 
         # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-        transpose!(temp_M_M, V[t].mat)
-        V[t].mat .+= temp_M_M
+        transpose!(temp_L_L, V[t].mat)
+        V[t].mat .+= temp_L_L
         lmul!(0.5, V[t].mat)
 
         copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
@@ -74,8 +74,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
 
         # K[t] .= CP[t]' / V[t]  # Kalman gain
         # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
-        ldiv!(temp_M_N, V[t].chol, CP[t])
-        transpose!(K[t], temp_M_N)
+        ldiv!(temp_L_N, V[t].chol, CP[t])
+        transpose!(K[t], temp_L_N)
 
         #u[t] += K[t] * innovation[t]
         copy!(u[t], u_mid[t])
@@ -99,7 +99,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C, u0 = prob
     N = length(u0)
-    M = size(C, 1)
+    L = size(C, 1)
 
     # TODO: move to internal algorithm cache
     # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
@@ -113,12 +113,12 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     u_mid = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # intermediate in u calculation
     P_mid = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
     innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
-    K = [Matrix{eltype(u0)}(undef, N, M) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0)}(undef, M, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(M, Matrix{eltype(u0)}(undef, M, M),
+    K = [Matrix{eltype(u0)}(undef, N, L) for _ in 1:T] # Gain
+    CP = [Matrix{eltype(u0)}(undef, L, N) for _ in 1:T] # C * P[t]
+    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(L, Matrix{eltype(u0)}(undef, L, L),
                                               Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef,
-                                                                                                         M,
-                                                                                                         M),
+                                                                                                         L,
+                                                                                                         L),
                                                                                       'U', 0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
@@ -135,10 +135,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
     # temp buffers.  Could be moved into algorithm settings
     temp_N_N = Matrix{eltype(u0)}(undef, N, N)
-    temp_M_M = Matrix{eltype(u0)}(undef, M, M)
-    temp_M_N = Matrix{eltype(u0)}(undef, M, N)
-    temp_N_M = Matrix{eltype(u0)}(undef, N, M)
-    temp_M = Vector{eltype(u0)}(undef, M)
+    temp_L_L = Matrix{eltype(u0)}(undef, L, L)
+    temp_L_N = Matrix{eltype(u0)}(undef, L, N)
+    temp_N_L = Matrix{eltype(u0)}(undef, N, L)
+    temp_M = Vector{eltype(u0)}(undef, L)
     temp_N = Vector{eltype(u0)}(undef, N)
 
     @inbounds for t in 2:T
@@ -158,8 +158,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         V[t].mat .+= R
 
         # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-        transpose!(temp_M_M, V[t].mat)
-        V[t].mat .+= temp_M_M
+        transpose!(temp_L_L, V[t].mat)
+        V[t].mat .+= temp_L_L
         lmul!(0.5, V[t].mat)
 
         copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
@@ -169,8 +169,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
         # K[t] .= CP[t]' / V[t]  # Kalman gain
         # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
-        ldiv!(temp_M_N, V[t].chol, CP[t])
-        transpose!(K[t], temp_M_N)
+        ldiv!(temp_L_N, V[t].chol, CP[t])
+        transpose!(K[t], temp_L_N)
 
         #u[t] += K[t] * innovation[t]
         copy!(u[t], u_mid[t])
@@ -216,9 +216,9 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(ΔCP, inv_V, ΔK', 1, 1) # ΔCP += inv_V * ΔK'
 
             # ΔV .= -inv_V * CP[t] * ΔK * inv_V
-            mul!(temp_M_N, inv_V, CP[t])
-            mul!(temp_N_M, ΔK, inv_V)
-            mul!(ΔV, temp_M_N, temp_N_M, -1, 0)
+            mul!(temp_L_N, inv_V, CP[t])
+            mul!(temp_N_L, ΔK, inv_V)
+            mul!(ΔV, temp_L_N, temp_N_L, -1, 0)
 
             mul!(ΔC, ΔCP, P_mid[t]', 1, 1) # ΔC += ΔCP * P_mid[t]'
             mul!(ΔP_mid, C', ΔCP, 1, 1) # ΔP_mid += C' * ΔCP
@@ -226,20 +226,20 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
             #ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
             mul!(temp_M, inv_V, innovation[t])
-            mul!(temp_M_M, temp_M, temp_M')
-            temp_M_M .-= inv_V
-            rmul!(temp_M_M, Δlogpdf * 0.5)
-            ΔV += temp_M_M
+            mul!(temp_L_L, temp_M, temp_M')
+            temp_L_L .-= inv_V
+            rmul!(temp_L_L, Δlogpdf * 0.5)
+            ΔV += temp_L_L
 
             #ΔC += ΔV * C * P_mid[t]' + ΔV' * C * P_mid[t]
-            mul!(temp_M_N, C, P_mid[t])
-            transpose!(temp_M_M, ΔV)
-            temp_M_M .+= ΔV
-            mul!(ΔC, temp_M_M, temp_M_N, 1, 1)
+            mul!(temp_L_N, C, P_mid[t])
+            transpose!(temp_L_L, ΔV)
+            temp_L_L .+= ΔV
+            mul!(ΔC, temp_L_L, temp_L_N, 1, 1)
 
             # ΔP_mid += C' * ΔV * C
-            mul!(temp_M_N, ΔV, C)
-            mul!(ΔP_mid, C', temp_M_N, 1, 1)
+            mul!(temp_L_N, ΔV, C)
+            mul!(ΔP_mid, C', temp_L_N, 1, 1)
 
             mul!(ΔC, Δz, u_mid[t]', 1, 1) # ΔC += Δz * u_mid[t]'
             mul!(Δu_mid, C', Δz, 1, 1) # Δu_mid += C' * Δz
@@ -260,7 +260,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(ΔA, Δu_mid, u[t - 1]', 1, 1) # ΔA += Δu_mid * u[t - 1]'
             mul!(Δu, A', Δu_mid)
         end
-        ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
+        ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP, chol = NoTangent(), dim = NoTangent()) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC,
                                       u0 = Tangent{typeof(prob.u0)}(; μ = Δu, Σ = ΔΣ)), NoTangent(),
