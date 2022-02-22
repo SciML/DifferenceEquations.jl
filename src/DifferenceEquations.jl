@@ -11,6 +11,8 @@ using PDMats
 
 using SciMLBase: SciMLBase, SciMLProblem, solve
 
+struct NoiseConditionalFilter <: SciMLBase.SciMLAlgorithm end
+struct KalmanFilter <: SciMLBase.SciMLAlgorithm end
 abstract type DifferenceProblem <: SciMLProblem end
 abstract type AbstractStateSpaceProblem{isinplace} <: DifferenceProblem end
 
@@ -30,14 +32,7 @@ function CommonSolve.solve!(cache::StateSpaceCache, args...; kwargs...)
     return _solve!(cache.problem, cache.solver, args...; kwargs...)
 end
 
-# Yuck hate this so much
-promote_noise(x, y) = [x], [y]
-promote_noise(x, y::AbstractArray) = [x], y
-promote_noise(x::AbstractArray, y) = x, [y]
-promote_noise(x::AbstractArray, y::AbstractArray) = x, y
-
-include("noise.jl")
-include("alg.jl")
+include("utilities.jl")
 include("linear.jl")
 include("quadratic.jl")
 include("solution.jl")

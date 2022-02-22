@@ -17,8 +17,7 @@ struct LinearStateSpaceProblem{isinplace,Atype<:AbstractArray,Btype<:AbstractArr
 end
 
 function LinearStateSpaceProblem(A::Atype, B::Btype, C::Ctype, u0::utype, tspan::ttype;
-                                 obs_noise = (h0 = C * u0;
-                                              MvNormal(zeros(eltype(h0), length(h0)), I)), # Assume the default measurement error is MvNormal with identity covariance
+                                 obs_noise = nothing, # Assume the default measurement error is MvNormal with identity covariance
                                  observables = nothing,
                                  noise = nothing) where {Atype<:AbstractArray,Btype<:AbstractArray,
                                                          Ctype<:AbstractArray,utype,ttype}
@@ -61,10 +60,10 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     loglik = 0.0
     @inbounds for t in 2:T
         mul!(u[t], A, u[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -92,10 +91,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     loglik = 0.0
     @inbounds for t in 2:T
         mul!(u[t], A, u[t - 1])
-        mul!(u[t], B, prob.noise[:, t - 1], 1, 1)
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.obs_noise, prob.observables[:, t - 1] - z[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
@@ -110,20 +109,30 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         ΔB = zero(B)
         ΔC = zero(C)
         Δnoise = similar(prob.noise)
-        Δu = [zero(prob.u0) for _ in 1:T]
-        for t in T:-1:2
-            Δz = Δlogpdf * (prob.observables[:, t - 1] - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
-            mul!(Δu[t], C', Δz, 1, 1)
-            mul!(Δu[t - 1], A', Δu[t])
-            Δnoise[:, t - 1] = B' * Δu[t]
+        Δu = zero(u[1])
+        Δu_temp = zero(u[1])
+        Δz = zero(z[1])
+
+        @views @inbounds for t in T:-1:2
+            Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
+            # ldiv!(Δz, obs_noise.Σ.chol, innovation[t])
+            # rmul!(Δlogpdf, Δz)
+
+            copy!(Δu_temp, Δu)
+            mul!(Δu_temp, C', Δz, 1, 1)
+            mul!(Δu, A', Δu_temp)
+            mul!(view(Δnoise, :, t - 1), B', Δu_temp)
             # Now, deal with the coefficients
-            mul!(ΔA, Δu[t], u[t - 1]', 1, 1)
-            mul!(ΔB, Δu[t], prob.noise[:, t - 1]', 1, 1)
+            mul!(ΔA, Δu_temp, u[t - 1]', 1, 1)
+            mul!(ΔB, Δu_temp, view(prob.noise, :, t - 1)', 1, 1)
             mul!(ΔC, Δz, u[t]', 1, 1)
         end
         return (NoTangent(),
-                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu[1], noise = Δnoise),
-                NoTangent(), map(_ -> NoTangent(), args)...)
+                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
+                                      observables = NoTangent(), # not implemented
+                                      obs_noise = NoTangent()), NoTangent(),
+                map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end
