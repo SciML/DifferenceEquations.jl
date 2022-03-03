@@ -5,6 +5,9 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
                                    ttype,otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
+    # checks on bounds
+    @assert size(prob.observables, 2) == T - 1
+
     @unpack A, B, C, u0 = prob
     N = length(u0)
     L = size(C, 1)
@@ -97,6 +100,9 @@ function ChainRulesCore.rrule(::typeof(_solve!),
                                                 otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
+    # checks on bounds
+    @assert size(prob.observables, 2) == T - 1
+
     @unpack A, B, C, u0 = prob
     N = length(u0)
     L = size(C, 1)

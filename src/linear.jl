@@ -49,6 +49,11 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C = prob
 
+    # checks on bounds
+    @assert size(prob.noise, 1) == size(prob.B, 2)
+    @assert size(prob.noise, 2) == size(prob.observables, 2)
+    @assert size(prob.noise, 2) == T - 1
+
     u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
     z1 = C * prob.u0
     z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
@@ -78,6 +83,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     # Preallocate values
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
+    # checks on bounds
+    @assert size(prob.noise, 1) == size(prob.B, 2)
+    @assert size(prob.noise, 2) == size(prob.observables, 2)
+    @assert size(prob.noise, 2) == T - 1
+
     @unpack A, B, C = prob
 
     u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache

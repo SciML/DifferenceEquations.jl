@@ -62,6 +62,11 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
                                    wtype,Rtype,utype,ttype,otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
+    # checks on bounds
+    @assert size(prob.noise, 1) == size(prob.B, 2)
+    @assert size(prob.noise, 2) == size(prob.observables, 2)
+    @assert size(prob.noise, 2) == T - 1
+
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
     C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)] # should be the native datastructure
@@ -105,6 +110,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
                                                 C_1type,C_2type,wtype,Rtype,utype,ttype,otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
+    # checks on bounds
+    @assert size(prob.noise, 1) == size(prob.B, 2)
+    @assert size(prob.noise, 2) == size(prob.observables, 2)
+    @assert size(prob.noise, 2) == T - 1
+
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
     C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)] # should be the native datastructure
