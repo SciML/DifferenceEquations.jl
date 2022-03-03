@@ -4,7 +4,6 @@ using ChainRulesCore
 using Distributions
 using LinearAlgebra
 using CommonSolve
-using Zygote
 using Parameters
 using PDMats
 #using Infiltrator # TEMP Add or remove during testing
@@ -36,7 +35,6 @@ include("utilities.jl")
 include("linear.jl")
 include("quadratic.jl")
 include("solution.jl")
-include("nonlinear.jl")
 include("kalman.jl")
 
 # Exports
