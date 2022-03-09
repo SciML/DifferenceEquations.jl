@@ -3,3 +3,4 @@ Manifest.toml
 *.code-workspace
 /.benchmarkci
 /benchmark/*.json
+LocalPreferences.toml

@@ -4,7 +4,7 @@ using ChainRulesCore
 using Distributions
 using LinearAlgebra
 using CommonSolve
-using Parameters
+using UnPack
 using PDMats
 using SciMLBase: SciMLBase, SciMLProblem, solve
 
