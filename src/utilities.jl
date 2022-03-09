@@ -1,7 +1,4 @@
 
-#utility to fill array with zeros inplace
-fill_zero!(v) = fill!(v, zero(eltype(v)))
-
 # old quad and adjoint replaced by inplace accumulation versions.
 # function quad(A::AbstractArray{<:Number,3}, x)
 #     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))

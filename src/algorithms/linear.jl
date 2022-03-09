@@ -1,5 +1,110 @@
 
 function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
+                                               otype}, ::NoiseConditionalFilter, args...;
+                 kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,otype}
+    # Preallocate values
+    T = prob.tspan[2] - prob.tspan[1] + 1
+    @unpack A, B, C = prob
+
+    # checks on bounds
+    @assert size(prob.noise, 1) == size(prob.B, 2)
+    @assert size(prob.noise, 2) == size(prob.observables, 2)
+    @assert size(prob.noise, 2) == T - 1
+
+    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
+    z1 = C * prob.u0
+    z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
+
+    # Initialize
+    u[1] .= prob.u0
+    z[1] .= z1
+
+    loglik = 0.0
+    @inbounds for t in 2:T
+        mul!(u[t], A, u[t - 1])
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
+
+        mul!(z[t], C, u[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
+    end
+
+    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+end
+
+function ChainRulesCore.rrule(::typeof(_solve!),
+                              prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,
+                                                            utype,ttype,otype},
+                              ::NoiseConditionalFilter, args...;
+                              kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
+                                                otype}
+    # Preallocate values
+    # Preallocate values
+    T = prob.tspan[2] - prob.tspan[1] + 1
+    # checks on bounds
+    @assert size(prob.noise, 1) == size(prob.B, 2)
+    @assert size(prob.noise, 2) == size(prob.observables, 2)
+    @assert size(prob.noise, 2) == T - 1
+
+    @unpack A, B, C = prob
+
+    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
+    z1 = C * prob.u0
+    z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
+
+    # Initialize
+    u[1] .= prob.u0
+    z[1] .= z1
+
+    loglik = 0.0
+    @inbounds for t in 2:T
+        mul!(u[t], A, u[t - 1])
+        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
+
+        mul!(z[t], C, u[t])
+        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
+    end
+
+    sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+
+    function solve_pb(Δsol)
+        Δlogpdf = Δsol.loglikelihood
+        if iszero(Δlogpdf)
+            return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
+                    map(_ -> NoTangent(), args)...)
+        end
+        ΔA = zero(A)
+        ΔB = zero(B)
+        ΔC = zero(C)
+        Δnoise = similar(prob.noise)
+        Δu = zero(u[1])
+        Δu_temp = zero(u[1])
+        Δz = zero(z[1])
+
+        @views @inbounds for t in T:-1:2
+            Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
+            # ldiv!(Δz, obs_noise.Σ.chol, innovation[t])
+            # rmul!(Δlogpdf, Δz)
+
+            copy!(Δu_temp, Δu)
+            mul!(Δu_temp, C', Δz, 1, 1)
+            mul!(Δu, A', Δu_temp)
+            mul!(view(Δnoise, :, t - 1), B', Δu_temp)
+            # Now, deal with the coefficients
+            mul!(ΔA, Δu_temp, u[t - 1]', 1, 1)
+            mul!(ΔB, Δu_temp, view(prob.noise, :, t - 1)', 1, 1)
+            mul!(ΔC, Δz, u[t]', 1, 1)
+        end
+        return (NoTangent(),
+                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
+                                      observables = NoTangent(), # not implemented
+                                      obs_noise = NoTangent()), NoTangent(),
+                map(_ -> NoTangent(), args)...)
+    end
+    return sol, solve_pb
+end
+
+function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
                                                otype}, solver::KalmanFilter, args...;
                  kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype<:Distribution,utype,
                                    ttype,otype}
