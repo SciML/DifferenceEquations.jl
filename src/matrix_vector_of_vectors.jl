@@ -1,5 +1,7 @@
 
-# promote to work with a standardized interface
+# Support for using a matrix as a AbstractVectorOfArray, especially iteration on A[i], etc.
+# Note that a proper implementation should probably work with an arbitrary Array, so that a 3-tensor
+# appears as a vector of matrices, etc.
 struct MatrixVectorOfArray{T,N,A} <: RecursiveArrayTools.AbstractVectorOfArray{T,N,A}
     u::A # A <: AbstractMatrix{T} where size(u, 1) == N
 end

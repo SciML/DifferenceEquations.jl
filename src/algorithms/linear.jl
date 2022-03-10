@@ -67,7 +67,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     sol = StateSpaceSolution(z, u, prob.noise, nothing, loglik)
 
     function solve_pb(Δsol)
-        # TODO: Assert no changes in Δz or Δu
+        # Currently only changes in the logpdf are supported in the rrule
+        @assert Δsol.u == ZeroTangent()
+        @assert Δsol.W == ZeroTangent()
+        @assert Δsol.observables == ZeroTangent()
+
         Δlogpdf = Δsol.logpdf
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
@@ -295,6 +299,12 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 
     sol = StateSpaceSolution(z, u, prob.noise, P, loglik)
     function solve_pb(Δsol)
+        # Currently only changes in the logpdf are supported in the rrule
+        @assert Δsol.u == ZeroTangent()
+        @assert Δsol.W == ZeroTangent()
+        @assert Δsol.P == ZeroTangent()
+        @assert Δsol.observables == ZeroTangent()
+
         Δlogpdf = Δsol.logpdf
 
         if iszero(Δlogpdf)
