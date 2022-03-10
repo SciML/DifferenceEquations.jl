@@ -1,7 +1,4 @@
-
-function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                               otype}, alg::NoiseConditionalFilter, args...;
-                 kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,otype}
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::DirectIteration, args...; kwargs...)
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     @unpack A, B, C = prob
@@ -32,12 +29,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
                           logpdf = loglik, retcode = :Success)
 end
 
-function ChainRulesCore.rrule(::typeof(_solve!),
-                              prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,
-                                                            utype,ttype,otype},
-                              alg::NoiseConditionalFilter, args...;
-                              kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                                otype}
+function ChainRulesCore.rrule(::typeof(DiffEqBase.__solve), prob::LinearStateSpaceProblem,
+                              alg::DirectIteration, args...; kwargs...)
     # Preallocate values
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
@@ -110,10 +103,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
     return sol, solve_pb
 end
 
-function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                               otype}, alg::KalmanFilter, args...;
-                 kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype<:Distribution,utype,
-                                   ttype,otype}
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, args...; kwargs...)
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     # checks on bounds
@@ -204,12 +194,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
                           logpdf = loglik, retcode = :Success)
 end
 
-function ChainRulesCore.rrule(::typeof(_solve!),
-                              prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,
-                                                            utype,ttype,otype}, alg::KalmanFilter,
-                              args...;
-                              kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                                otype}
+function ChainRulesCore.rrule(::typeof(DiffEqBase.__solve), prob::LinearStateSpaceProblem,
+                              alg::KalmanFilter, args...; kwargs...)
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
     # checks on bounds

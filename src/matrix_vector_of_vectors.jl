@@ -106,3 +106,9 @@ Base.map(f, A::MatrixVectorOfArray) = map(f, eachcol(A.u))
 function Base.mapreduce(f, op, A::MatrixVectorOfArray)
     return mapreduce(f, op, (mapreduce(f, op, x) for x in eachcol(A.u)))
 end
+
+# Promotion utilities
+promote_vv(vec::AbstractVectorOfArray) = vec
+promote_vv(mat::AbstractMatrix) = MatrixVectorOfArray(mat)
+promote_vv(vec::AbstractVector) = VectorOfArray(vec)
+promote_vv(::Nothing) = nothing

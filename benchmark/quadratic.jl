@@ -6,7 +6,7 @@ function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observab
     problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2));
                                          obs_noise = MvNormal(Diagonal(abs2.(D))), noise,
                                          observables, kwargs...)
-    return solve(problem, NoiseConditionalFilter()).logpdf
+    return solve(problem).logpdf
 end
 
 const QUADRATIC = BenchmarkGroup()

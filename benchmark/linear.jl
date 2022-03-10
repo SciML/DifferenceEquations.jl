@@ -5,12 +5,12 @@ using DelimitedFiles, Distributions, Zygote, LinearAlgebra
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables, 2)); obs_noise = D, noise,
                                       observables, kwargs...)
-    return solve(problem, NoiseConditionalFilter()).logpdf
+    return solve(problem).logpdf
 end
 function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables, 2)); obs_noise = D,
                                       noise = nothing, observables, kwargs...)
-    return solve(problem, KalmanFilter()).logpdf
+    return solve(problem).logpdf
 end
 
 # Matrices from RBC

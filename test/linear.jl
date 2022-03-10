@@ -5,7 +5,7 @@ using FiniteDiff: finite_difference_gradient
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables, 2)); obs_noise = D, noise,
                                       observables, kwargs...)
-    return solve(problem, NoiseConditionalFilter()).logpdf
+    return solve(problem).logpdf
 end
 
 # CRTU has problems with generating random MvNormal, so just testing diagonals
@@ -13,7 +13,7 @@ function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, MvNormal(u0, diagm(ones(length(u0)))),
                                       (0, size(observables, 2)); obs_noise = D, noise = nothing,
                                       observables, kwargs...)
-    return solve(problem, KalmanFilter()).logpdf
+    return solve(problem).logpdf
 end
 
 # Matrices from RBC
@@ -44,6 +44,13 @@ noise_rbc = noise_rbc[:, 1:T]
                (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
+
+# @testset "plots" begin
+# problem = LinearStateSpaceProblem(A_rbc, B_rbc, C_rbc, u0_rbc, (0, size(observables_rbc, 2));
+#                                   obs_noise = D_rbc, noise = noise_rbc,
+#                                   observables = observables_rbc)
+# sol = solve(problem)
+# end
 
 @testset "linear rbc kalman likelihood" begin
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈
