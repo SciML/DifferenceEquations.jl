@@ -28,7 +28,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    return build_solution(prob, alg, 1:T, u; W = prob.noise, logpdf = loglik, retcode = :Success)
+    return build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise,
+                          logpdf = loglik, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
@@ -64,7 +65,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    sol = build_solution(prob, alg, 1:T, u; W = prob.noise, logpdf = loglik, retcode = :Success)
+    sol = build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise, logpdf = loglik,
+                         retcode = :Success)
 
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
@@ -198,7 +200,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
-    return build_solution(prob, alg, 1:T, u; P, W = prob.noise, logpdf = loglik, retcode = :Success)
+    return build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; P, W = prob.noise,
+                          logpdf = loglik, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
@@ -296,7 +299,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
-    sol = build_solution(prob, alg, 1:T, u; P, W = prob.noise, logpdf = loglik, retcode = :Success)
+    sol = build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; P, W = prob.noise,
+                         logpdf = loglik, retcode = :Success)
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
