@@ -28,7 +28,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    return StateSpaceSolution(z, u, prob.noise, nothing, loglik)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
@@ -64,10 +64,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    sol = StateSpaceSolution(z, u, prob.noise, nothing, loglik)
 
     function solve_pb(Δsol)
-        Δlogpdf = Δsol.loglikelihood
+        # TODO: Assert no changes in Δz or Δu
+        Δlogpdf = Δsol.logpdf
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
                     map(_ -> NoTangent(), args)...)
@@ -194,7 +195,7 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
-    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    return StateSpaceSolution(z, u, prob.noise, P, loglik)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
@@ -292,9 +293,10 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
-    sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    sol = StateSpaceSolution(z, u, prob.noise, P, loglik)
     function solve_pb(Δsol)
-        Δlogpdf = Δsol.loglikelihood
+        Δlogpdf = Δsol.logpdf
+
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
                     map(_ -> NoTangent(), args)...)

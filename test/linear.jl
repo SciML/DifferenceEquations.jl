@@ -5,7 +5,7 @@ using FiniteDiff: finite_difference_gradient
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables, 2)); obs_noise = D, noise,
                                       observables, kwargs...)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
+    return solve(problem, NoiseConditionalFilter()).logpdf
 end
 
 # CRTU has problems with generating random MvNormal, so just testing diagonals
@@ -13,7 +13,7 @@ function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, C, MvNormal(u0, diagm(ones(length(u0)))),
                                       (0, size(observables, 2)); obs_noise = D, noise = nothing,
                                       observables, kwargs...)
-    return solve(problem, KalmanFilter(); save_everystep = false).loglikelihood
+    return solve(problem, KalmanFilter()).logpdf
 end
 
 # Matrices from RBC

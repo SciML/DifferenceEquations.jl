@@ -7,7 +7,8 @@ using CommonSolve
 using UnPack
 using PDMats
 using RecursiveArrayTools
-using SciMLBase: SciMLBase, SciMLProblem, solve
+using SciMLBase: SciMLBase, SciMLProblem, solve, @add_kwonly, NullParameters, promote_tspan,
+                 AbstractRODESolution
 
 include("matrix_vector_of_vectors.jl")
 include("utilities.jl")
