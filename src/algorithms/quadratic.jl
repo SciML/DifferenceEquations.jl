@@ -42,7 +42,7 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    return StateSpaceSolution(z, u, prob.noise, nothing, loglik)
+    return build_solution(prob, alg, 1:T, u; W = prob.noise, logpdf = loglik, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
@@ -90,13 +90,12 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    sol = StateSpaceSolution(z, u, prob.noise, nothing, loglik)
+    sol = build_solution(prob, alg, 1:T, u; W = prob.noise, logpdf = loglik, retcode = :Success)
 
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
         @assert Δsol.W == ZeroTangent()
-        @assert Δsol.observables == ZeroTangent()
 
         Δlogpdf = Δsol.logpdf
         if iszero(Δlogpdf)

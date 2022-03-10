@@ -1,6 +1,6 @@
 
 function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                               otype}, ::NoiseConditionalFilter, args...;
+                                               otype}, alg::NoiseConditionalFilter, args...;
                  kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,otype}
     # Preallocate values
     T = prob.tspan[2] - prob.tspan[1] + 1
@@ -28,13 +28,13 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    return StateSpaceSolution(z, u, prob.noise, nothing, loglik)
+    return build_solution(prob, alg, 1:T, u; W = prob.noise, logpdf = loglik, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
                               prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,
                                                             utype,ttype,otype},
-                              ::NoiseConditionalFilter, args...;
+                              alg::NoiseConditionalFilter, args...;
                               kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
                                                 otype}
     # Preallocate values
@@ -64,13 +64,12 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    sol = StateSpaceSolution(z, u, prob.noise, nothing, loglik)
+    sol = build_solution(prob, alg, 1:T, u; W = prob.noise, logpdf = loglik, retcode = :Success)
 
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
         @assert Δsol.W == ZeroTangent()
-        @assert Δsol.observables == ZeroTangent()
 
         Δlogpdf = Δsol.logpdf
         if iszero(Δlogpdf)
@@ -110,7 +109,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
 end
 
 function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                               otype}, solver::KalmanFilter, args...;
+                                               otype}, alg::KalmanFilter, args...;
                  kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype<:Distribution,utype,
                                    ttype,otype}
     # Preallocate values
@@ -199,12 +198,12 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
-    return StateSpaceSolution(z, u, prob.noise, P, loglik)
+    return build_solution(prob, alg, 1:T, u; P, W = prob.noise, logpdf = loglik, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(_solve!),
                               prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,
-                                                            utype,ttype,otype}, ::KalmanFilter,
+                                                            utype,ttype,otype}, alg::KalmanFilter,
                               args...;
                               kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
                                                 otype}
@@ -297,13 +296,12 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
-    sol = StateSpaceSolution(z, u, prob.noise, P, loglik)
+    sol = build_solution(prob, alg, 1:T, u; P, W = prob.noise, logpdf = loglik, retcode = :Success)
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
         @assert Δsol.W == ZeroTangent()
         @assert Δsol.P == ZeroTangent()
-        @assert Δsol.observables == ZeroTangent()
 
         Δlogpdf = Δsol.logpdf
 
