@@ -4,10 +4,6 @@ using Distributions
 using LinearAlgebra
 using Random
 
-@testset "Linear tests" begin
-    include("linear.jl")
-end
-
-@testset "Quadratic tests" begin
-    include("quadratic.jl")
-end
+include("matrix_vector_of_vectors.jl")
+include("linear.jl")
+include("quadratic.jl")
