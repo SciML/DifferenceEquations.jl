@@ -1,7 +1,7 @@
 
 function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2type,Btype,C_0type,
                                                   C_1type,C_2type,wtype,Rtype,utype,ttype,otype},
-                 ::NoiseConditionalFilter, args...;
+                 alg::NoiseConditionalFilter, args...;
                  kwargs...) where {isinplace,A_0type,A_1type,A_2type,Btype,C_0type,C_1type,C_2type,
                                    wtype,Rtype,utype,ttype,otype}
     # Preallocate values
@@ -49,7 +49,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
                               prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2type,
                                                                Btype,C_0type,C_1type,C_2type,wtype,
                                                                Rtype,utype,ttype,otype},
-                              ::NoiseConditionalFilter, args...;
+                              alg::NoiseConditionalFilter, args...;
                               kwargs...) where {isinplace,A_0type,A_1type,A_2type,Btype,C_0type,
                                                 C_1type,C_2type,wtype,Rtype,utype,ttype,otype}
     # Preallocate values
