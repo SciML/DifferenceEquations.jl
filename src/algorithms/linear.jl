@@ -22,7 +22,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::DirectIteration,
         mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     return build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise,
@@ -55,7 +55,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.__solve), prob::LinearStateSpa
         mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     sol = build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise, logpdf = loglik,
@@ -80,9 +80,10 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.__solve), prob::LinearStateSpa
         Δz = zero(z[1])
 
         @views @inbounds for t in T:-1:2
-            Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./
+                  diag(prob.observables_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
             # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
-            # ldiv!(Δz, obs_noise.Σ.chol, innovation[t])
+            # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
             # rmul!(Δlogpdf, Δz)
 
             copy!(Δu_temp, Δu)
@@ -97,7 +98,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.__solve), prob::LinearStateSpa
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
                                       observables = NoTangent(), # not implemented
-                                      obs_noise = NoTangent()), NoTangent(),
+                                      observables_noise = NoTangent()), NoTangent(),
                 map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
@@ -134,8 +135,8 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
                                                                                       'U', 0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
-    # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = prob.obs_noise.Σ # Extract covariance from noise distribution
+    # The following line could be cov(prob.observables_noise) if the measurement error distribution is not MvNormal
+    R = prob.observables_noise.Σ # Extract covariance from noise distribution
     mul!(B_prod, B, B')
 
     # Gaussian Prior
@@ -227,8 +228,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.__solve), prob::LinearStateSpa
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     # Gaussian Prior
-    # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = prob.obs_noise.Σ # Extract covariance from noise distribution
+    # The following line could be cov(prob.observables_noise) if the measurement error distribution is not MvNormal
+    R = prob.observables_noise.Σ # Extract covariance from noise distribution
     mul!(B_prod, B, B')
 
     u[1] .= mean(u0)

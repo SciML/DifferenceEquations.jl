@@ -5,7 +5,7 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RTy
     A::AType
     B::BType
     C::CType
-    R::RType
+    observables_noise::RType
     observables::ObsType
     u0::uType
     u0_prior::uPriorType
@@ -17,7 +17,7 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RTy
     syms::SymsType
     @add_kwonly function LinearStateSpaceProblem{iip}(A, B, u0, tspan, p = NullParameters();
                                                       f = nothing, u0_prior = u0, # default copies the u0 to u0_prior so it doesn't mess up get_concrete
-                                                      C = nothing, R = nothing,
+                                                      C = nothing, observables_noise = nothing,
                                                       observables = nothing, noise = nothing,
                                                       seed = UInt64(0), syms = nothing,
                                                       kwargs...) where {iip}
@@ -26,20 +26,9 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RTy
         _noise = promote_vv(noise)
 
         return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(A),
-                   typeof(B),typeof(C),typeof(R),typeof(_observables),typeof(kwargs),typeof(syms)}(f,
-                                                                                                   A,
-                                                                                                   B,
-                                                                                                   C,
-                                                                                                   R,
-                                                                                                   _observables,
-                                                                                                   u0,
-                                                                                                   u0_prior,
-                                                                                                   _tspan,
-                                                                                                   p,
-                                                                                                   _noise,
-                                                                                                   kwargs,
-                                                                                                   seed,
-                                                                                                   syms)
+                   typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),
+                   typeof(kwargs),typeof(syms)}(f, A, B, C, observables_noise, _observables, u0,
+                                                u0_prior, _tspan, p, _noise, kwargs, seed, syms)
     end
 end
 # just forwards to a iip = false case
@@ -64,7 +53,7 @@ LinearStateSpaceProblem(args...; kwargs...) = LinearStateSpaceProblem{false}(arg
 #     C_1::C_1type
 #     C_2::C_2type # Observation matrix
 #     noise::wtype # Latent noises
-#     obs_noise::Rtype # Observation noise / measurement error distribution
+#     observables_noise::Rtype # Observation noise / measurement error distribution
 #     u0::utype # Initial condition
 #     tspan::ttype # Timespan to use
 #     observables::otype # Observed data to use, if any
@@ -72,7 +61,7 @@ LinearStateSpaceProblem(args...; kwargs...) = LinearStateSpaceProblem{false}(arg
 
 # function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B::Btype,
 #                                     C_0::C_0type, C_1::C_1type, C_2::C_2type, u0::utype,
-#                                     tspan::ttype; obs_noise = nothing, observables = nothing,
+#                                     tspan::ttype; observables_noise = nothing, observables = nothing,
 #                                     noise = nothing) where {A_0type<:AbstractArray,
 #                                                             A_1type<:AbstractArray,
 #                                                             A_2type<:AbstractArray,
@@ -81,12 +70,12 @@ LinearStateSpaceProblem(args...; kwargs...) = LinearStateSpaceProblem{false}(arg
 #                                                             C_1type<:AbstractArray,
 #                                                             C_2type<:AbstractArray,utype,ttype}
 #     return QuadraticStateSpaceProblem{Val(false),A_0type,A_1type,A_2type,Btype,C_0type,C_1type,
-#                                       C_2type,typeof(noise),typeof(obs_noise),utype,ttype,
+#                                       C_2type,typeof(noise),typeof(observables_noise),utype,ttype,
 #                                       typeof(observables)}(A_0::A_0type, A_1::A_1type, A_2::A_2type, # Evolution matrix
 #                                                            B::Btype, # Noise matrix
 #                                                            C_0::C_0type, C_1::C_1type, C_2::C_2type, # Observation matrix
 #                                                            noise, # Latent noise distribution
-#                                                            obs_noise, # Observation noise matrix
+#                                                            observables_noise, # Observation noise matrix
 #                                                            u0, # Initial condition
 #                                                            tspan, # Timespan to use
 #                                                            observables)

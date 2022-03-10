@@ -3,16 +3,16 @@ using DelimitedFiles
 using FiniteDiff: finite_difference_gradient
 
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, C, u0, (0, size(observables, 2)); obs_noise = D, noise,
-                                      observables, kwargs...)
+    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
+                                      noise, observables, kwargs...)
     return solve(problem).logpdf
 end
 
 # CRTU has problems with generating random MvNormal, so just testing diagonals
 function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, C, MvNormal(u0, diagm(ones(length(u0)))),
-                                      (0, size(observables, 2)); obs_noise = D, noise = nothing,
-                                      observables, kwargs...)
+    problem = LinearStateSpaceProblem(A, B, MvNormal(u0, diagm(ones(length(u0)))),
+                                      (0, size(observables, 2)); C, observables_noise = D,
+                                      noise = nothing, observables, kwargs...)
     return solve(problem).logpdf
 end
 
@@ -46,10 +46,10 @@ noise_rbc = noise_rbc[:, 1:T]
 end
 
 # @testset "plots" begin
-# problem = LinearStateSpaceProblem(A_rbc, B_rbc, C_rbc, u0_rbc, (0, size(observables_rbc, 2));
-#                                   obs_noise = D_rbc, noise = noise_rbc,
-#                                   observables = observables_rbc)
-# sol = solve(problem)
+problem = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                  observables_noise = D_rbc, noise = noise_rbc,
+                                  observables = observables_rbc)
+sol = solve(problem)
 # end
 
 @testset "linear rbc kalman likelihood" begin

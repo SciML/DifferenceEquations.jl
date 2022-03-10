@@ -39,7 +39,7 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     return build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise,
@@ -88,7 +88,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.obs_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
     sol = build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise, logpdf = loglik,
@@ -123,7 +123,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
 
         @views @inbounds for t in T:-1:2
-            Δz = Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./ diag(prob.obs_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            Δz = Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./
+                 diag(prob.observables_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
 
             # inplace adoint of quadratic form with accumulation
             quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
@@ -159,7 +160,7 @@ function ChainRulesCore.rrule(::typeof(_solve!),
                 Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB, C_0 = ΔC_0,
                                       C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1], noise = Δnoise,
                                       observables = NoTangent(), # not implemented
-                                      obs_noise = NoTangent()), NoTangent(),
+                                      observables_noise = NoTangent()), NoTangent(),
                 map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
