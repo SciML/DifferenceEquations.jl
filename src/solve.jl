@@ -1,15 +1,18 @@
 
-# Note that u0 as a distribution becomes a draw with the internal get_concrete_problem.  The u0_prior ensures it isn't lost in that call
-DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::Nothing, args...; kwargs...) = DiffEqBase.__solve(prob,
-                                                                                                         default_alg(prob),
-                                                                                                         args...;
-                                                                                                         kwargs...)
+abstract type AbstractDifferenceEquationAlgorithm end
+struct DirectIteration <: AbstractDifferenceEquationAlgorithm end
+struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 
-#                                                                                                          # Apply default algorithm to adjoints as
-# DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::Nothing, args...; kwargs...) = DiffEqBase._concrete_solve_adjoint(prob,
-#                                                                                                                                          default_alg(prob),
-#                                                                                                                                          args...;
-#                                                                                                                                          kwargs...)
+default_alg(prob::LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RType,ObsType,K,SymsType}) where {uType,uPriorType<:AbstractVector,tType,P,NP,AType,BType,CType,RType,ObsType,K,SymsType} = DirectIteration()
+
+# If a normal prior, normal observational noise, no noise given, and observables provided then can use a kalman filter
+default_alg(prob::LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RType,ObsType,K,SymsType}) where {uType,uPriorType<:MvNormal,tType,P,NP<:Nothing,AType,BType,CType,RType<:MvNormal,ObsType,K,SymsType} = KalmanFilter()
+
+# Select default algorithm if not provided
 DiffEqBase.solve(prob::LinearStateSpaceProblem; kwargs...) = DiffEqBase.solve(prob,
                                                                               default_alg(prob);
                                                                               kwargs...)
+DiffEqBase.solve(prob::LinearStateSpaceProblem, alg::Nothing, args...; kwargs...) = DiffEqBase.solve(prob,
+                                                                                                     default_alg(prob),
+                                                                                                     args...;
+                                                                                                     kwargs...)

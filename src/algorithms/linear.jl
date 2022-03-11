@@ -28,9 +28,11 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::DirectIteration,
                           retcode = :Success)
 end
 
-# Ideally, this is how it would work
-function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
-                                            sensealg, u0, p, args...; kwargs...)
+# Ideally hook into sensitity dispatching
+# function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
+#                                             sensealg, u0, p, args...; kwargs...)
+function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
+                              alg::DirectIteration, args...; kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
     @assert size(prob.noise, 1) == size(prob.B, 2)
@@ -193,11 +195,10 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
                           retcode = :Success)
 end
 
-function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
-                                            sensealg, u0, p, args...; kwargs...)
-
-    # function ChainRulesCore.rrule(::typeof(DiffEqBase.__solve), prob::LinearStateSpaceProblem,
-    #                               alg::KalmanFilter, args...; kwargs...)
+# function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
+#                                             sensealg, u0, p, args...; kwargs...)
+function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
+                              alg::KalmanFilter, args...; kwargs...)
     # Preallocate values
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
