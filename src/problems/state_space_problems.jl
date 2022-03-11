@@ -1,16 +1,15 @@
 abstract type AbstractStateSpaceProblem <: DiffEqBase.DEProblem end
 abstract type AbstractPerturbationProblem <: AbstractStateSpaceProblem end
 
-using DiffEqBase: get_concrete_tspan, get_concrete_u0, get_concrete_p, promote_u0, promote_tspan
+using DiffEqBase: get_concrete_tspan, get_concrete_u0, get_concrete_p, promote_u0, promote_tspan,
+                  isconcreteu0
 # Perturbation problesm don't have f, g
-# TODO: Inference was failing on the default version of this
+# In discrete time, tspan should not have a sensitivity so the concretization is less obvious
 function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isadapt; kwargs...)
     p = DiffEqBase.get_concrete_p(prob, kwargs)
-    tspan = get_concrete_tspan(prob, isadapt, kwargs, p)
+    tspan = prob.tspan #get_concrete_tspan(prob, isadapt, kwargs, p)
     u0 = get_concrete_u0(prob, isadapt, tspan[1], kwargs)
     u0_promote = promote_u0(u0, p, tspan[1])
-    #tspan_promote = promote_tspan(u0_promote, p, tspan, prob, kwargs)
-    #tspan_promote = tspan # not sure why promote_tspan is breaking type stability
 
     if isconcreteu0(prob, tspan[1], kwargs) &&
        typeof(u0_promote) === typeof(prob.u0) &&

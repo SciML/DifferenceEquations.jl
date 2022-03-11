@@ -109,7 +109,8 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     # checks on bounds
     @assert size(prob.observables, 2) == T - 1
 
-    @unpack A, B, C, u0 = prob
+    @unpack A, B, C = prob
+    u0 = prob.u0_prior # use the prior, not the concretized u0
     N = length(u0)
     L = size(C, 1)
 
@@ -204,7 +205,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     # checks on bounds
     @assert size(prob.observables, 2) == T - 1
 
-    @unpack A, B, C, u0 = prob
+    @unpack A, B, C = prob
+    u0 = prob.u0_prior # use the prior, not the concretized u0    
     N = length(u0)
     L = size(C, 1)
 

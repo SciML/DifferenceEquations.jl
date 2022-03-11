@@ -34,23 +34,41 @@ T = 5
 observables_rbc = observables_rbc[:, 1:T]
 noise_rbc = noise_rbc[:, 1:T]
 
-# @testset "basic inference" begin
-prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
-                               observables_noise = D_rbc, noise = noise_rbc,
-                               observables = observables_rbc)
-@inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
-                                  observables_noise = D_rbc, noise = noise_rbc,
-                                  observables = observables_rbc)
+@testset "basic inference" begin
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                   observables_noise = D_rbc, noise = noise_rbc,
+                                   observables = observables_rbc)
+    @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+                                      C = C_rbc, observables_noise = D_rbc, noise = noise_rbc,
+                                      observables = observables_rbc)
 
-sol = solve(prob)
-@inferred solve(prob)
+    sol = solve(prob)
+    @inferred solve(prob)
 
-DiffEqBase.get_concrete_problem(prob, false)
-@inferred DiffEqBase.get_concrete_problem(prob, false)
+    DiffEqBase.get_concrete_problem(prob, false)
+    @inferred DiffEqBase.get_concrete_problem(prob, false)
 
-joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
-@inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
-# end
+    joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+end
+
+@testset "basic kalman inference" begin
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
+                                   (0, size(observables_rbc, 2)); C = C_rbc,
+                                   observables_noise = D_rbc, observables = observables_rbc)
+    @inferred LinearStateSpaceProblem(A_rbc, B_rbc, MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
+                                      (0, size(observables_rbc, 2)); C = C_rbc,
+                                      observables_noise = D_rbc, observables = observables_rbc)
+
+    sol = solve(prob)
+    @inferred solve(prob)
+
+    prob_concrete = DiffEqBase.get_concrete_problem(prob, false)
+    @inferred DiffEqBase.get_concrete_problem(prob, false)
+
+    kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
+    @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
+end
 
 gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
          u0_rbc, noise_rbc)
