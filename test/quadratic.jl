@@ -4,9 +4,8 @@ using FiniteDiff: finite_difference_gradient
 
 # joint case
 function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D; kwargs...)
-    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0,
-                                         (0, size(observables, 2)); observables_noise = D, noise,
-                                         observables, kwargs...)
+    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0, C_1,
+                                         C_2, observables_noise = D, noise, observables, kwargs...)
     return solve(problem).logpdf
 end
 
@@ -32,6 +31,26 @@ noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise
 T = 5
 observables_2_rbc = observables_2_rbc[:, 1:T]
 noise_2_rbc = noise_2_rbc[:, 1:T]
+
+# @testset "basic inference" begin
+prob = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, u0_rbc,
+                                  (0, size(observables_rbc, 2)); C_0 = C_0_rbc, C_1 = C_1_rbc,
+                                  C_2 = C_2_rbc, observables_noise = D_rbc, noise = noise_rbc,
+                                  observables = observables_rbc)
+@inferred QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_rbc, u0_rbc,
+                                     (0, size(observables_rbc, 2)); C_0 = C_0_rbc, C_1 = C_1_rbc,
+                                     C_2 = C_2_rbc, observables_noise = D_rbc, noise = noise_rbc,
+                                     observables = observables_rbc)
+
+DiffEqBase.get_concrete_problem(prob, false)
+@inferred DiffEqBase.get_concrete_problem(prob, false)
+
+sol = solve(prob)
+@inferred solve(prob)
+
+joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+@inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+# end
 
 @testset "quadratic rbc joint likelihood" begin
     @test joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc,

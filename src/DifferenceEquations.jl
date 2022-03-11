@@ -22,7 +22,7 @@ include("algorithms/linear.jl")
 # Exports
 export MatrixVectorOfArray
 
-export AbstractStateSpaceProblem, LinearStateSpaceProblem #QuadraticStateSpaceProblem
+export AbstractStateSpaceProblem, LinearStateSpaceProblem, QuadraticStateSpaceProblem
 export StateSpaceSolution, DirectIteration, KalmanFilter
 
 export solve

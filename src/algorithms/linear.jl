@@ -28,7 +28,10 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::DirectIteration,
                           retcode = :Success)
 end
 
-# Ideally hook into sensitity dispatching
+# Ideally hook into existing sensitity dispatching
+# Trouble with Zygote.  The problem isn't the _concrete_solve_adjoint but rather something in the
+# adjoint of the basic solve and `solve_up`.  Probably promotion on the prob
+
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
 #                                             sensealg, u0, p, args...; kwargs...)
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
@@ -195,6 +198,10 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     return build_solution(prob, alg, t_values, u; P, W = prob.noise, logpdf = loglik,
                           retcode = :Success)
 end
+
+# NOTE: when moving to ._concrete_solve_adjoint will need to be careful to ensure the u0 sensitivity
+# takes into account any promotion in the `remake_model` side.  We want u0 to be the prior and have the
+# sensitivity of it as a distribution, not a draw from it which might happen in the remake(...)
 
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
 #                                             sensealg, u0, p, args...; kwargs...)

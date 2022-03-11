@@ -66,53 +66,66 @@ LinearStateSpaceProblem(args...; kwargs...) = LinearStateSpaceProblem{false}(arg
 # z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
 # z_tilde(t) = z(t) + v(t+1)
 # """
-# struct QuadraticStateSpaceProblem{isinplace,A_0type<:AbstractArray,A_1type<:AbstractArray,
-#                                   A_2type<:AbstractArray,Btype<:AbstractArray,
-#                                   C_0type<:AbstractArray,C_1type<:AbstractArray,
-#                                   C_2type<:AbstractArray,wtype,Rtype, # Distributions only
-#                                   utype,ttype,otype} <: AbstractStateSpaceProblem{isinplace}
-#     A_0::A_0type
-#     A_1::A_1type
-#     A_2::A_2type # Evolution matrix
-#     B::Btype # Noise matrix
-#     C_0::C_0type
-#     C_1::C_1type
-#     C_2::C_2type # Observation matrix
-#     noise::wtype # Latent noises
-#     observables_noise::Rtype # Observation noise / measurement error distribution
-#     u0::utype # Initial condition
-#     tspan::ttype # Timespan to use
-#     observables::otype # Observed data to use, if any
-# end
+struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,A0Type,A1Type,A2Type,BType,C0Type,
+                                  C1Type,C2Type,RType,ObsType,K,SymsType} <:
+       AbstractPerturbationProblem
+    f::Nothing  # HACK: need something called "f" which supports "isinplace" for plotting
+    A_0::A0Type
+    A_1::A1Type
+    A_2::A2Type
+    B::BType
+    C_0::C0Type
+    C_1::C1Type
+    C_2::C2Type
+    observables_noise::RType
+    observables::ObsType
+    u0::uType
+    u0_prior::uPriorType
+    tspan::tType
+    p::P
+    noise::NP
+    kwargs::K
+    seed::UInt64
+    syms::SymsType
+    @add_kwonly function QuadraticStateSpaceProblem{iip}(A_0, A_1, A_2, B, u0, tspan,
+                                                         p = NullParameters(); f = nothing,
+                                                         u0_prior = u0, # default copies the u0 to u0_prior so it doesn't mess up get_concrete
+                                                         C_0 = nothing, C_1 = nothing,
+                                                         C_2 = nothing, observables_noise = nothing,
+                                                         observables = nothing, noise = nothing,
+                                                         seed = UInt64(0), syms = nothing,
+                                                         kwargs...) where {iip}
+        _tspan = promote_tspan(tspan)
+        # _observables = promote_vv(observables)
+        # _noise = promote_vv(noise)
+        _observables = observables
+        _noise = noise
 
-# function QuadraticStateSpaceProblem(A_0::A_0type, A_1::A_1type, A_2::A_2type, B::Btype,
-#                                     C_0::C_0type, C_1::C_1type, C_2::C_2type, u0::utype,
-#                                     tspan::ttype; observables_noise = nothing, observables = nothing,
-#                                     noise = nothing) where {A_0type<:AbstractArray,
-#                                                             A_1type<:AbstractArray,
-#                                                             A_2type<:AbstractArray,
-#                                                             Btype<:AbstractArray,
-#                                                             C_0type<:AbstractArray,
-#                                                             C_1type<:AbstractArray,
-#                                                             C_2type<:AbstractArray,utype,ttype}
-#     return QuadraticStateSpaceProblem{Val(false),A_0type,A_1type,A_2type,Btype,C_0type,C_1type,
-#                                       C_2type,typeof(noise),typeof(observables_noise),utype,ttype,
-#                                       typeof(observables)}(A_0::A_0type, A_1::A_1type, A_2::A_2type, # Evolution matrix
-#                                                            B::Btype, # Noise matrix
-#                                                            C_0::C_0type, C_1::C_1type, C_2::C_2type, # Observation matrix
-#                                                            noise, # Latent noise distribution
-#                                                            observables_noise, # Observation noise matrix
-#                                                            u0, # Initial condition
-#                                                            tspan, # Timespan to use
-#                                                            observables)
-# end
+        # Require integer distances between time periods for now.  Later could check with dt != 1
+        @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
-# # Default is NoiseConditionalFilter
-# function CommonSolve.init(prob::QuadraticStateSpaceProblem, args...; kwargs...)
-#     return StateSpaceCache(prob)
-# end
-
-# function CommonSolve.init(prob::QuadraticStateSpaceProblem, solver::SciMLBase.SciMLAlgorithm,
-#                           args...; kwargs...)
-#     return StateSpaceCache(prob, solver)
-# end
+        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(A_0),
+                   typeof(A_1),typeof(A_2),typeof(B),typeof(C_0),typeof(C_1),typeof(C_2),
+                   typeof(observables_noise),typeof(_observables),typeof(kwargs),typeof(syms)}(f,
+                                                                                               A_0,
+                                                                                               A_1,
+                                                                                               A_2,
+                                                                                               B,
+                                                                                               C_0,
+                                                                                               C_1,
+                                                                                               C_2,
+                                                                                               observables_noise,
+                                                                                               _observables,
+                                                                                               u0,
+                                                                                               u0_prior,
+                                                                                               _tspan,
+                                                                                               p,
+                                                                                               _noise,
+                                                                                               kwargs,
+                                                                                               seed,
+                                                                                               syms)
+    end
+end
+# just forwards to a iip = false case
+QuadraticStateSpaceProblem(args...; kwargs...) = QuadraticStateSpaceProblem{false}(args...;
+                                                                                   kwargs...)
