@@ -1,28 +1,28 @@
 abstract type AbstractStateSpaceProblem <: DiffEqBase.DEProblem end
+abstract type AbstractPerturbationProblem <: AbstractStateSpaceProblem end
 
+using DiffEqBase: get_concrete_tspan, get_concrete_u0, get_concrete_p, promote_u0, promote_tspan
+# Perturbation problesm don't have f, g
 # TODO: Inference was failing on the default version of this
-function DiffEqBase.get_concrete_problem(prob::AbstractStateSpaceProblem, isadapt; kwargs...)
-    return prob
-    # p = get_concrete_p(prob, kwargs)
-    # tspan = get_concrete_tspan(prob, isadapt, kwargs, p)
-    # u0 = get_concrete_u0(prob, isadapt, tspan[1], kwargs)
-    # u0_promote = promote_u0(u0, p, tspan[1])
-    # f_promote = promote_f(prob.f, u0_promote)
-    # tspan_promote = promote_tspan(u0_promote, p, tspan, prob, kwargs)
-    # if isconcreteu0(prob, tspan[1], kwargs) &&
-    #    typeof(u0_promote) === typeof(prob.u0) &&
-    #    prob.tspan == tspan &&
-    #    typeof(prob.tspan) === typeof(tspan_promote) &&
-    #    p === prob.p &&
-    #    f_promote === prob.f
-    #     return prob
-    # else
-    #     return remake(prob; f = f_promote, u0 = u0_promote, p = p, tspan = tspan_promote)
-    # end
+function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isadapt; kwargs...)
+    p = DiffEqBase.get_concrete_p(prob, kwargs)
+    tspan = get_concrete_tspan(prob, isadapt, kwargs, p)
+    u0 = get_concrete_u0(prob, isadapt, tspan[1], kwargs)
+    u0_promote = promote_u0(u0, p, tspan[1])
+    #tspan_promote = promote_tspan(u0_promote, p, tspan, prob, kwargs)
+    #tspan_promote = tspan # not sure why promote_tspan is breaking type stability
+
+    if isconcreteu0(prob, tspan[1], kwargs) &&
+       typeof(u0_promote) === typeof(prob.u0) &&
+       p === prob.p &&
+       return prob
+    else
+        return remake(prob; u0 = u0_promote, p = p)
+    end
 end
 
 struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RType,ObsType,K,
-                               SymsType} <: AbstractStateSpaceProblem
+                               SymsType} <: AbstractPerturbationProblem
     f::Nothing  # HACK: need something called "f" which supports "isinplace" for plotting
     A::AType
     B::BType
