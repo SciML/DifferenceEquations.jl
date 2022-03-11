@@ -4,3 +4,12 @@ DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::Nothing, args...; kwargs.
                                                                                                          default_alg(prob),
                                                                                                          args...;
                                                                                                          kwargs...)
+
+#                                                                                                          # Apply default algorithm to adjoints as
+# DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::Nothing, args...; kwargs...) = DiffEqBase._concrete_solve_adjoint(prob,
+#                                                                                                                                          default_alg(prob),
+#                                                                                                                                          args...;
+#                                                                                                                                          kwargs...)
+DiffEqBase.solve(prob::LinearStateSpaceProblem; kwargs...) = DiffEqBase.solve(prob,
+                                                                              default_alg(prob);
+                                                                              kwargs...)

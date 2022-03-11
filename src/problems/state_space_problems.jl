@@ -1,4 +1,26 @@
 abstract type AbstractStateSpaceProblem <: DiffEqBase.DEProblem end
+
+# TODO: Inference was failing on the default version of this
+function DiffEqBase.get_concrete_problem(prob::AbstractStateSpaceProblem, isadapt; kwargs...)
+    return prob
+    # p = get_concrete_p(prob, kwargs)
+    # tspan = get_concrete_tspan(prob, isadapt, kwargs, p)
+    # u0 = get_concrete_u0(prob, isadapt, tspan[1], kwargs)
+    # u0_promote = promote_u0(u0, p, tspan[1])
+    # f_promote = promote_f(prob.f, u0_promote)
+    # tspan_promote = promote_tspan(u0_promote, p, tspan, prob, kwargs)
+    # if isconcreteu0(prob, tspan[1], kwargs) &&
+    #    typeof(u0_promote) === typeof(prob.u0) &&
+    #    prob.tspan == tspan &&
+    #    typeof(prob.tspan) === typeof(tspan_promote) &&
+    #    p === prob.p &&
+    #    f_promote === prob.f
+    #     return prob
+    # else
+    #     return remake(prob; f = f_promote, u0 = u0_promote, p = p, tspan = tspan_promote)
+    # end
+end
+
 struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RType,ObsType,K,
                                SymsType} <: AbstractStateSpaceProblem
     f::Nothing  # HACK: need something called "f" which supports "isinplace" for plotting
@@ -22,8 +44,13 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RTy
                                                       seed = UInt64(0), syms = nothing,
                                                       kwargs...) where {iip}
         _tspan = promote_tspan(tspan)
-        _observables = promote_vv(observables)
-        _noise = promote_vv(noise)
+        # _observables = promote_vv(observables)
+        # _noise = promote_vv(noise)
+        _observables = observables
+        _noise = noise
+
+        # Require integer distances between time periods for now.  Later could check with dt != 1
+        @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
         return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(A),
                    typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),

@@ -1,11 +1,12 @@
 using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
 using DelimitedFiles
+using DiffEqBase
 using FiniteDiff: finite_difference_gradient
 
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
                                       noise, observables, kwargs...)
-    return solve(problem).logpdf
+    return solve(problem, DirectIteration()).logpdf
 end
 
 # CRTU has problems with generating random MvNormal, so just testing diagonals
@@ -33,6 +34,24 @@ T = 5
 observables_rbc = observables_rbc[:, 1:T]
 noise_rbc = noise_rbc[:, 1:T]
 
+@testset "basic inference" begin
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                   observables_noise = D_rbc, noise = noise_rbc,
+                                   observables = observables_rbc)
+    @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+                                      C = C_rbc, observables_noise = D_rbc, noise = noise_rbc,
+                                      observables = observables_rbc)
+
+    sol = solve(prob)
+    @inferred solve(prob)
+
+    joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+end
+
+gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+         u0_rbc, noise_rbc)
+
 @testset "linear rbc joint likelihood" begin
     @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
           -690.9407412360038
@@ -44,13 +63,6 @@ noise_rbc = noise_rbc[:, 1:T]
                (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
-
-# @testset "plots" begin
-problem = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
-                                  observables_noise = D_rbc, noise = noise_rbc,
-                                  observables = observables_rbc)
-sol = solve(problem)
-# end
 
 @testset "linear rbc kalman likelihood" begin
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈
