@@ -8,7 +8,7 @@ function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     return solve(problem).logpdf
 end
 function kalman_likelihood(A, B, C, u0_prior, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, u0_prior, (0, size(observables, 2)); C,
+    problem = LinearStateSpaceProblem(A, B, u0_prior, (0, size(observables, 2)); C, u0_prior,
                                       observables_noise = D, noise = nothing, observables,
                                       kwargs...)
     return solve(problem).logpdf

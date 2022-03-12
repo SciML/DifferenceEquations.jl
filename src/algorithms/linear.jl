@@ -383,11 +383,11 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
             mul!(ΔA, Δu_mid, u[t - 1]', 1, 1) # ΔA += Δu_mid * u[t - 1]'
             mul!(Δu, A', Δu_mid)
         end
-        ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP, chol = NoTangent(), dim = NoTangent()) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
+        ΔΣ = Tangent{typeof(prob.u0_prior.Σ)}(; mat = ΔP, chol = NoTangent(), dim = NoTangent()) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),
-                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC,
-                                      u0 = Tangent{typeof(prob.u0)}(; μ = Δu, Σ = ΔΣ)), NoTangent(),
-                map(_ -> NoTangent(), args)...)
+                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
+                                      u0_prior = Tangent{typeof(prob.u0_prior)}(; μ = Δu, Σ = ΔΣ)),
+                NoTangent(), map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end

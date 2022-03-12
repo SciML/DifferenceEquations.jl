@@ -37,8 +37,8 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RTy
     seed::UInt64
     syms::SymsType
     @add_kwonly function LinearStateSpaceProblem{iip}(A, B, u0, tspan, p = NullParameters();
-                                                      f = nothing, u0_prior = u0, # default copies the u0 to u0_prior so it doesn't mess up get_concrete
-                                                      C = nothing, observables_noise = nothing,
+                                                      f = nothing, u0_prior = nothing, C = nothing,
+                                                      observables_noise = nothing,
                                                       observables = nothing, noise = nothing,
                                                       seed = UInt64(0), syms = nothing,
                                                       kwargs...) where {iip}
@@ -89,9 +89,9 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,A0Type,A1Type,A2Ty
     syms::SymsType
     @add_kwonly function QuadraticStateSpaceProblem{iip}(A_0, A_1, A_2, B, u0, tspan,
                                                          p = NullParameters(); f = nothing,
-                                                         u0_prior = u0, # default copies the u0 to u0_prior so it doesn't mess up get_concrete
-                                                         C_0 = nothing, C_1 = nothing,
-                                                         C_2 = nothing, observables_noise = nothing,
+                                                         u0_prior = nothing, C_0 = nothing,
+                                                         C_1 = nothing, C_2 = nothing,
+                                                         observables_noise = nothing,
                                                          observables = nothing, noise = nothing,
                                                          seed = UInt64(0), syms = nothing,
                                                          kwargs...) where {iip}

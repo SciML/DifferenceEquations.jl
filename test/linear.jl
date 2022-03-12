@@ -11,8 +11,8 @@ end
 
 # CRTU has problems with generating random MvNormal, so just testing diagonals
 function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, MvNormal(u0, diagm(ones(length(u0)))),
-                                      (0, size(observables, 2)); C, observables_noise = D,
+    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
+                                      u0_prior = MvNormal(u0, diagm(ones(length(u0)))),
                                       noise = nothing, observables, kwargs...)
     return solve(problem).logpdf
 end
@@ -53,12 +53,13 @@ noise_rbc = noise_rbc[:, 1:T]
 end
 
 @testset "basic kalman inference" begin
-    prob = LinearStateSpaceProblem(A_rbc, B_rbc, MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
-                                   (0, size(observables_rbc, 2)); C = C_rbc,
-                                   observables_noise = D_rbc, observables = observables_rbc)
-    @inferred LinearStateSpaceProblem(A_rbc, B_rbc, MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
-                                      (0, size(observables_rbc, 2)); C = C_rbc,
-                                      observables_noise = D_rbc, observables = observables_rbc)
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                   observables_noise = D_rbc, observables = observables_rbc,
+                                   u0_prior = MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))))
+    @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+                                      C = C_rbc, observables_noise = D_rbc,
+                                      observables = observables_rbc,
+                                      u0_prior = MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))))
 
     sol = solve(prob)
     @inferred solve(prob)
@@ -84,6 +85,9 @@ gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc
                (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
+
+gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+         u0_rbc)
 
 @testset "linear rbc kalman likelihood" begin
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈
