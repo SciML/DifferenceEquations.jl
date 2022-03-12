@@ -3,9 +3,9 @@ using DifferenceEquations, BenchmarkTools, LinearAlgebra
 using DelimitedFiles, Distributions, Zygote
 # General likelihood calculation
 function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D; kwargs...)
-    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, (0, size(noise, 2));
-                                         observables_noise = MvNormal(Diagonal(abs2.(D))), noise,
-                                         observables, kwargs...)
+    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0, C_1,
+                                         C_2, observables_noise = MvNormal(Diagonal(abs2.(D))),
+                                         noise, observables, kwargs...)
     return solve(problem).logpdf
 end
 
