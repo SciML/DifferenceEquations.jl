@@ -17,7 +17,7 @@ include("problems/state_space_problems.jl")
 include("solutions/state_space_solutions.jl")
 include("solve.jl")
 include("algorithms/linear.jl")
-#include("algorithms/quadratic.jl")
+include("algorithms/quadratic.jl")
 
 # Exports
 export MatrixVectorOfArray

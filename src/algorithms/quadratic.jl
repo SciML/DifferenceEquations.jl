@@ -1,11 +1,7 @@
 
-function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2type,Btype,C_0type,
-                                                  C_1type,C_2type,wtype,Rtype,utype,ttype,otype},
-                 alg::NoiseConditionalFilter, args...;
-                 kwargs...) where {isinplace,A_0type,A_1type,A_2type,Btype,C_0type,C_1type,C_2type,
-                                   wtype,Rtype,utype,ttype,otype}
-    # Preallocate values
-    T = prob.tspan[2] - prob.tspan[1] + 1
+function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem, alg::DirectIteration, args...;
+                            kwargs...)
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
     @assert size(prob.noise, 1) == size(prob.B, 2)
     @assert size(prob.noise, 2) == size(prob.observables, 2)
@@ -42,19 +38,14 @@ function _solve!(prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2t
         loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
 
-    return build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise,
-                          logpdf = loglik, retcode = :Success)
+    t_values = prob.tspan[1]:prob.tspan[2]
+    return build_solution(prob, alg, t_values, u; W = prob.noise, logpdf = loglik,
+                          retcode = :Success)
 end
 
-function ChainRulesCore.rrule(::typeof(_solve!),
-                              prob::QuadraticStateSpaceProblem{isinplace,A_0type,A_1type,A_2type,
-                                                               Btype,C_0type,C_1type,C_2type,wtype,
-                                                               Rtype,utype,ttype,otype},
-                              alg::NoiseConditionalFilter, args...;
-                              kwargs...) where {isinplace,A_0type,A_1type,A_2type,Btype,C_0type,
-                                                C_1type,C_2type,wtype,Rtype,utype,ttype,otype}
-    # Preallocate values
-    T = prob.tspan[2] - prob.tspan[1] + 1
+function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSpaceProblem,
+                              alg::DirectIteration, args...; kwargs...)
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
     @assert size(prob.noise, 1) == size(prob.B, 2)
     @assert size(prob.noise, 2) == size(prob.observables, 2)
@@ -90,8 +81,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
         loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
-
-    sol = build_solution(prob, alg, prob.tspan[1]:prob.tspan[2], u; W = prob.noise, logpdf = loglik,
+    t_values = prob.tspan[1]:prob.tspan[2]
+    sol = build_solution(prob, alg, t_values, u; W = prob.noise, logpdf = loglik,
                          retcode = :Success)
 
     function solve_pb(Δsol)
