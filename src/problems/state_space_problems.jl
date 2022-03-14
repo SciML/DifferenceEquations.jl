@@ -20,9 +20,9 @@ function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isad
     end
 end
 
-struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RType,ObsType,K,
+struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,ObsType,K,
                                SymsType} <: AbstractPerturbationProblem
-    f::Nothing  # HACK: need something called "f" which supports "isinplace" for plotting
+    f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     A::AType
     B::BType
     C::CType
@@ -37,10 +37,12 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RTy
     seed::UInt64
     syms::SymsType
     @add_kwonly function LinearStateSpaceProblem{iip}(A, B, u0, tspan, p = NullParameters();
-                                                      f = nothing, u0_prior = nothing, C = nothing,
+                                                      u0_prior = nothing, C = nothing,
                                                       observables_noise = nothing,
                                                       observables = nothing, noise = nothing,
                                                       seed = UInt64(0), syms = nothing,
+                                                      f = ODEFunction{false}(((u, p, t) -> error("not implemented"));
+                                                                             syms = syms),
                                                       kwargs...) where {iip}
         _tspan = promote_tspan(tspan)
         # _observables = promote_vv(observables)
@@ -51,8 +53,8 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,AType,BType,CType,RTy
         # Require integer distances between time periods for now.  Later could check with dt != 1
         @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
-        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(A),
-                   typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),
+        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(f),
+                   typeof(A),typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),
                    typeof(kwargs),typeof(syms)}(f, A, B, C, observables_noise, _observables, u0,
                                                 u0_prior, _tspan, p, _noise, kwargs, seed, syms)
     end
@@ -66,10 +68,10 @@ LinearStateSpaceProblem(args...; kwargs...) = LinearStateSpaceProblem{false}(arg
 # z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
 # z_tilde(t) = z(t) + v(t+1)
 # """
-struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,A0Type,A1Type,A2Type,BType,C0Type,
+struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2Type,BType,C0Type,
                                   C1Type,C2Type,RType,ObsType,K,SymsType} <:
        AbstractPerturbationProblem
-    f::Nothing  # HACK: need something called "f" which supports "isinplace" for plotting
+    f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     A_0::A0Type
     A_1::A1Type
     A_2::A2Type
@@ -88,12 +90,13 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,A0Type,A1Type,A2Ty
     seed::UInt64
     syms::SymsType
     @add_kwonly function QuadraticStateSpaceProblem{iip}(A_0, A_1, A_2, B, u0, tspan,
-                                                         p = NullParameters(); f = nothing,
-                                                         u0_prior = nothing, C_0 = nothing,
-                                                         C_1 = nothing, C_2 = nothing,
-                                                         observables_noise = nothing,
+                                                         p = NullParameters(); u0_prior = nothing,
+                                                         C_0 = nothing, C_1 = nothing,
+                                                         C_2 = nothing, observables_noise = nothing,
                                                          observables = nothing, noise = nothing,
                                                          seed = UInt64(0), syms = nothing,
+                                                         f = ODEFunction{false}(((u, p, t) -> error("not implemented"));
+                                                                                syms = syms),
                                                          kwargs...) where {iip}
         _tspan = promote_tspan(tspan)
         # _observables = promote_vv(observables)
@@ -104,26 +107,11 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,A0Type,A1Type,A2Ty
         # Require integer distances between time periods for now.  Later could check with dt != 1
         @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
-        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(A_0),
-                   typeof(A_1),typeof(A_2),typeof(B),typeof(C_0),typeof(C_1),typeof(C_2),
-                   typeof(observables_noise),typeof(_observables),typeof(kwargs),typeof(syms)}(f,
-                                                                                               A_0,
-                                                                                               A_1,
-                                                                                               A_2,
-                                                                                               B,
-                                                                                               C_0,
-                                                                                               C_1,
-                                                                                               C_2,
-                                                                                               observables_noise,
-                                                                                               _observables,
-                                                                                               u0,
-                                                                                               u0_prior,
-                                                                                               _tspan,
-                                                                                               p,
-                                                                                               _noise,
-                                                                                               kwargs,
-                                                                                               seed,
-                                                                                               syms)
+        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(f),
+                   typeof(A_0),typeof(A_1),typeof(A_2),typeof(B),typeof(C_0),typeof(C_1),
+                   typeof(C_2),typeof(observables_noise),typeof(_observables),typeof(kwargs),
+                   typeof(syms)}(f, A_0, A_1, A_2, B, C_0, C_1, C_2, observables_noise,
+                                 _observables, u0, u0_prior, _tspan, p, _noise, kwargs, seed, syms)
     end
 end
 # just forwards to a iip = false case

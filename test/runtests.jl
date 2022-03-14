@@ -5,5 +5,6 @@ using LinearAlgebra
 using Random
 
 include("matrix_vector_of_vectors.jl")
-include("linear.jl")
-include("quadratic.jl")
+include("linear_likelihood.jl")
+include("quadratic_likelihood.jl")
+include("sciml_interfaces.jl")
