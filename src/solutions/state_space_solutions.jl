@@ -80,8 +80,5 @@ end
 # _interpolate(sol::StateSpaceSolution, t::Integer, idxs) = sol.u[t][idxs]
 
 # For recipes
-# function SciMLBase.getsyms(sol::StateSpaceSolution)
-#     return isnothing(sol.prob.syms) ? keys(sol.prob.u0) : sol.prob.syms
-# end
 SciMLBase.getindepsym(sol::StateSpaceSolution) = :t
 SciMLBase.getindepsym_defaultt(sol::StateSpaceSolution) = :t

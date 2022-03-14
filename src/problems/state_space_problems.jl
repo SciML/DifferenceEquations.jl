@@ -20,8 +20,8 @@ function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isad
     end
 end
 
-struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,ObsType,K,
-                               SymsType} <: AbstractPerturbationProblem
+struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,ObsType,K} <:
+       AbstractPerturbationProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     A::AType
     B::BType
@@ -35,7 +35,6 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,R
     noise::NP
     kwargs::K
     seed::UInt64
-    syms::SymsType
     @add_kwonly function LinearStateSpaceProblem{iip}(A, B, u0, tspan, p = NullParameters();
                                                       u0_prior = nothing, C = nothing,
                                                       observables_noise = nothing,
@@ -55,8 +54,8 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,R
 
         return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(f),
                    typeof(A),typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),
-                   typeof(kwargs),typeof(syms)}(f, A, B, C, observables_noise, _observables, u0,
-                                                u0_prior, _tspan, p, _noise, kwargs, seed, syms)
+                   typeof(kwargs)}(f, A, B, C, observables_noise, _observables, u0, u0_prior,
+                                   _tspan, p, _noise, kwargs, seed)
     end
 end
 # just forwards to a iip = false case
@@ -69,8 +68,7 @@ LinearStateSpaceProblem(args...; kwargs...) = LinearStateSpaceProblem{false}(arg
 # z_tilde(t) = z(t) + v(t+1)
 # """
 struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2Type,BType,C0Type,
-                                  C1Type,C2Type,RType,ObsType,K,SymsType} <:
-       AbstractPerturbationProblem
+                                  C1Type,C2Type,RType,ObsType,K} <: AbstractPerturbationProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     A_0::A0Type
     A_1::A1Type
@@ -88,7 +86,6 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
     noise::NP
     kwargs::K
     seed::UInt64
-    syms::SymsType
     @add_kwonly function QuadraticStateSpaceProblem{iip}(A_0, A_1, A_2, B, u0, tspan,
                                                          p = NullParameters(); u0_prior = nothing,
                                                          C_0 = nothing, C_1 = nothing,
@@ -109,9 +106,23 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
 
         return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(f),
                    typeof(A_0),typeof(A_1),typeof(A_2),typeof(B),typeof(C_0),typeof(C_1),
-                   typeof(C_2),typeof(observables_noise),typeof(_observables),typeof(kwargs),
-                   typeof(syms)}(f, A_0, A_1, A_2, B, C_0, C_1, C_2, observables_noise,
-                                 _observables, u0, u0_prior, _tspan, p, _noise, kwargs, seed, syms)
+                   typeof(C_2),typeof(observables_noise),typeof(_observables),typeof(kwargs)}(f,
+                                                                                              A_0,
+                                                                                              A_1,
+                                                                                              A_2,
+                                                                                              B,
+                                                                                              C_0,
+                                                                                              C_1,
+                                                                                              C_2,
+                                                                                              observables_noise,
+                                                                                              _observables,
+                                                                                              u0,
+                                                                                              u0_prior,
+                                                                                              _tspan,
+                                                                                              p,
+                                                                                              _noise,
+                                                                                              kwargs,
+                                                                                              seed)
     end
 end
 # just forwards to a iip = false case
