@@ -134,7 +134,7 @@ end
 end
 
 using Plots
-@testset "plotting" begin
+@testset "Plotting" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
                                    observables_noise = D_rbc, noise = noise_rbc,
                                    observables = observables_rbc, syms = (:a, :b))
@@ -143,7 +143,7 @@ using Plots
 end
 
 # random initial conditions
-@testset "ensemble" begin
+@testset "Ensemble simulation and plotting" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
                                    (0, size(observables_rbc, 2)); C = C_rbc,
                                    observables_noise = D_rbc, noise = noise_rbc,

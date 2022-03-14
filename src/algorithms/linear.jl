@@ -32,10 +32,10 @@ end
 # Trouble with Zygote.  The problem isn't the _concrete_solve_adjoint but rather something in the
 # adjoint of the basic solve and `solve_up`.  Probably promotion on the prob
 
-# function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
-#                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
-                              alg::DirectIteration, args...; kwargs...)
+function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
+                                            sensealg, u0, p, args...; kwargs...)
+    # function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
+    #                               alg::DirectIteration, args...; kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
     @assert size(prob.noise, 1) == size(prob.B, 2)
