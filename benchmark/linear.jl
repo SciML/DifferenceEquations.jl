@@ -2,16 +2,28 @@
 using DifferenceEquations, BenchmarkTools
 using DelimitedFiles, Distributions, Zygote, LinearAlgebra
 
+# for benchmarking construction itself
+function make_problem_1(A, B, C, u0, noise, observables, D; kwargs...)
+    prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
+                                   noise, observables, kwargs...)
+    return prob.A[1, 1] + prob.B[1, 1]
+end
+function make_problem_kalman(A, B, C, u0_prior, observables, D; kwargs...)
+    prob = LinearStateSpaceProblem(A, B, u0_prior, (0, size(observables, 2)); C, u0_prior,
+                                   observables_noise = D, noise = nothing, observables, kwargs...)
+    return prob.A[1, 1] + prob.B[1, 1]
+end
+
+# for benchmarking likelihoods
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
-                                      noise, observables, kwargs...)
-    return solve(problem).logpdf
+    prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
+                                   noise, observables, kwargs...)
+    return solve(prob).logpdf
 end
 function kalman_likelihood(A, B, C, u0_prior, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, u0_prior, (0, size(observables, 2)); C, u0_prior,
-                                      observables_noise = D, noise = nothing, observables,
-                                      kwargs...)
-    return solve(problem).logpdf
+    prob = LinearStateSpaceProblem(A, B, u0_prior, (0, size(observables, 2)); C, u0_prior,
+                                   observables_noise = D, noise = nothing, observables, kwargs...)
+    return solve(prob).logpdf
 end
 
 # Matrices from RBC
@@ -43,6 +55,15 @@ const u0_FVGQ = zeros(size(A_FVGQ, 1))
 const u0_prior_FVGQ = MvNormal(diagm(ones(length(u0_FVGQ))))
 
 # executing gradients once to avoid compilation time in benchmarking
+
+make_problem_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+gradient((args...) -> make_problem_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc, u0_rbc,
+         noise_rbc)
+
+make_problem_kalman(A_rbc, B_rbc, C_rbc, u0_prior_rbc, observables_rbc, D_rbc)
+gradient((args...) -> make_problem_kalman(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+         u0_prior_rbc)
+
 kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_prior_rbc, observables_rbc, D_rbc)
 gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
          u0_prior_rbc)
@@ -63,6 +84,15 @@ const LINEAR = BenchmarkGroup()
 
 const LINEAR["rbc"] = BenchmarkGroup()
 
+const LINEAR["rbc"]["make_problem_1"] = @benchmarkable make_problem_1($A_rbc, $B_rbc, $C_rbc,
+                                                                      $u0_rbc, $noise_rbc,
+                                                                      $observables_rbc, $D_rbc)
+const LINEAR["rbc"]["make_problem_1_gradient"] = @benchmarkable gradient((args...) -> make_problem_1(args...,
+                                                                                                     $observables_rbc,
+                                                                                                     $D_rbc),
+                                                                         $A_rbc, $B_rbc, $C_rbc,
+                                                                         $u0_rbc, $noise_rbc)
+
 const LINEAR["rbc"]["joint_1"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc, $u0_rbc,
                                                                    $noise_rbc, $observables_rbc,
                                                                    $D_rbc)
@@ -71,6 +101,16 @@ const LINEAR["rbc"]["joint_1_gradient"] = @benchmarkable gradient((args...) -> j
                                                                                                   $D_rbc),
                                                                   $A_rbc, $B_rbc, $C_rbc, $u0_rbc,
                                                                   $noise_rbc)
+const LINEAR["rbc"]["make_problem_kalman"] = @benchmarkable make_problem_kalman($A_rbc, $B_rbc,
+                                                                                $C_rbc,
+                                                                                $u0_prior_rbc,
+                                                                                $observables_rbc,
+                                                                                $D_rbc)
+const LINEAR["rbc"]["make_problem_kalman_gradient"] = @benchmarkable gradient((args...) -> make_problem_kalman(args...,
+                                                                                                               $observables_rbc,
+                                                                                                               $D_rbc),
+                                                                              $A_rbc, $B_rbc,
+                                                                              $C_rbc, $u0_prior_rbc)
 const LINEAR["rbc"]["kalman"] = @benchmarkable kalman_likelihood($A_rbc, $B_rbc, $C_rbc,
                                                                  $u0_prior_rbc, $observables_rbc,
                                                                  $D_rbc)
@@ -82,7 +122,14 @@ const LINEAR["rbc"]["kalman_gradient"] = @benchmarkable gradient((args...) -> ka
 
 # FVGQ
 const LINEAR["FVGQ"] = BenchmarkGroup()
-
+const LINEAR["FVGQ"]["make_problem_1"] = @benchmarkable make_problem_1($A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                       $u0_FVGQ, $noise_FVGQ,
+                                                                       $observables_FVGQ, $D_FVGQ)
+const LINEAR["FVGQ"]["make_problem_1_gradient"] = @benchmarkable gradient((args...) -> make_problem_1(args...,
+                                                                                                      $observables_FVGQ,
+                                                                                                      $D_FVGQ),
+                                                                          $A_FVGQ, $B_FVGQ, $C_FVGQ,
+                                                                          $u0_FVGQ, $noise_FVGQ)
 const LINEAR["FVGQ"]["joint_1"] = @benchmarkable joint_likelihood_1($A_FVGQ, $B_FVGQ, $C_FVGQ,
                                                                     $u0_FVGQ, $noise_FVGQ,
                                                                     $observables_FVGQ, $D_FVGQ)
@@ -91,6 +138,17 @@ const LINEAR["FVGQ"]["joint_1_gradient"] = @benchmarkable gradient((args...) -> 
                                                                                                    $D_FVGQ),
                                                                    $A_FVGQ, $B_FVGQ, $C_FVGQ,
                                                                    $u0_FVGQ, $noise_FVGQ)
+const LINEAR["FVGQ"]["make_problem_kalman"] = @benchmarkable make_problem_kalman($A_FVGQ, $B_FVGQ,
+                                                                                 $C_FVGQ,
+                                                                                 $u0_prior_FVGQ,
+                                                                                 $observables_FVGQ,
+                                                                                 $D_FVGQ)
+const LINEAR["FVGQ"]["make_problem_kalman_gradient"] = @benchmarkable gradient((args...) -> make_problem_kalman(args...,
+                                                                                                                $observables_FVGQ,
+                                                                                                                $D_FVGQ),
+                                                                               $A_FVGQ, $B_FVGQ,
+                                                                               $C_FVGQ,
+                                                                               $u0_prior_FVGQ)
 const LINEAR["FVGQ"]["kalman"] = @benchmarkable kalman_likelihood($A_FVGQ, $B_FVGQ, $C_FVGQ,
                                                                   $u0_prior_FVGQ, $observables_FVGQ,
                                                                   $D_FVGQ)

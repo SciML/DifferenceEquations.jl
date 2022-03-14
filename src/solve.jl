@@ -3,6 +3,8 @@ abstract type AbstractDifferenceEquationAlgorithm <: DiffEqBase.DEAlgorithm end
 struct DirectIteration <: AbstractDifferenceEquationAlgorithm end
 struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 
+# The typical algorithm in discrete-time is DirectIteration()
+# Unlike continuous time, there aren't many simple variations
 default_alg(prob::AbstractStateSpaceProblem) = DirectIteration()
 
 # If a normal prior, normal observational noise, no noise given, and observables provided then can use a kalman filter

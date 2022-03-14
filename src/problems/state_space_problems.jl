@@ -20,6 +20,8 @@ function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isad
     end
 end
 
+# the {iip} isn't relevant here at this point, but if we remove it then there are failures in the "remake" call above
+# when using the Ensemble unit tests
 struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,ObsType,K} <:
        AbstractPerturbationProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
