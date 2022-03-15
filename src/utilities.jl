@@ -33,3 +33,8 @@ function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     end
     return nothing
 end
+
+# Temporary.  Eventually, move to sciml NoiseProcess with better rng support/etc.
+get_concrete_noise(prob, noise, B, T) = noise # maybe do a promotion to an AbstractVectorOfVector type
+get_concrete_noise(prob, noise::Nothing, B, T) = randn(eltype(B), size(B, 2), T) # default is unit Gaussian
+get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size(B, 2), T) # iid

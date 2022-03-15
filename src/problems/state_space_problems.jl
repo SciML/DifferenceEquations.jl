@@ -47,17 +47,15 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,R
                                                       kwargs...) where {iip}
         _tspan = promote_tspan(tspan)
         # _observables = promote_vv(observables)
-        # _noise = promote_vv(noise)
         _observables = observables
-        _noise = noise
 
         # Require integer distances between time periods for now.  Later could check with dt != 1
         @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
-        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(f),
+        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(noise),typeof(f),
                    typeof(A),typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),
                    typeof(kwargs)}(f, A, B, C, observables_noise, _observables, u0, u0_prior,
-                                   _tspan, p, _noise, kwargs, seed)
+                                   _tspan, p, noise, kwargs, seed)
     end
 end
 # just forwards to a iip = false case
@@ -99,14 +97,12 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
                                                          kwargs...) where {iip}
         _tspan = promote_tspan(tspan)
         # _observables = promote_vv(observables)
-        # _noise = promote_vv(noise)
         _observables = observables
-        _noise = noise
 
         # Require integer distances between time periods for now.  Later could check with dt != 1
         @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
-        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(_noise),typeof(f),
+        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(noise),typeof(f),
                    typeof(A_0),typeof(A_1),typeof(A_2),typeof(B),typeof(C_0),typeof(C_1),
                    typeof(C_2),typeof(observables_noise),typeof(_observables),typeof(kwargs)}(f,
                                                                                               A_0,
@@ -122,7 +118,7 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
                                                                                               u0_prior,
                                                                                               _tspan,
                                                                                               p,
-                                                                                              _noise,
+                                                                                              noise,
                                                                                               kwargs,
                                                                                               seed)
     end

@@ -2,10 +2,11 @@
 function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem, alg::DirectIteration, args...;
                             kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
     # checks on bounds
-    @assert size(prob.noise, 1) == size(prob.B, 2)
-    @assert size(prob.noise, 2) == size(prob.observables, 2)
-    @assert size(prob.noise, 2) == T - 1
+    @assert size(noise, 1) == size(prob.B, 2)
+    @assert size(noise, 2) == size(prob.observables, 2)
+    @assert size(noise, 2) == T - 1
 
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
@@ -25,12 +26,12 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem, alg::DirectIterati
     loglik = 0.0
     @inbounds @views for t in 2:T
         mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, view(prob.noise, :, t - 1), 1, 1)
+        mul!(u_f[t], B, view(noise, :, t - 1), 1, 1)
 
         u[t] .= A_0
         mul!(u[t], A_1, u[t - 1], 1, 1)
         quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
+        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
@@ -39,17 +40,17 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem, alg::DirectIterati
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(prob, alg, t_values, u; W = prob.noise, logpdf = loglik,
-                          retcode = :Success)
+    return build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSpaceProblem,
                               alg::DirectIteration, args...; kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
     # checks on bounds
-    @assert size(prob.noise, 1) == size(prob.B, 2)
-    @assert size(prob.noise, 2) == size(prob.observables, 2)
-    @assert size(prob.noise, 2) == T - 1
+    @assert size(noise, 1) == size(prob.B, 2)
+    @assert size(noise, 2) == size(prob.observables, 2)
+    @assert size(noise, 2) == T - 1
 
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
@@ -69,12 +70,12 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
     loglik = 0.0
     @inbounds @views for t in 2:T
         mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, view(prob.noise, :, t - 1), 1, 1)
+        mul!(u_f[t], B, view(noise, :, t - 1), 1, 1)
 
         u[t] .= A_0
         mul!(u[t], A_1, u[t - 1], 1, 1)
         quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, view(prob.noise, :, t - 1), 1, 1)
+        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
@@ -82,8 +83,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
         loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
     t_values = prob.tspan[1]:prob.tspan[2]
-    sol = build_solution(prob, alg, t_values, u; W = prob.noise, logpdf = loglik,
-                         retcode = :Success)
+    sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, retcode = :Success)
 
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
@@ -107,7 +107,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
         ΔC_2 = zero(C_2)
         Δu_f_sum = zero(u[1])
 
-        Δnoise = similar(prob.noise)
+        Δnoise = similar(noise)
         Δu = [zero(prob.u0) for _ in 1:T]
         Δu_f = [zero(prob.u0) for _ in 1:T]
         A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
@@ -134,7 +134,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
             ΔA_0 += Δu[t]
             mul!(ΔA_1, Δu[t], u[t - 1]', 1, 1)
             mul!(ΔA_1, Δu_f[t], u_f[t - 1]', 1, 1)
-            mul!(ΔB, Δu_f_sum, view(prob.noise, :, t - 1)', 1, 1)
+            mul!(ΔB, Δu_f_sum, view(noise, :, t - 1)', 1, 1)
             ΔC_0 += Δz
             mul!(ΔC_1, Δz, u[t]', 1, 1)
         end
