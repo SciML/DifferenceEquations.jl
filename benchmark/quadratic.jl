@@ -16,6 +16,14 @@ function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observab
     return solve(prob).logpdf
 end
 
+function simulate_model_no_noise_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, observables, D; kwargs...)
+    prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0, C_1,
+                                      C_2, observables_noise = MvNormal(Diagonal(abs2.(D))),
+                                      observables, kwargs...)
+    sol = solve(prob)
+    return sol.retcode
+end
+
 const QUADRATIC = BenchmarkGroup()
 
 # Matrices from RBC
@@ -97,6 +105,16 @@ const QUADRATIC["rbc"]["make_problem_2_gradient"] = @benchmarkable gradient((arg
                                                                             $C_2_rbc, $u0_2_rbc,
                                                                             $noise_2_rbc)
 
+const QUADRATIC["rbc"]["simulate_model_no_noise_2"] = @benchmarkable simulate_model_no_noise_2($A_0_rbc,
+                                                                                               $A_1_rbc,
+                                                                                               $A_2_rbc,
+                                                                                               $B_2_rbc,
+                                                                                               $C_0_rbc,
+                                                                                               $C_1_rbc,
+                                                                                               $C_2_rbc,
+                                                                                               $u0_2_rbc,
+                                                                                               $observables_2_rbc,
+                                                                                               $D_2_rbc)
 const QUADRATIC["rbc"]["joint_2"] = @benchmarkable joint_likelihood_2($A_0_rbc, $A_1_rbc, $A_2_rbc,
                                                                       $B_2_rbc, $C_0_rbc, $C_1_rbc,
                                                                       $C_2_rbc, $u0_2_rbc,
@@ -127,6 +145,17 @@ const QUADRATIC["FVGQ"]["make_problem_2_gradient"] = @benchmarkable gradient((ar
                                                                              $C_0_FVGQ, $C_1_FVGQ,
                                                                              $C_2_FVGQ, $u0_2_FVGQ,
                                                                              $noise_2_FVGQ)
+
+const QUADRATIC["FVGQ"]["simulate_model_no_noise_2"] = @benchmarkable simulate_model_no_noise_2($A_0_FVGQ,
+                                                                                                $A_1_FVGQ,
+                                                                                                $A_2_FVGQ,
+                                                                                                $B_2_FVGQ,
+                                                                                                $C_0_FVGQ,
+                                                                                                $C_1_FVGQ,
+                                                                                                $C_2_FVGQ,
+                                                                                                $u0_2_FVGQ,
+                                                                                                $observables_2_FVGQ,
+                                                                                                $D_2_FVGQ)
 const QUADRATIC["FVGQ"]["joint_2"] = @benchmarkable joint_likelihood_2($A_0_FVGQ, $A_1_FVGQ,
                                                                        $A_2_FVGQ, $B_2_FVGQ,
                                                                        $C_0_FVGQ, $C_1_FVGQ,

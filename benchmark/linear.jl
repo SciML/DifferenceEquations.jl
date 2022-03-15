@@ -26,6 +26,13 @@ function kalman_likelihood(A, B, C, u0_prior, observables, D; kwargs...)
     return solve(prob).logpdf
 end
 
+function simulate_model_no_noise_1(A, B, C, u0, observables, D; kwargs...)
+    prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
+                                   observables, kwargs...)
+    sol = solve(prob)
+    return sol.retcode
+end
+
 # Matrices from RBC
 const A_rbc = [0.9568351489231076 6.209371005755285;
                3.0153731819288737e-18 0.20000000000000007]
@@ -93,6 +100,12 @@ const LINEAR["rbc"]["make_problem_1_gradient"] = @benchmarkable gradient((args..
                                                                          $A_rbc, $B_rbc, $C_rbc,
                                                                          $u0_rbc, $noise_rbc)
 
+const LINEAR["rbc"]["simulate_model_no_noise_1"] = @benchmarkable simulate_model_no_noise_1($A_rbc,
+                                                                                            $B_rbc,
+                                                                                            $C_rbc,
+                                                                                            $u0_rbc,
+                                                                                            $observables_rbc,
+                                                                                            $D_rbc)
 const LINEAR["rbc"]["joint_1"] = @benchmarkable joint_likelihood_1($A_rbc, $B_rbc, $C_rbc, $u0_rbc,
                                                                    $noise_rbc, $observables_rbc,
                                                                    $D_rbc)
@@ -130,6 +143,12 @@ const LINEAR["FVGQ"]["make_problem_1_gradient"] = @benchmarkable gradient((args.
                                                                                                       $D_FVGQ),
                                                                           $A_FVGQ, $B_FVGQ, $C_FVGQ,
                                                                           $u0_FVGQ, $noise_FVGQ)
+const LINEAR["FVGQ"]["simulate_model_no_noise_1"] = @benchmarkable simulate_model_no_noise_1($A_FVGQ,
+                                                                                             $B_FVGQ,
+                                                                                             $C_FVGQ,
+                                                                                             $u0_FVGQ,
+                                                                                             $observables_FVGQ,
+                                                                                             $D_FVGQ)
 const LINEAR["FVGQ"]["joint_1"] = @benchmarkable joint_likelihood_1($A_FVGQ, $B_FVGQ, $C_FVGQ,
                                                                     $u0_FVGQ, $noise_FVGQ,
                                                                     $observables_FVGQ, $D_FVGQ)
