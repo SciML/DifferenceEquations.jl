@@ -21,7 +21,7 @@ T = 5
 observables_rbc = observables_rbc[:, 1:T]
 noise_rbc = noise_rbc[:, 1:T]
 
-@testset "Plotting" begin
+@testset "Plotting given noise" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
                                    observables_noise = D_rbc, noise = noise_rbc,
                                    observables = observables_rbc, syms = (:a, :b))
@@ -29,7 +29,7 @@ noise_rbc = noise_rbc[:, 1:T]
     plot(sol)
 end
 
-@testset "Ensemble simulation and plotting" begin
+@testset "Ensemble simulation and plotting given noise" begin
     # random initial conditions via the u0
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
                                    (0, size(observables_rbc, 2)); C = C_rbc,
@@ -50,4 +50,23 @@ end
     df = DataFrame(sol)
     @test propertynames(df) == [:timestamp, :a, :b]
     @test size(df) == (6, 3)
+end
+
+@testset "Plotting simulating noise" begin
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                   observables_noise = D_rbc, observables = observables_rbc,
+                                   syms = (:a, :b))
+    sol = solve(prob)
+    plot(sol)
+end
+
+@testset "Ensemble simulation and plotting, simulating noise" begin
+    # fixed initial condition, random noise
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                   observables_noise = D_rbc, observables = observables_rbc,
+                                   syms = (:a, :b))
+    sol2 = solve(EnsembleProblem(prob), DirectIteration(), EnsembleThreads(); trajectories = 10)
+    plot(sol2)
+    summ = EnsembleSummary(sol2)
+    plot(summ)
 end

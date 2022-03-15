@@ -36,12 +36,11 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,R
     p::P
     noise::NP
     kwargs::K
-    seed::UInt64
     @add_kwonly function LinearStateSpaceProblem{iip}(A, B, u0, tspan, p = NullParameters();
                                                       u0_prior = nothing, C = nothing,
                                                       observables_noise = nothing,
                                                       observables = nothing, noise = nothing,
-                                                      seed = UInt64(0), syms = nothing,
+                                                      syms = nothing,
                                                       f = ODEFunction{false}(((u, p, t) -> error("not implemented"));
                                                                              syms = syms),
                                                       kwargs...) where {iip}
@@ -55,7 +54,7 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,R
         return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(noise),typeof(f),
                    typeof(A),typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),
                    typeof(kwargs)}(f, A, B, C, observables_noise, _observables, u0, u0_prior,
-                                   _tspan, p, noise, kwargs, seed)
+                                   _tspan, p, noise, kwargs)
     end
 end
 # just forwards to a iip = false case
@@ -85,13 +84,12 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
     p::P
     noise::NP
     kwargs::K
-    seed::UInt64
     @add_kwonly function QuadraticStateSpaceProblem{iip}(A_0, A_1, A_2, B, u0, tspan,
                                                          p = NullParameters(); u0_prior = nothing,
                                                          C_0 = nothing, C_1 = nothing,
                                                          C_2 = nothing, observables_noise = nothing,
                                                          observables = nothing, noise = nothing,
-                                                         seed = UInt64(0), syms = nothing,
+                                                         syms = nothing,
                                                          f = ODEFunction{false}(((u, p, t) -> error("not implemented"));
                                                                                 syms = syms),
                                                          kwargs...) where {iip}
@@ -119,8 +117,7 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
                                                                                               _tspan,
                                                                                               p,
                                                                                               noise,
-                                                                                              kwargs,
-                                                                                              seed)
+                                                                                              kwargs)
     end
 end
 # just forwards to a iip = false case

@@ -3,13 +3,7 @@ using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Te
 using DelimitedFiles
 using DiffEqBase
 using FiniteDiff: finite_difference_gradient
-using Plots
 
-# function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
-#     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
-#                                       noise, observables, kwargs...)
-#     return solve(problem, DirectIteration()).logpdf
-# end
 # Matrices from RBC
 A_rbc = [0.9568351489231076 6.209371005755285;
          3.0153731819288737e-18 0.20000000000000007]
@@ -21,9 +15,6 @@ u0_rbc = zeros(2)
 observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),
                           ',')' |> collect
 # Data and Noise
-T = 5
-observables_rbc = observables_rbc[:, 1:T]
-
 @testset "basic inference, simulated noise" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
                                    observables_noise = D_rbc, observables = observables_rbc,
@@ -34,5 +25,6 @@ observables_rbc = observables_rbc[:, 1:T]
 
     sol = solve(prob)
     @inferred solve(prob)
-    # plot(sol)
+
+    # todo: add in regression tests
 end

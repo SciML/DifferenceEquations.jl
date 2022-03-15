@@ -47,6 +47,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
                               alg::DirectIteration, args...; kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
+    @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
     # checks on bounds
     @assert size(noise, 1) == size(prob.B, 2)
     @assert size(noise, 2) == size(prob.observables, 2)

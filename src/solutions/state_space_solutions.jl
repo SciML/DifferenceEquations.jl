@@ -12,7 +12,6 @@ struct StateSpaceSolution{T,N,uType,uType2,DType,tType,randType,P,A,IType,DE,Pos
     tslocation::Int
     destats::DE
     retcode::Symbol
-    seed::UInt64
     P::PosteriorType
     logpdf::logpdfType
 end
@@ -21,7 +20,7 @@ function build_solution(prob::AbstractStateSpaceProblem, alg, t, u; P = nothing,
                         W = nothing, timeseries_errors = length(u) > 2, dense = false,
                         dense_errors = dense, calculate_error = true,
                         interp = SciMLBase.ConstantInterpolation(t, u), retcode = :Default,
-                        seed = UInt64(0), destats = nothing, kwargs...)
+                        destats = nothing, kwargs...)
     T = eltype(eltype(u))
     N = length((size(prob.u0)..., length(u)))
 
@@ -39,7 +38,6 @@ function build_solution(prob::AbstractStateSpaceProblem, alg, t, u; P = nothing,
                                                                                                   0,
                                                                                                   destats,
                                                                                                   retcode,
-                                                                                                  seed,
                                                                                                   P,
                                                                                                   logpdf)
     return sol
