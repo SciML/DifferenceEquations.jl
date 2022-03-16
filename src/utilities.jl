@@ -1,7 +1,4 @@
 
-#utility to fill array with zeros inplace
-fill_zero!(v) = fill!(v, zero(eltype(v)))
-
 # old quad and adjoint replaced by inplace accumulation versions.
 # function quad(A::AbstractArray{<:Number,3}, x)
 #     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
@@ -36,3 +33,12 @@ function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     end
     return nothing
 end
+
+# Temporary.  Eventually, move to sciml NoiseProcess with better rng support/etc.
+get_concrete_noise(prob, noise, B, T) = noise # maybe do a promotion to an AbstractVectorOfVector type
+get_concrete_noise(prob, noise::Nothing, B, T) = randn(eltype(B), size(B, 2), T) # default is unit Gaussian
+get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size(B, 2), T) # iid
+
+# Utility functions to conditionally check size if not-nothing
+maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
+maybe_check_size(m::Nothing, index, val) = true

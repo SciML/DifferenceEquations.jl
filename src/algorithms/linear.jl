@@ -1,14 +1,135 @@
 
-function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                               otype}, solver::KalmanFilter, args...;
-                 kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype<:Distribution,utype,
-                                   ttype,otype}
-    # Preallocate values
-    T = prob.tspan[2] - prob.tspan[1] + 1
+maybe_logpdf(observables_noise, observables::Nothing, t, z) = 0.0
+maybe_logpdf(observables_noise, observables, t, z) = logpdf(observables_noise,
+                                                            view(observables, :, t) - z)
+
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,
+                                                          CType,RType,ObsType,K},
+                            alg::DirectIteration, args...;
+                            kwargs...) where {uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,
+                                              ObsType,K}
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+    @unpack A, B, C = prob
+
+    # checks on bounds
+    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
+
+    @assert size(noise, 1) == size(prob.B, 2)
+    @assert size(noise, 2) == T - 1
+    @assert maybe_check_size(prob.observables, 2, T - 1)
+
+    u = [zero(prob.u0) for _ in 1:T]
+    z1 = C * prob.u0
+    z = [zero(z1) for _ in 1:T]
+
+    # Initialize
+    u[1] .= prob.u0
+    z[1] .= z1
+
+    loglik = 0.0
+    @inbounds for t in 2:T
+        mul!(u[t], A, u[t - 1])
+        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
+
+        mul!(z[t], C, u[t])
+        loglik += maybe_logpdf(prob.observables_noise, prob.observables, t - 1, z[t])
+    end
+    t_values = prob.tspan[1]:prob.tspan[2]
+    return build_solution(prob, alg, t_values, u; W = noise,
+                          logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
+end
+
+# Ideally hook into existing sensitity dispatching
+# Trouble with Zygote.  The problem isn't the _concrete_solve_adjoint but rather something in the
+# adjoint of the basic solve and `solve_up`.  Probably promotion on the prob
+
+# function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
+#                                             sensealg, u0, p, args...; kwargs...)
+function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
+                              alg::DirectIteration, args...; kwargs...)
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+    @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
+    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
+
+    # checks on bounds
+    @assert size(noise, 1) == size(prob.B, 2)
+    @assert maybe_check_size(prob.observables, 2, T - 1)
+
+    @assert size(noise, 2) == T - 1
+
+    @unpack A, B, C = prob
+
+    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
+    z1 = C * prob.u0
+    z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
+
+    # Initialize
+    u[1] .= prob.u0
+    z[1] .= z1
+
+    loglik = 0.0
+    @inbounds for t in 2:T
+        mul!(u[t], A, u[t - 1])
+        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
+
+        mul!(z[t], C, u[t])
+        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
+    end
+    t_values = prob.tspan[1]:prob.tspan[2]
+    sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z, retcode = :Success)
+
+    function solve_pb(Δsol)
+        # Currently only changes in the logpdf are supported in the rrule
+        @assert Δsol.u == ZeroTangent()
+        @assert Δsol.W == ZeroTangent()
+        @assert Δsol.z == ZeroTangent()
+
+        Δlogpdf = Δsol.logpdf
+        if iszero(Δlogpdf)
+            return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
+                    map(_ -> NoTangent(), args)...)
+        end
+        ΔA = zero(A)
+        ΔB = zero(B)
+        ΔC = zero(C)
+        Δnoise = similar(noise)
+        Δu = zero(u[1])
+        Δu_temp = zero(u[1])
+        Δz = zero(z[1])
+
+        @views @inbounds for t in T:-1:2
+            Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./
+                  diag(prob.observables_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+            # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
+            # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
+            # rmul!(Δlogpdf, Δz)
+
+            copy!(Δu_temp, Δu)
+            mul!(Δu_temp, C', Δz, 1, 1)
+            mul!(Δu, A', Δu_temp)
+            mul!(view(Δnoise, :, t - 1), B', Δu_temp)
+            # Now, deal with the coefficients
+            mul!(ΔA, Δu_temp, u[t - 1]', 1, 1)
+            mul!(ΔB, Δu_temp, view(noise, :, t - 1)', 1, 1)
+            mul!(ΔC, Δz, u[t]', 1, 1)
+        end
+        return (NoTangent(),
+                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
+                                      observables = NoTangent(), # not implemented
+                                      observables_noise = NoTangent()), NoTangent(),
+                map(_ -> NoTangent(), args)...)
+    end
+    return sol, solve_pb
+end
+
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, args...; kwargs...)
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+
     # checks on bounds
     @assert size(prob.observables, 2) == T - 1
 
-    @unpack A, B, C, u0 = prob
+    @unpack A, B, C = prob
+    u0 = prob.u0_prior # use the prior, not the concretized u0
     N = length(u0)
     L = size(C, 1)
 
@@ -33,8 +154,8 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
                                                                                       'U', 0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
-    # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = prob.obs_noise.Σ # Extract covariance from noise distribution
+    # The following line could be cov(prob.observables_noise) if the measurement error distribution is not MvNormal
+    R = prob.observables_noise.Σ # Extract covariance from noise distribution
     mul!(B_prod, B, B')
 
     # Gaussian Prior
@@ -89,21 +210,26 @@ function _solve!(prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype
         mul!(P[t], K[t], CP[t], -1, 1)
     end
 
-    return StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    t_values = prob.tspan[1]:prob.tspan[2]
+    return build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
+                          retcode = :Success)
 end
 
-function ChainRulesCore.rrule(::typeof(_solve!),
-                              prob::LinearStateSpaceProblem{isinplace,Atype,Btype,Ctype,wtype,Rtype,
-                                                            utype,ttype,otype}, ::KalmanFilter,
-                              args...;
-                              kwargs...) where {isinplace,Atype,Btype,Ctype,wtype,Rtype,utype,ttype,
-                                                otype}
+# NOTE: when moving to ._concrete_solve_adjoint will need to be careful to ensure the u0 sensitivity
+# takes into account any promotion in the `remake_model` side.  We want u0 to be the prior and have the
+# sensitivity of it as a distribution, not a draw from it which might happen in the remake(...)
+
+# function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
+#                                             sensealg, u0, p, args...; kwargs...)
+function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
+                              alg::KalmanFilter, args...; kwargs...)
     # Preallocate values
-    T = prob.tspan[2] - prob.tspan[1] + 1
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
     @assert size(prob.observables, 2) == T - 1
 
-    @unpack A, B, C, u0 = prob
+    @unpack A, B, C = prob
+    u0 = prob.u0_prior # use the prior, not the concretized u0    
     N = length(u0)
     L = size(C, 1)
 
@@ -129,8 +255,8 @@ function ChainRulesCore.rrule(::typeof(_solve!),
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     # Gaussian Prior
-    # The following line could be cov(prob.obs_noise) if the measurement error distribution is not MvNormal
-    R = prob.obs_noise.Σ # Extract covariance from noise distribution
+    # The following line could be cov(prob.observables_noise) if the measurement error distribution is not MvNormal
+    R = prob.observables_noise.Σ # Extract covariance from noise distribution
     mul!(B_prod, B, B')
 
     u[1] .= mean(u0)
@@ -186,10 +312,18 @@ function ChainRulesCore.rrule(::typeof(_solve!),
         copy!(P[t], P_mid[t])
         mul!(P[t], K[t], CP[t], -1, 1)
     end
-
-    sol = StateSpaceSolution(nothing, nothing, nothing, nothing, loglik)
+    t_values = prob.tspan[1]:prob.tspan[2]
+    sol = build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
+                         retcode = :Success)
     function solve_pb(Δsol)
-        Δlogpdf = Δsol.loglikelihood
+        # Currently only changes in the logpdf are supported in the rrule
+        @assert Δsol.u == ZeroTangent()
+        @assert Δsol.W == ZeroTangent()
+        @assert Δsol.P == ZeroTangent()
+        @assert Δsol.z == ZeroTangent()
+
+        Δlogpdf = Δsol.logpdf
+
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
                     map(_ -> NoTangent(), args)...)
@@ -266,11 +400,11 @@ function ChainRulesCore.rrule(::typeof(_solve!),
             mul!(ΔA, Δu_mid, u[t - 1]', 1, 1) # ΔA += Δu_mid * u[t - 1]'
             mul!(Δu, A', Δu_mid)
         end
-        ΔΣ = Tangent{typeof(prob.u0.Σ)}(; mat = ΔP, chol = NoTangent(), dim = NoTangent()) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
+        ΔΣ = Tangent{typeof(prob.u0_prior.Σ)}(; mat = ΔP, chol = NoTangent(), dim = NoTangent()) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),
-                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC,
-                                      u0 = Tangent{typeof(prob.u0)}(; μ = Δu, Σ = ΔΣ)), NoTangent(),
-                map(_ -> NoTangent(), args)...)
+                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
+                                      u0_prior = Tangent{typeof(prob.u0_prior)}(; μ = Δu, Σ = ΔΣ)),
+                NoTangent(), map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end

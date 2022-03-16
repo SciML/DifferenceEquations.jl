@@ -1,13 +1,13 @@
 using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
 using DelimitedFiles
+using DiffEqBase
 using FiniteDiff: finite_difference_gradient
 
 # joint case
 function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D; kwargs...)
-    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, C_0, C_1, C_2, u0,
-                                         (0, size(observables, 2)); obs_noise = D, noise,
-                                         observables, kwargs...)
-    return solve(problem, NoiseConditionalFilter(); save_everystep = false).loglikelihood
+    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0, C_1,
+                                         C_2, observables_noise = D, noise, observables, kwargs...)
+    return solve(problem).logpdf
 end
 
 # Matrices from RBC
@@ -32,6 +32,23 @@ noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise
 T = 5
 observables_2_rbc = observables_2_rbc[:, 1:T]
 noise_2_rbc = noise_2_rbc[:, 1:T]
+
+@testset "basic inference" begin
+    prob = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
+                                      (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc, C_1 = C_1_rbc,
+                                      C_2 = C_2_rbc, observables_noise = D_2_rbc,
+                                      noise = noise_2_rbc, observables = observables_2_rbc)
+    @inferred QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
+                                         (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc,
+                                         C_1 = C_1_rbc, C_2 = C_2_rbc, observables_noise = D_2_rbc,
+                                         noise = noise_2_rbc, observables = observables_2_rbc)
+
+    DiffEqBase.get_concrete_problem(prob, false)
+    @inferred DiffEqBase.get_concrete_problem(prob, false)
+
+    sol = solve(prob)
+    @inferred solve(prob)
+end
 
 @testset "quadratic rbc joint likelihood" begin
     @test joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc,
