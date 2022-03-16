@@ -1,35 +1,40 @@
 
-maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z) = 0.0
-maybe_logpdf(observables_noise, observables, t::Integer, z) = logpdf(observables_noise,
-                                                                     view(observables, :, t) - z)
+@inline maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z) = 0.0
+Base.@propagate_inbounds @inline maybe_logpdf(observables_noise, observables, t::Integer, z) = logpdf(observables_noise,
+                                                                                                      view(observables,
+                                                                                                           :,
+                                                                                                           t) -
+                                                                                                      z)
 
-maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z, s::Integer) = 0.0
-maybe_logpdf(observables_noise, observables, t::Integer, z::Nothing, s::Integer) = 0.0
-maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z, s::Integer) = 0.0
-maybe_logpdf(observables_noise::Nothing, observables, t::Integer, z::Nothing, s::Integer) = 0.0
-maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z::Nothing, s::Integer) = 0.0
-maybe_logpdf(observables_noise, observables, t::Integer, z, s::Integer) = logpdf(observables_noise,
-                                                                                 view(observables,
-                                                                                      :, t) - z[s])
+@inline maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z, s::Integer) = 0.0
+@inline maybe_logpdf(observables_noise, observables, t::Integer, z::Nothing, s::Integer) = 0.0
+@inline maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z, s::Integer) = 0.0
+@inline maybe_logpdf(observables_noise::Nothing, observables, t::Integer, z::Nothing, s::Integer) = 0.0
+@inline maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z::Nothing, s::Integer) = 0.0
+Base.@propagate_inbounds @inline maybe_logpdf(observables_noise, observables, t::Integer, z, s::Integer) = logpdf(observables_noise,
+                                                                                                                  view(observables,
+                                                                                                                       :,
+                                                                                                                       t) -
+                                                                                                                  z[s])
 
 # equivalent to x = mul!(x, A, view(B, :, t), 1, 1) if not nothing, else just x
 # eventually will support !! notation to support static arrays 
-maybe_muladd!!(x, A, B, t) = mul!(x, A, view(B, :, t), 1, 1)
-maybe_muladd!!(x, A::Nothing, B, t) = x
-maybe_muladd!!(x, A, B::Nothing, t) = x
-maybe_muladd!!(x, A::Nothing, B::Nothing, t) = x
+Base.@propagate_inbounds @inline maybe_muladd!!(x, A, B, t) = mul!(x, A, view(B, :, t), 1, 1)
+@inline maybe_muladd!!(x, A::Nothing, B, t) = x
+@inline maybe_muladd!!(x, A, B::Nothing, t) = x
+@inline maybe_muladd!!(x, A::Nothing, B::Nothing, t) = x
 
 # maybe mul!, and possibly !! as well for staticarrays, and nothing otherwise
-maybe_mul!!(x, A, B) = mul!(x, A, B)
-maybe_mul!!(x, A::Nothing, B) = nothing
-maybe_mul!!(x, A, B::Nothing) = nothing
-maybe_mul!!(x, A::Nothing, B::Nothing) = nothing
+@inline maybe_mul!!(x, A, B) = mul!(x, A, B)
+@inline maybe_mul!!(x, A::Nothing, B) = nothing
+@inline maybe_mul!!(x, A, B::Nothing) = nothing
+@inline maybe_mul!!(x, A::Nothing, B::Nothing) = nothing
 
 # with indices
-maybe_mul!!(x, t::Integer, A, B) = mul!(x[t], A, B)
-maybe_mul!!(x, t::Integer, A::Nothing, B) = nothing
-maybe_mul!!(x, t::Integer, A, B::Nothing) = nothing
-maybe_mul!!(x, t::Integer, A::Nothing, B::Nothing) = nothing
+Base.@propagate_inbounds @inline maybe_mul!!(x, t::Integer, A, B) = mul!(x[t], A, B)
+@inline maybe_mul!!(x, t::Integer, A::Nothing, B) = nothing
+@inline maybe_mul!!(x, t::Integer, A, B::Nothing) = nothing
+@inline maybe_mul!!(x, t::Integer, A::Nothing, B::Nothing) = nothing
 
 z_prototype(C, u) = zero(C * u)
 z_prototype(C::Nothing, u) = nothing
