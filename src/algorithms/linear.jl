@@ -1,7 +1,38 @@
 
-maybe_logpdf(observables_noise, observables::Nothing, t, z) = 0.0
-maybe_logpdf(observables_noise, observables, t, z) = logpdf(observables_noise,
-                                                            view(observables, :, t) - z)
+maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z) = 0.0
+maybe_logpdf(observables_noise, observables, t::Integer, z) = logpdf(observables_noise,
+                                                                     view(observables, :, t) - z)
+
+maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z, s::Integer) = 0.0
+maybe_logpdf(observables_noise, observables, t::Integer, z::Nothing, s::Integer) = 0.0
+maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z, s::Integer) = 0.0
+maybe_logpdf(observables_noise::Nothing, observables, t::Integer, z::Nothing, s::Integer) = 0.0
+maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z::Nothing, s::Integer) = 0.0
+maybe_logpdf(observables_noise, observables, t::Integer, z, s::Integer) = logpdf(observables_noise,
+                                                                                 view(observables,
+                                                                                      :, t) - z[s])
+
+# equivalent to x = mul!(x, A, view(B, :, t), 1, 1) if not nothing, else just x
+# eventually will support !! notation to support static arrays 
+maybe_muladd!!(x, A, B, t) = mul!(x, A, view(B, :, t), 1, 1)
+maybe_muladd!!(x, A::Nothing, B, t) = x
+maybe_muladd!!(x, A, B::Nothing, t) = x
+maybe_muladd!!(x, A::Nothing, B::Nothing, t) = x
+
+# maybe mul!, and possibly !! as well for staticarrays, and nothing otherwise
+maybe_mul!!(x, A, B) = mul!(x, A, B)
+maybe_mul!!(x, A::Nothing, B) = nothing
+maybe_mul!!(x, A, B::Nothing) = nothing
+maybe_mul!!(x, A::Nothing, B::Nothing) = nothing
+
+# with indices
+maybe_mul!!(x, t::Integer, A, B) = mul!(x[t], A, B)
+maybe_mul!!(x, t::Integer, A::Nothing, B) = nothing
+maybe_mul!!(x, t::Integer, A, B::Nothing) = nothing
+maybe_mul!!(x, t::Integer, A::Nothing, B::Nothing) = nothing
+
+z_prototype(C, u) = zero(C * u)
+z_prototype(C::Nothing, u) = nothing
 
 function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,
                                                           CType,RType,ObsType,K},
@@ -12,27 +43,28 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType
     @unpack A, B, C = prob
 
     # checks on bounds
-    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
+    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations if B not nothing
 
-    @assert size(noise, 1) == size(prob.B, 2)
-    @assert size(noise, 2) == T - 1
+    @assert maybe_check_size(noise, 1, prob.B, 2)
+    @assert maybe_check_size(noise, 2, T - 1)
     @assert maybe_check_size(prob.observables, 2, T - 1)
 
     u = [zero(prob.u0) for _ in 1:T]
-    z1 = C * prob.u0
-    z = [zero(z1) for _ in 1:T]
+    z_zero = z_prototype(C, prob.u0) # might be nothing
+
+    z = CType <: Nothing ? nothing : [deepcopy(z_zero) for _ in 1:T]
 
     # Initialize
     u[1] .= prob.u0
-    z[1] .= z1
+    maybe_mul!!(z, 1, C, prob.u0)
 
     loglik = 0.0
     @inbounds for t in 2:T
-        mul!(u[t], A, u[t - 1])
-        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
+        maybe_mul!!(u[t], A, u[t - 1])
+        maybe_muladd!!(u[t], B, noise, t - 1) # i.e. mul!(u[t], B, view(noise, :, t - 1), 1, 1) if not static and not nothing
 
-        mul!(z[t], C, u[t])
-        loglik += maybe_logpdf(prob.observables_noise, prob.observables, t - 1, z[t])
+        maybe_mul!!(z, t, C, u[t]) # z[t] = C * u[t] if not nothing
+        loglik += maybe_logpdf(prob.observables_noise, prob.observables, t - 1, z, t)
     end
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(prob, alg, t_values, u; W = noise,

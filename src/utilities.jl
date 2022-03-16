@@ -36,9 +36,17 @@ end
 
 # Temporary.  Eventually, move to sciml NoiseProcess with better rng support/etc.
 get_concrete_noise(prob, noise, B, T) = noise # maybe do a promotion to an AbstractVectorOfVector type
+get_concrete_noise(prob, noise::Nothing, B::Nothing, T) = nothing # if no noise covariance, then no noise required
+get_concrete_noise(prob, noise, B::Nothing, T) = nothing # if no noise covariance, then no noise required
 get_concrete_noise(prob, noise::Nothing, B, T) = randn(eltype(B), size(B, 2), T) # default is unit Gaussian
 get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size(B, 2), T) # iid
 
 # Utility functions to conditionally check size if not-nothing
-maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
+maybe_check_size(m::AbstractArray, index, val) = (size(m, index) == val)
 maybe_check_size(m::Nothing, index, val) = true
+
+maybe_check_size(m1::AbstractArray, index1, m2::AbstractArray, index2) = (size(m1, index1) ==
+                                                                          size(m2, index2))
+maybe_check_size(m1::Nothing, index1, m2, index2) = true
+maybe_check_size(m1, index1, m2::Nothing, index2) = true
+maybe_check_size(m1::Nothing, index1, m2::Nothing, index2) = true
