@@ -38,3 +38,7 @@ end
 get_concrete_noise(prob, noise, B, T) = noise # maybe do a promotion to an AbstractVectorOfVector type
 get_concrete_noise(prob, noise::Nothing, B, T) = randn(eltype(B), size(B, 2), T) # default is unit Gaussian
 get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size(B, 2), T) # iid
+
+# Utility functions to conditionally check size if not-nothing
+maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
+maybe_check_size(m::Nothing, index, val) = true

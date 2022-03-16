@@ -1,12 +1,16 @@
 
-function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem, alg::DirectIteration, args...;
-                            kwargs...)
+function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,
+                                                             A1Type,A2Type,BType,C0Type,C1Type,
+                                                             C2Type,RType,ObsType,K},
+                            alg::DirectIteration, args...;
+                            kwargs...) where {uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2Type,
+                                              BType,C0Type,C1Type,C2Type,RType,ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
     # checks on bounds
     @assert size(noise, 1) == size(prob.B, 2)
-    @assert size(noise, 2) == size(prob.observables, 2)
     @assert size(noise, 2) == T - 1
+    @assert maybe_check_size(prob.observables, 2, T - 1)
 
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
@@ -36,11 +40,12 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem, alg::DirectIterati
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += maybe_logpdf(prob.observables_noise, prob.observables, t - 1, z[t])
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, retcode = :Success)
+    return build_solution(prob, alg, t_values, u; W = noise,
+                          logpdf = ObsType <: Nothing ? nothing : loglik, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSpaceProblem,
@@ -50,7 +55,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
     @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
     # checks on bounds
     @assert size(noise, 1) == size(prob.B, 2)
-    @assert size(noise, 2) == size(prob.observables, 2)
+    @assert maybe_check_size(prob.observables, 2, T - 1)
     @assert size(noise, 2) == T - 1
 
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob

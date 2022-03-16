@@ -1,4 +1,13 @@
-function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::DirectIteration, args...; kwargs...)
+
+maybe_logpdf(observables_noise, observables::Nothing, t, z) = 0.0
+maybe_logpdf(observables_noise, observables, t, z) = logpdf(observables_noise,
+                                                            view(observables, :, t) - z)
+
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,
+                                                          CType,RType,ObsType,K},
+                            alg::DirectIteration, args...;
+                            kwargs...) where {uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,
+                                              ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
 
@@ -6,12 +15,12 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::DirectIteration,
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
 
     @assert size(noise, 1) == size(prob.B, 2)
-    @assert size(noise, 2) == size(prob.observables, 2)
     @assert size(noise, 2) == T - 1
+    @assert maybe_check_size(prob.observables, 2, T - 1)
 
-    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
+    u = [zero(prob.u0) for _ in 1:T]
     z1 = C * prob.u0
-    z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
+    z = [zero(z1) for _ in 1:T]
 
     # Initialize
     u[1] .= prob.u0
@@ -23,10 +32,11 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::DirectIteration,
         mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += maybe_logpdf(prob.observables_noise, prob.observables, t - 1, z[t])
     end
     t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, retcode = :Success)
+    return build_solution(prob, alg, t_values, u; W = noise,
+                          logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
 end
 
 # Ideally hook into existing sensitity dispatching
@@ -43,7 +53,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
 
     # checks on bounds
     @assert size(noise, 1) == size(prob.B, 2)
-    @assert size(noise, 2) == size(prob.observables, 2)
+    @assert maybe_check_size(prob.observables, 2, T - 1)
+
     @assert size(noise, 2) == T - 1
 
     @unpack A, B, C = prob
@@ -65,12 +76,13 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
         loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
     t_values = prob.tspan[1]:prob.tspan[2]
-    sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, retcode = :Success)
+    sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z, retcode = :Success)
 
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
         @assert Δsol.W == ZeroTangent()
+        @assert Δsol.z == ZeroTangent()
 
         Δlogpdf = Δsol.logpdf
         if iszero(Δlogpdf)
@@ -199,7 +211,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik,
+    return build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
                           retcode = :Success)
 end
 
@@ -301,13 +313,14 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
         mul!(P[t], K[t], CP[t], -1, 1)
     end
     t_values = prob.tspan[1]:prob.tspan[2]
-    sol = build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik,
+    sol = build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
                          retcode = :Success)
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
         @assert Δsol.W == ZeroTangent()
         @assert Δsol.P == ZeroTangent()
+        @assert Δsol.z == ZeroTangent()
 
         Δlogpdf = Δsol.logpdf
 

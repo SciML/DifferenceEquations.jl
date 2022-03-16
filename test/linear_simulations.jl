@@ -28,3 +28,14 @@ observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_o
 
     # todo: add in regression tests
 end
+
+@testset "basic inference, simulated noise, no observations" begin
+    T = 20
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc, syms = [:a, :b])
+    @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc, syms = [:a, :b])
+
+    sol = solve(prob)
+    @inferred solve(prob)
+
+    # todo: add in regression tests
+end

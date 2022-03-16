@@ -24,6 +24,12 @@ function simulate_model_no_noise_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, observab
     return sol.retcode
 end
 
+function simulate_model_no_observations_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, T; kwargs...)
+    prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T); C_0, C_1, C_2, kwargs...)
+    sol = solve(prob)
+    return sol.retcode
+end
+
 const QUADRATIC = BenchmarkGroup()
 
 # Matrices from RBC
@@ -43,7 +49,7 @@ const observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
                                            "test/data/RBC_observables.csv"), ',')' |> collect
 const noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
                             ',')' |> collect
-
+const T_2_rbc = size(observables_2_rbc, 2)
 # Matrices from FVGQ
 # Load FVGQ data for checks
 A_0_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A_0.csv"), ',')
@@ -60,12 +66,12 @@ const C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0
 # D_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "FVGQ_D.csv"); header = false)))
 D_2_FVGQ = ones(6) * 1e-3
 u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
-
 const observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
                                             "test/data/FVGQ20_observables.csv"), ',')' |> collect
 
 const noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
                              ',')' |> collect
+const T_2_FVGQ = size(observables_2_FVGQ, 2)
 
 # RBC sized specific tests
 # Verifying code prior to benchmark
@@ -115,6 +121,15 @@ const QUADRATIC["rbc"]["simulate_model_no_noise_2"] = @benchmarkable simulate_mo
                                                                                                $u0_2_rbc,
                                                                                                $observables_2_rbc,
                                                                                                $D_2_rbc)
+const QUADRATIC["rbc"]["simulate_model_no_observations_2"] = @benchmarkable simulate_model_no_observations_2($A_0_rbc,
+                                                                                                             $A_1_rbc,
+                                                                                                             $A_2_rbc,
+                                                                                                             $B_2_rbc,
+                                                                                                             $C_0_rbc,
+                                                                                                             $C_1_rbc,
+                                                                                                             $C_2_rbc,
+                                                                                                             $u0_2_rbc,
+                                                                                                             $T_2_rbc)
 const QUADRATIC["rbc"]["joint_2"] = @benchmarkable joint_likelihood_2($A_0_rbc, $A_1_rbc, $A_2_rbc,
                                                                       $B_2_rbc, $C_0_rbc, $C_1_rbc,
                                                                       $C_2_rbc, $u0_2_rbc,
@@ -156,6 +171,16 @@ const QUADRATIC["FVGQ"]["simulate_model_no_noise_2"] = @benchmarkable simulate_m
                                                                                                 $u0_2_FVGQ,
                                                                                                 $observables_2_FVGQ,
                                                                                                 $D_2_FVGQ)
+const QUADRATIC["FVGQ"]["simulate_model_no_observations_2"] = @benchmarkable simulate_model_no_observations_2($A_0_FVGQ,
+                                                                                                              $A_1_FVGQ,
+                                                                                                              $A_2_FVGQ,
+                                                                                                              $B_2_FVGQ,
+                                                                                                              $C_0_FVGQ,
+                                                                                                              $C_1_FVGQ,
+                                                                                                              $C_2_FVGQ,
+                                                                                                              $u0_2_FVGQ,
+                                                                                                              $T_2_FVGQ)
+
 const QUADRATIC["FVGQ"]["joint_2"] = @benchmarkable joint_likelihood_2($A_0_FVGQ, $A_1_FVGQ,
                                                                        $A_2_FVGQ, $B_2_FVGQ,
                                                                        $C_0_FVGQ, $C_1_FVGQ,

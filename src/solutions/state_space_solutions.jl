@@ -1,5 +1,5 @@
 struct StateSpaceSolution{T,N,uType,uType2,DType,tType,randType,P,A,IType,DE,PosteriorType,
-                          logpdfType} <: SciMLBase.AbstractRODESolution{T,N,uType}
+                          logpdfType,zType} <: SciMLBase.AbstractRODESolution{T,N,uType}
     u::uType
     u_analytic::uType2
     errors::DType
@@ -14,32 +14,22 @@ struct StateSpaceSolution{T,N,uType,uType2,DType,tType,randType,P,A,IType,DE,Pos
     retcode::Symbol
     P::PosteriorType
     logpdf::logpdfType
+    z::zType
 end
 
 function build_solution(prob::AbstractStateSpaceProblem, alg, t, u; P = nothing, logpdf = nothing,
                         W = nothing, timeseries_errors = length(u) > 2, dense = false,
                         dense_errors = dense, calculate_error = true,
                         interp = SciMLBase.ConstantInterpolation(t, u), retcode = :Default,
-                        destats = nothing, kwargs...)
+                        destats = nothing, z = nothing, kwargs...)
     T = eltype(eltype(u))
     N = length((size(prob.u0)..., length(u)))
 
     # TODO: add support for has_analytic in the future
     sol = StateSpaceSolution{T,N,typeof(u),Nothing,Nothing,typeof(t),typeof(W),typeof(prob),
-                             typeof(alg),typeof(interp),typeof(destats),typeof(P),typeof(logpdf)}(u,
-                                                                                                  nothing,
-                                                                                                  nothing,
-                                                                                                  t,
-                                                                                                  W,
-                                                                                                  prob,
-                                                                                                  alg,
-                                                                                                  interp,
-                                                                                                  dense,
-                                                                                                  0,
-                                                                                                  destats,
-                                                                                                  retcode,
-                                                                                                  P,
-                                                                                                  logpdf)
+                             typeof(alg),typeof(interp),typeof(destats),typeof(P),typeof(logpdf),
+                             typeof(z)}(u, nothing, nothing, t, W, prob, alg, interp, dense, 0,
+                                        destats, retcode, P, logpdf, z)
     return sol
 end
 
