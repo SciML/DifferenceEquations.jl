@@ -161,11 +161,11 @@ const LINEAR["FVGQ"]["simulate_model_no_noise_1"] = @benchmarkable simulate_mode
                                                                                              $u0_FVGQ,
                                                                                              $observables_FVGQ,
                                                                                              $D_FVGQ)
-const LINEAR["rbc"]["simulate_model_no_observations_1"] = @benchmarkable simulate_model_no_observations_1($A_FVGQ,
-                                                                                                          $B_FVGQ,
-                                                                                                          $C_FVGQ,
-                                                                                                          $u0_FVGQ,
-                                                                                                          $T_FVGQ)
+const LINEAR["FVGQ"]["simulate_model_no_observations_1"] = @benchmarkable simulate_model_no_observations_1($A_FVGQ,
+                                                                                                           $B_FVGQ,
+                                                                                                           $C_FVGQ,
+                                                                                                           $u0_FVGQ,
+                                                                                                           $T_FVGQ)
 const LINEAR["FVGQ"]["joint_1"] = @benchmarkable joint_likelihood_1($A_FVGQ, $B_FVGQ, $C_FVGQ,
                                                                     $u0_FVGQ, $noise_FVGQ,
                                                                     $observables_FVGQ, $D_FVGQ)
