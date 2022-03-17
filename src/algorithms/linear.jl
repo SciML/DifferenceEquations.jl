@@ -36,8 +36,10 @@ Base.@propagate_inbounds @inline maybe_mul!!(x, t::Integer, A, B) = mul!(x[t], A
 @inline maybe_mul!!(x, t::Integer, A, B::Nothing) = nothing
 @inline maybe_mul!!(x, t::Integer, A::Nothing, B::Nothing) = nothing
 
-allocate_z(C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
-allocate_z(C::Nothing, u0, T) = nothing
+# allocation enable specializations for static, dual numbers, and nothings
+allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
+allocate_z(prob, C::Nothing, u0, T) = nothing
+allocate_u(prob, u0, T) = [zero(u0) for _ in 1:T]
 
 function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,
                                                           CType,RType,ObsType,K},
@@ -54,8 +56,8 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType
     @assert maybe_check_size(noise, 2, T - 1)
     @assert maybe_check_size(prob.observables, 2, T - 1)
 
-    u = [zero(prob.u0) for _ in 1:T]
-    z = allocate_z(C, prob.u0, T)
+    u = allocate_u(prob, prob.u0, T)
+    z = allocate_z(prob, C, prob.u0, T)
 
     # Initialize
     u[1] .= prob.u0
