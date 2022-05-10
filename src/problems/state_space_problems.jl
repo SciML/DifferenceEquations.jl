@@ -20,6 +20,8 @@ function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isad
     end
 end
 
+SciMLBase.isinplace(prob::AbstractPerturbationProblem) = false  # necessary for the get_concrete_u0 overloads
+
 # the {iip} isn't relevant here at this point, but if we remove it then there are failures in the "remake" call above
 # when using the Ensemble unit tests
 struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,ObsType,K} <:
