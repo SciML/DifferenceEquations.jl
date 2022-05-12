@@ -132,3 +132,26 @@ end
     # test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> kalman_likelihood(args..., observables, D),
     #            A, B, C, u0; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
 end
+
+@testset "basic kalman failure" begin
+    A = [1e20 0.0; 1e20 0.0]
+    u0_prior = MvNormal(u0_rbc, diagm(1e10 * ones(length(u0_rbc))))
+    prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                   observables_noise = D_rbc, observables = observables_rbc,
+                                   u0_prior)
+    sol = solve(prob)
+    @test sol.logpdf ≈ -Inf
+    @test sol.retcode != :Success
+end
+
+@testset "basic kalman failure gradient" begin
+    A = [1e20 0.0; 1e20 0.0]
+    u0_prior = MvNormal(u0_rbc, diagm(1e10 * ones(length(u0_rbc))))
+    function fail_kalman(B_rbc)
+        prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+                                       observables_noise = D_rbc, observables = observables_rbc,
+                                       u0_prior)
+        return solve(prob).logpdf
+    end
+    @test gradient(fail_kalman, B_rbc)[1] ≈ [0.0; 0.0;;] # but hopefully gradients are ignored!
+end
