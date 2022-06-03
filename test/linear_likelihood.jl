@@ -147,20 +147,20 @@ C_kalman = [0.0979797  0.114992   0.0964536  0.110065   0.0946794;
             0.110095   0.0856981  0.0841296  0.0981172  0.0811817;
             0.109134   0.103406   0.112622   0.0925896  0.112384;
             0.0848231  0.0821602  0.099332   0.113586   0.115105]
-D_kalman = MvNormal(Diagonal(abs2.([0.1, 0.1])))
+D_kalman = MvNormal(Diagonal(abs2.(ones(4) * 0.1)))
 u0_kalman = zeros(5)
 
 observables_kalman = readdlm(joinpath(pkgdir(DifferenceEquations),
-                                    "test/data/FVGQ20_observables.csv"), ',')' |> collect
+                                    "test/data/Kalman_observables.csv"), ',')' |> collect
 
-noise_kalman = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ',')' |>
+noise_kalman = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/Kalman_noise.csv"), ',')' |>
              collect
 
 @testset "linear non-square Kalman" begin
-    @test kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, D_FVGQ) ≈
-          -108.52706300389917
-    gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ,
-             C_FVGQ, u0_FVGQ)
+    @test kalman_likelihood(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_kalman) ≈
+            329.7550738722514
+    gradient((args...) -> kalman_likelihood(args..., observables_kalman, D_kalman), A_kalman, B_kalman,
+             C_kalman, u0_kalman)
 
     # TODO: this is not turned on because the numbers explode.  Need better unit test data to be interior
     # test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> kalman_likelihood(args..., observables, D),
