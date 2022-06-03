@@ -3,6 +3,10 @@ abstract type AbstractPerturbationProblem <: AbstractStateSpaceProblem end
 
 using DiffEqBase: get_concrete_tspan, get_concrete_u0, get_concrete_p, promote_u0, promote_tspan,
                   isconcreteu0
+
+# TODO: Can add in more checks on the algorithm choice
+DiffEqBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothing
+
 # Perturbation problesm don't have f, g
 # In discrete time, tspan should not have a sensitivity so the concretization is less obvious
 function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isadapt; kwargs...)
