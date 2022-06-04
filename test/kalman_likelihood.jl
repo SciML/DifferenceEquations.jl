@@ -3,7 +3,7 @@ using DelimitedFiles
 using DiffEqBase
 using FiniteDiff: finite_difference_gradient
 
-function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
+function solve_kalman(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
                                       u0_prior = MvNormal(u0, diagm(ones(length(u0)))),
                                       noise = nothing, observables, kwargs...)
@@ -75,19 +75,19 @@ T = 200
 @testset "linear non-square Kalman" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_kalman,
                                    MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
-    sol = kalman_likelihood(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_kalman)
-    @inferred kalman_likelihood(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman,
+    sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_kalman)
+    @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman,
                                 D_kalman)
-    @test loglik ≈ sol.logpdf
+    @test sol.logpdf ≈ loglik
     @test sol.logpdf ≈ 329.7550738722514
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
-    gradient((args...) -> kalman_likelihood(args..., observables_kalman, D_kalman).logpdf, A_kalman,
+    gradient((args...) -> solve_kalman(args..., observables_kalman, D_kalman).logpdf, A_kalman,
              B_kalman,
              C_kalman, u0_kalman)
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> kalman_likelihood(args..., observables_kalman, D_kalman), A_kalman,
+               (args...) -> solve_kalman(args..., observables_kalman, D_kalman).logpdf, A_kalman,
                B_kalman, C_kalman,
                u0_kalman; rrule_f = rrule_via_ad, check_inferred = false)
 end
