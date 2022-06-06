@@ -91,8 +91,8 @@ T = 200
 end
 
 D_offdiag = MvNormal([0.01 0.0 0.0 0.0;
-                      0.0 0.02 0.0 0.01;
-                      0.0 0.0 0.03 0.0;
+                      0.0 0.02 0.005 0.01;
+                      0.0 0.005 0.03 0.0;
                       0.0 0.01 0.0 0.04])
 @testset "linear non-square Kalman (off-diagonal D)" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_offdiag,
@@ -101,7 +101,7 @@ D_offdiag = MvNormal([0.01 0.0 0.0 0.0;
     @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman,
                            D_offdiag)
     @test sol.logpdf ≈ loglik
-    @test sol.logpdf ≈ 118.7259007526564
+    @test sol.logpdf ≈ 124.86949661078718
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
