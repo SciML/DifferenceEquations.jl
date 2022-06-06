@@ -1,4 +1,5 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
+using ChainRulesCore, ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test,
+      Zygote
 using DelimitedFiles
 using DiffEqBase
 using FiniteDiff: finite_difference_gradient
@@ -67,9 +68,6 @@ u0_kalman = zeros(5)
 
 observables_kalman = readdlm(joinpath(pkgdir(DifferenceEquations),
                                       "test/data/Kalman_observables.csv"), ',')' |> collect
-
-noise_kalman = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/Kalman_noise.csv"), ',')' |>
-               collect
 T = 200
 
 @testset "linear non-square Kalman" begin
@@ -77,7 +75,7 @@ T = 200
                                    MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
     sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_kalman)
     @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman,
-                                D_kalman)
+                           D_kalman)
     @test sol.logpdf ≈ loglik
     @test sol.logpdf ≈ 329.7550738722514
     @test sol.z ≈ z
@@ -90,4 +88,45 @@ T = 200
                (args...) -> solve_kalman(args..., observables_kalman, D_kalman).logpdf, A_kalman,
                B_kalman, C_kalman,
                u0_kalman; rrule_f = rrule_via_ad, check_inferred = false)
+end
+
+D_offdiag = MvNormal([0.01 0.0 0.0 0.0;
+                      0.0 0.02 0.0 0.01;
+                      0.0 0.0 0.03 0.0;
+                      0.0 0.01 0.0 0.04])
+@testset "linear non-square Kalman (off-diagonal D)" begin
+    z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_offdiag,
+                                   MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
+    sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_offdiag)
+    @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman,
+                           D_offdiag)
+    @test sol.logpdf ≈ loglik
+    @test sol.logpdf ≈ 118.7259007526564
+    @test sol.z ≈ z
+    @test sol.u ≈ u
+    @test sol.P ≈ P
+    gradient((args...) -> solve_kalman(args..., observables_kalman, D_offdiag).logpdf, A_kalman,
+             B_kalman,
+             C_kalman, u0_kalman)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> solve_kalman(args..., observables_kalman, D_offdiag).logpdf, A_kalman,
+               B_kalman, C_kalman,
+               u0_kalman; rrule_f = rrule_via_ad, check_inferred = false)
+end
+
+@testset "linear non-square Kalman (direct rrule)" begin
+    z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_kalman,
+                                   MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
+    problem = LinearStateSpaceProblem(A_kalman, B_kalman, u0_kalman,
+                                      (0, size(observables_kalman, 2));
+                                      C = C_kalman, observables_noise = D_kalman,
+                                      u0_prior = MvNormal(u0_kalman,
+                                                          diagm(ones(length(u0_kalman)))),
+                                      observables = observables_kalman)
+    sol, pb = ChainRulesCore.rrule(DiffEqBase.solve, problem, KalmanFilter())
+    @test sol.logpdf ≈ loglik
+    @test sol.logpdf ≈ 329.7550738722514
+    @test sol.z ≈ z
+    @test sol.u ≈ u
+    @test sol.P ≈ P
 end
