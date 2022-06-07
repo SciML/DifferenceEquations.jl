@@ -24,6 +24,9 @@ unvech_5(v) = LowerTriangular(hcat(v[1:5],
                                    [zeros(4);
                                     v[15]]))
 
+unvech_5(v) = LowerTriangular(hcat(v[1:5], [zeros(1); v[6:9]], [zeros(2) v[10:12]],
+                                   [zeros(3) v[13:14]], [zeros(4) v[15]]))
+
 function solve_kalman_cov(A, B, C, u0_mean, u0_variance_vech, observables, D; kwargs...)
     # manually inverse-vech the u0_variance_vech back into a matrix
     u0_variance_cholesky = unvech_5(u0_variance_vech)
@@ -64,7 +67,8 @@ function solve_manual(observables, A::AbstractMatrix, B::AbstractMatrix, C::Abst
         z[i] = C * u[i]
 
         CP_i = C * P[i]
-        V = Symmetric(CP_i * C' + R)
+        V_temp = CP_i * C' + R
+        V = Symmetric((V_temp + V_temp') / 2)
         loglik += logpdf(MvNormal(z[i], V), observables[:, i - 1])
         K = CP_i' / V  # gain
         u[i] += K * (observables[:, i - 1] - z[i])
