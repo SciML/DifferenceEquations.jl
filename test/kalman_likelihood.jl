@@ -24,9 +24,6 @@ unvech_5(v) = LowerTriangular(hcat(v[1:5],
                                    [zeros(4);
                                     v[15]]))
 
-unvech_5(v) = LowerTriangular(hcat(v[1:5], [zeros(1); v[6:9]], [zeros(2) v[10:12]],
-                                   [zeros(3) v[13:14]], [zeros(4) v[15]]))
-
 function solve_kalman_cov(A, B, C, u0_mean, u0_variance_vech, observables, D; kwargs...)
     # manually inverse-vech the u0_variance_vech back into a matrix
     u0_variance_cholesky = unvech_5(u0_variance_vech)
