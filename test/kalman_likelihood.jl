@@ -14,7 +14,15 @@ function solve_kalman(A, B, C, u0, observables, D; kwargs...)
     return solve(problem)
 end
 
-unvech_5(v) = LowerTriangular(hcat(v[1:5], [zeros(1); v[6:9]], [zeros(2); v[10:12]], [zeros(3); v[13:14]], [zeros(4); v[15]]))
+unvech_5(v) = LowerTriangular(hcat(v[1:5],
+                                   [zeros(1);
+                                    v[6:9]],
+                                   [zeros(2);
+                                    v[10:12]],
+                                   [zeros(3);
+                                    v[13:14]],
+                                   [zeros(4);
+                                    v[15]]))
 
 function solve_kalman_cov(A, B, C, u0_mean, u0_variance_vech, observables, D; kwargs...)
     # manually inverse-vech the u0_variance_vech back into a matrix
@@ -149,7 +157,11 @@ end
 
 u0_mean = [0.0, 0.0, 0.0, 0.0, 0.0]
 @testset "covariance prior" begin
-    u0_var_vech = rand(15)
+    u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855, 0.6799242624030147,
+                   -0.7627861222280011, 0.1346800868329039, 0.46537792458084976,
+                   -0.16223737917345768, 0.1772417632124954, 0.2722945202387173,
+                   -0.3971349857502508, -0.1474011998331263, 0.18113754883619412,
+                   0.13433861105247683, 0.029171596025489813]
     sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
                            D_offdiag)
     test_rrule(Zygote.ZygoteRuleConfig(),
@@ -164,7 +176,8 @@ u0_mean = [0.0, 0.0, 0.0, 0.0, 0.0]
                            D_offdiag)
 
     @test grad_values[1] ≈
-          finite_difference_gradient(A -> solve_kalman_cov(A, B_kalman, C_kalman, u0_mean, u0_var_vech,
+          finite_difference_gradient(A -> solve_kalman_cov(A, B_kalman, C_kalman, u0_mean,
+                                                           u0_var_vech,
                                                            observables_kalman,
                                                            D_offdiag).logpdf, A_kalman) rtol = 1e-7
     # try this with non-zero mean
@@ -177,8 +190,8 @@ u0_mean = [0.0, 0.0, 0.0, 0.0, 0.0]
 
     @test grad_values[5] ≈
           finite_difference_gradient(u0_var_vech -> solve_kalman_cov(A_kalman, B_kalman, C_kalman,
-                                                                u0_mean,
-                                                                u0_var_vech,
-                                                                observables_kalman,
-                                                                D_offdiag).logpdf, u0_var_vech) rtol = 3e-6
+                                                                     u0_mean,
+                                                                     u0_var_vech,
+                                                                     observables_kalman,
+                                                                     D_offdiag).logpdf, u0_var_vech) rtol = 1.4e-5
 end
