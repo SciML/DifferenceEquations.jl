@@ -247,9 +247,20 @@ end
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
-    test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> solve_manual_cov(args..., observables_kalman, D_offdiag, [0, T])[4],
-               A_kalman,
-               B_kalman, C_kalman,
-               u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
+    #test_rrule(Zygote.ZygoteRuleConfig(),
+    #           (args...) -> solve_manual_cov(args..., observables_kalman, D_offdiag, [0, T])[4],
+    #           A_kalman,
+    #           B_kalman, C_kalman,
+    #           u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
+    grad_values = gradient((args...) -> solve_manual_cov(args..., [0, T])[4], A_kalman, B_kalman,
+                           C_kalman,
+                           u0_mean,
+                           u0_var_vech, observables_kalman,
+                           D_offdiag)
+
+    @test grad_values[1] ≈
+          finite_difference_gradient(A -> solve_manual_cov(A, B_kalman, C_kalman, u0_mean,
+                                                           u0_var_vech,
+                                                           observables_kalman,
+                                                           D_offdiag, [0, T])[4], A_kalman) rtol = 1e-7
 end
