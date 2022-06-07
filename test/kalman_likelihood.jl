@@ -4,9 +4,25 @@ using DelimitedFiles
 using DiffEqBase
 using FiniteDiff: finite_difference_gradient
 
+# inv_vech in dssm repo manually with slices instead of given code
+# in diffeq turn the cholesky pdef check off in fvgq in linear.jl
+
 function solve_kalman(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
                                       u0_prior = MvNormal(u0, diagm(ones(length(u0)))),
+                                      noise = nothing, observables, kwargs...)
+    return solve(problem)
+end
+
+unvech_5(v) = LowerTriangular(hcat(v[1:5], [zeros(1); v[6:9]], [zeros(2); v[10:12]], [zeros(3); v[13:14]], [zeros(4); v[15]]))
+
+function solve_kalman_cov(A, B, C, u0_mean, u0_variance_vech, observables, D; kwargs...)
+    # manually inverse-vech the u0_variance_vech back into a matrix
+    u0_variance_cholesky = unvech_5(u0_variance_vech)
+    u0_variance = u0_variance_cholesky * u0_variance_cholesky'
+    problem = LinearStateSpaceProblem(A, B, zeros(length(u0_mean)), (0, size(observables, 2)); C,
+                                      observables_noise = D,
+                                      u0_prior = MvNormal(u0_mean, u0_variance),
                                       noise = nothing, observables, kwargs...)
     return solve(problem)
 end
@@ -70,7 +86,7 @@ observables_kalman = readdlm(joinpath(pkgdir(DifferenceEquations),
                                       "test/data/Kalman_observables.csv"), ',')' |> collect
 T = 200
 
-@testset "linear non-square Kalman" begin
+@testset "basic test, non-square matrices" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_kalman,
                                    MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
     sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_kalman)
@@ -94,7 +110,7 @@ D_offdiag = MvNormal([0.01 0.0 0.0 0.0;
                       0.0 0.02 0.005 0.01;
                       0.0 0.005 0.03 0.0;
                       0.0 0.01 0.0 0.04])
-@testset "linear non-square Kalman (off-diagonal D)" begin
+@testset "off-diagonal D" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_offdiag,
                                    MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
     sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_offdiag)
@@ -114,7 +130,7 @@ D_offdiag = MvNormal([0.01 0.0 0.0 0.0;
                u0_kalman; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
-@testset "linear non-square Kalman (direct rrule)" begin
+@testset "direct rrule" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_kalman,
                                    MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
     problem = LinearStateSpaceProblem(A_kalman, B_kalman, u0_kalman,
@@ -129,4 +145,40 @@ end
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
+end
+
+u0_mean = [0.0, 0.0, 0.0, 0.0, 0.0]
+@testset "covariance prior" begin
+    u0_var_vech = rand(15)
+    sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
+                           D_offdiag)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> solve_kalman_cov(args..., observables_kalman, D_offdiag).logpdf,
+               A_kalman,
+               B_kalman, C_kalman,
+               u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
+    grad_values = gradient((args...) -> solve_kalman_cov(args...).logpdf, A_kalman, B_kalman,
+                           C_kalman,
+                           u0_mean,
+                           u0_var_vech, observables_kalman,
+                           D_offdiag)
+
+    @test grad_values[1] ≈
+          finite_difference_gradient(A -> solve_kalman_cov(A, B_kalman, C_kalman, u0_mean, u0_var_vech,
+                                                           observables_kalman,
+                                                           D_offdiag).logpdf, A_kalman) rtol = 1e-7
+    # try this with non-zero mean
+    @test grad_values[4] ≈
+          finite_difference_gradient(u0_mean -> solve_kalman_cov(A_kalman, B_kalman, C_kalman,
+                                                                 u0_mean,
+                                                                 u0_var_vech,
+                                                                 observables_kalman,
+                                                                 D_offdiag).logpdf, u0_mean) rtol = 1e-6
+
+    @test grad_values[5] ≈
+          finite_difference_gradient(u0_var_vech -> solve_kalman_cov(A_kalman, B_kalman, C_kalman,
+                                                                u0_mean,
+                                                                u0_var_vech,
+                                                                observables_kalman,
+                                                                D_offdiag).logpdf, u0_var_vech) rtol = 3e-6
 end
