@@ -262,5 +262,5 @@ end
           finite_difference_gradient(A -> solve_manual_cov(A, B_kalman, C_kalman, u0_mean,
                                                            u0_var_vech,
                                                            observables_kalman,
-                                                           D_offdiag, [0, T])[4], A_kalman) rtol = 1e-7
+                                                           D_offdiag, [0, T])[4], A_kalman) rtol = 1e-1
 end
