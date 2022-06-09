@@ -1,4 +1,4 @@
-using ChainRulesCore, ChainRulesTestUtils, Distributions, LinearAlgebra, Test,
+using ChainRulesCore, ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test,
       Zygote
 using DelimitedFiles
 using DiffEqBase
@@ -91,5 +91,21 @@ T = 20
           finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
                                                                u0_var_vech,
                                                                observables_kalman,
-                                                               R_kalman, [0, T]), A_kalman) rtol = 1e-2
+                                                               R_kalman, [0, T]), A_kalman) rtol = 1e-7
+
+    @test grad_values[4] ≈
+          finite_difference_gradient(u0_mean_vec -> solve_manual_cov_lik(A_kalman, B_kalman,
+                                                                         C_kalman,
+                                                                         u0_mean_vec,
+                                                                         u0_var_vech,
+                                                                         observables_kalman,
+                                                                         R_kalman, [0, T]), u0_mean) rtol = 1e-7
+
+    @test grad_values[5] ≈
+          finite_difference_gradient(u0_var -> solve_manual_cov_lik(A_kalman, B_kalman, C_kalman,
+                                                                    u0_mean,
+                                                                    u0_var,
+                                                                    observables_kalman,
+                                                                    R_kalman, [0, T]),
+                                     u0_var_vech) rtol = 1e-5
 end
