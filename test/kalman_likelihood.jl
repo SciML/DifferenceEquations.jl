@@ -105,7 +105,7 @@ function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractM
         u += K * (observables[:, i - 1] - z)
         P -= K * CP_i
     end
-    return z, u, P, loglik
+    return loglik
 end
 
 A_kalman = [0.0495388 0.0109918 0.0960529 0.0767147 0.0404643;
@@ -235,21 +235,21 @@ end
 
 D_kalman_cov = Diagonal(abs2.(ones(4) * 0.1))
 @testset "covariance prior manual" begin
-    z, u, P, loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
-                                           observables_kalman,
-                                           D_kalman_cov, [0, T])
+    loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
+                                  observables_kalman,
+                                  D_kalman_cov, [0, T])
     sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
                            D_kalman)
     @test sol.logpdf ≈ loglik
-    @test sol.z[end] ≈ z
-    @test sol.u[end] ≈ u
-    @test sol.P[end] ≈ P
+    #@test sol.z[end] ≈ z
+    #@test sol.u[end] ≈ u
+    #@test sol.P[end] ≈ P
     #test_rrule(Zygote.ZygoteRuleConfig(),
-    #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, D_kalman_cov, [0, T])[4],
+    #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, D_kalman_cov, [0, T]),
     #           A_kalman,
     #           B_kalman, C_kalman,
     #           u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
-    grad_values = gradient((args...) -> solve_manual_cov_lik(args..., [0, T])[4], A_kalman,
+    grad_values = gradient((args...) -> solve_manual_cov_lik(args..., [0, T]), A_kalman,
                            B_kalman,
                            C_kalman,
                            u0_mean,
@@ -260,5 +260,5 @@ D_kalman_cov = Diagonal(abs2.(ones(4) * 0.1))
           finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
                                                                u0_var_vech,
                                                                observables_kalman,
-                                                               D_kalman_cov, [0, T])[4], A_kalman) rtol = 1e-2
+                                                               D_kalman_cov, [0, T]), A_kalman) rtol = 1e-2
 end
