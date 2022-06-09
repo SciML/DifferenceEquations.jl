@@ -1,9 +1,11 @@
 
-function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,
+function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,
+                                                             tType,P,NP,F,A0Type,
                                                              A1Type,A2Type,BType,C0Type,C1Type,
                                                              C2Type,RType,ObsType,K},
                             alg::DirectIteration, args...;
-                            kwargs...) where {uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2Type,
+                            kwargs...) where {uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,
+                                              A0Type,A1Type,A2Type,
                                               BType,C0Type,C1Type,C2Type,RType,ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    

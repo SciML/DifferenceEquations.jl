@@ -28,7 +28,8 @@ SciMLBase.isinplace(prob::AbstractPerturbationProblem) = false  # necessary for 
 
 # the {iip} isn't relevant here at this point, but if we remove it then there are failures in the "remake" call above
 # when using the Ensemble unit tests
-struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,ObsType,K} <:
+struct LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,AType,BType,CType,
+                               RType,ObsType,K} <:
        AbstractPerturbationProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     A::AType
@@ -37,13 +38,15 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,R
     observables_noise::RType
     observables::ObsType
     u0::uType
-    u0_prior::uPriorType
+    u0_prior_mean::uPriorMeanType
+    u0_prior_var::uPriorVarType
     tspan::tType
     p::P
     noise::NP
     kwargs::K
     @add_kwonly function LinearStateSpaceProblem{iip}(A, B, u0, tspan, p = NullParameters();
-                                                      u0_prior = nothing, C = nothing,
+                                                      u0_prior_mean = nothing,
+                                                      u0_prior_var = nothing, C = nothing,
                                                       observables_noise = nothing,
                                                       observables = nothing, noise = nothing,
                                                       syms = nothing,
@@ -57,9 +60,11 @@ struct LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,CType,R
         # Require integer distances between time periods for now.  Later could check with dt != 1
         @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
-        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(noise),typeof(f),
+        return new{typeof(u0),typeof(u0_prior_mean),typeof(u0_prior_var),typeof(_tspan),typeof(p),
+                   typeof(noise),typeof(f),
                    typeof(A),typeof(B),typeof(C),typeof(observables_noise),typeof(_observables),
-                   typeof(kwargs)}(f, A, B, C, observables_noise, _observables, u0, u0_prior,
+                   typeof(kwargs)}(f, A, B, C, observables_noise, _observables, u0, u0_prior_mean,
+                                   u0_prior_var,
                                    _tspan, p, noise, kwargs)
     end
 end
@@ -72,7 +77,8 @@ LinearStateSpaceProblem(args...; kwargs...) = LinearStateSpaceProblem{false}(arg
 # z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
 # z_tilde(t) = z(t) + v(t+1)
 # """
-struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2Type,BType,C0Type,
+struct QuadraticStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,A0Type,A1Type,
+                                  A2Type,BType,C0Type,
                                   C1Type,C2Type,RType,ObsType,K} <: AbstractPerturbationProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     A_0::A0Type
@@ -85,13 +91,16 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
     observables_noise::RType
     observables::ObsType
     u0::uType
-    u0_prior::uPriorType
+    u0_prior_mean::uPriorMeanType
+    u0_prior_var::uPriorVarType
     tspan::tType
     p::P
     noise::NP
     kwargs::K
     @add_kwonly function QuadraticStateSpaceProblem{iip}(A_0, A_1, A_2, B, u0, tspan,
-                                                         p = NullParameters(); u0_prior = nothing,
+                                                         p = NullParameters();
+                                                         u0_prior_mean = nothing,
+                                                         u0_prior_var = nothing,
                                                          C_0 = nothing, C_1 = nothing,
                                                          C_2 = nothing, observables_noise = nothing,
                                                          observables = nothing, noise = nothing,
@@ -106,7 +115,8 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
         # Require integer distances between time periods for now.  Later could check with dt != 1
         @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
-        return new{typeof(u0),typeof(u0_prior),typeof(_tspan),typeof(p),typeof(noise),typeof(f),
+        return new{typeof(u0),typeof(u0_prior_mean),typeof(u0_prior_var),typeof(_tspan),typeof(p),
+                   typeof(noise),typeof(f),
                    typeof(A_0),typeof(A_1),typeof(A_2),typeof(B),typeof(C_0),typeof(C_1),
                    typeof(C_2),typeof(observables_noise),typeof(_observables),typeof(kwargs)}(f,
                                                                                               A_0,
@@ -119,7 +129,8 @@ struct QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2
                                                                                               observables_noise,
                                                                                               _observables,
                                                                                               u0,
-                                                                                              u0_prior,
+                                                                                              u0_prior_mean,
+                                                                                              u0_prior_var,
                                                                                               _tspan,
                                                                                               p,
                                                                                               noise,
