@@ -10,7 +10,6 @@ using RecursiveArrayTools
 using SciMLBase: @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution
 using DiffEqBase
 using DiffEqBase: __solve
-using DistributionsAD
 
 include("matrix_vector_of_vectors.jl")
 include("utilities.jl")
