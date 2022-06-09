@@ -114,6 +114,41 @@ function solve_manual_cov(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatri
     return copy(z), copy(u), copy(P), loglik
 end
 
+function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix, u0_mean,
+                              u0_variance_vech, observables, D, tspan)
+    # hardcoded right now for tspan = (0, T) for T+1 points
+    T = tspan[2]
+    @assert tspan[1] == 0
+    @assert size(observables)[2] == T # i.e. we do not calculate the likelihood of the initial condition
+
+    # Gaussian Prior
+    # u0 prior taken from params
+    u0_variance_cholesky = unvech_5(u0_variance_vech)
+    u0_variance = u0_variance_cholesky * u0_variance_cholesky'
+    R = D.Σ
+    B_prod = B * B'
+
+    u = u0_mean
+    P = u0_variance
+    z = C * u
+    loglik = 0.0
+    for i in 2:(T + 1)
+        # Kalman iteration
+        u = A * u
+        P = A * P * A' + B_prod
+        z = C * u
+
+        CP_i = C * P
+        V_temp = CP_i * C' + R
+        V = (V_temp + V_temp') / 2
+        loglik += logpdf(MvNormal(z, V), observables[:, i - 1])
+        K = CP_i' / V  # gain
+        u += K * (observables[:, i - 1] - z)
+        P -= K * CP_i
+    end
+    return z, u, P, loglik
+end
+
 A_kalman = [0.0495388 0.0109918 0.0960529 0.0767147 0.0404643;
             0.020344 0.0627784 0.00865501 0.0394004 0.0601155;
             0.0260677 0.039467 0.0344606 0.033846 0.00224089;
@@ -197,11 +232,12 @@ end
 end
 
 u0_mean = [0.0, 0.0, 0.0, 0.0, 0.0]
-u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855, 0.6799242624030147,
-               -0.7627861222280011, 0.1346800868329039, 0.46537792458084976,
-               -0.16223737917345768, 0.1772417632124954, 0.2722945202387173,
-               -0.3971349857502508, -0.1474011998331263, 0.18113754883619412,
-               0.13433861105247683, 0.029171596025489813]
+u0_var_vech = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0]
+#u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855, 0.6799242624030147,
+#               -0.7627861222280011, 0.1346800868329039, 0.46537792458084976,
+#               -0.16223737917345768, 0.1772417632124954, 0.2722945202387173,
+#               -0.3971349857502508, -0.1474011998331263, 0.18113754883619412,
+#               0.13433861105247683, 0.029171596025489813]
 @testset "covariance prior" begin
     sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
                            D_offdiag)
@@ -221,6 +257,7 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855, 0.6
                                                            u0_var_vech,
                                                            observables_kalman,
                                                            D_offdiag).logpdf, A_kalman) rtol = 1e-7
+
     # try this with non-zero mean
     @test grad_values[4] ≈
           finite_difference_gradient(u0_mean -> solve_kalman_cov(A_kalman, B_kalman, C_kalman,
@@ -238,29 +275,30 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855, 0.6
 end
 
 @testset "covariance prior manual" begin
-    z, u, P, loglik = solve_manual_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
-                                       observables_kalman,
-                                       D_offdiag, [0, T])
+    z, u, P, loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
+                                           observables_kalman,
+                                           D_kalman, [0, T])
     sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
-                           D_offdiag)
+                           D_kalman)
     @test sol.logpdf ≈ loglik
-    @test sol.z ≈ z
-    @test sol.u ≈ u
-    @test sol.P ≈ P
+    @test sol.z[end] ≈ z
+    @test sol.u[end] ≈ u
+    @test sol.P[end] ≈ P
     #test_rrule(Zygote.ZygoteRuleConfig(),
-    #           (args...) -> solve_manual_cov(args..., observables_kalman, D_offdiag, [0, T])[4],
+    #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, D_kalman, [0, T])[4],
     #           A_kalman,
     #           B_kalman, C_kalman,
     #           u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
-    grad_values = gradient((args...) -> solve_manual_cov(args..., [0, T])[4], A_kalman, B_kalman,
+    grad_values = gradient((args...) -> solve_manual_cov_lik(args..., [0, T])[4], A_kalman,
+                           B_kalman,
                            C_kalman,
                            u0_mean,
                            u0_var_vech, observables_kalman,
-                           D_offdiag)
+                           D_kalman)
 
     @test grad_values[1] ≈
-          finite_difference_gradient(A -> solve_manual_cov(A, B_kalman, C_kalman, u0_mean,
-                                                           u0_var_vech,
-                                                           observables_kalman,
-                                                           D_offdiag, [0, T])[4], A_kalman) rtol = 1e-1
+          finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
+                                                               u0_var_vech,
+                                                               observables_kalman,
+                                                               D_kalman, [0, T])[4], A_kalman) rtol = 1e-2
 end
