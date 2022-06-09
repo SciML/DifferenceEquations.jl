@@ -74,48 +74,8 @@ function solve_manual(observables, A::AbstractMatrix, B::AbstractMatrix, C::Abst
     return copy(z), copy(u), copy(P), loglik
 end
 
-function solve_manual_cov(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix, u0_mean,
-                          u0_variance_vech, observables, D::MvNormal, tspan)
-    # hardcoded right now for tspan = (0, T) for T+1 points
-    T = tspan[2]
-    @assert tspan[1] == 0
-    @assert size(observables)[2] == T # i.e. we do not calculate the likelihood of the initial condition
-
-    # Gaussian Prior
-    # u0 prior taken from params
-    u0_variance_cholesky = unvech_5(u0_variance_vech)
-    u0_variance = u0_variance_cholesky * u0_variance_cholesky'
-    R = D.Σ
-    B_prod = B * B'
-
-    # TODO: when saveall = false, etc. don't allocate everything, or at least don't save it
-    u = Zygote.Buffer(Vector{Vector{Float64}}(undef, T + 1)) # prior mean
-    P = Zygote.Buffer(Vector{Matrix{Float64}}(undef, T + 1)) # prior variance
-    z = Zygote.Buffer(Vector{Vector{Float64}}(undef, T + 1)) # mean observation
-
-    u[1] = u0_mean
-    P[1] = u0_variance
-    z[1] = C * u[1]
-    loglik = 0.0
-    for i in 2:(T + 1)
-        # Kalman iteration
-        u[i] = A * u[i - 1]
-        P[i] = A * P[i - 1] * A' + B_prod
-        z[i] = C * u[i]
-
-        CP_i = C * P[i]
-        V_temp = CP_i * C' + R
-        V = Symmetric((V_temp + V_temp') / 2)
-        loglik += logpdf(MvNormal(z[i], V), observables[:, i - 1])
-        K = CP_i' / V  # gain
-        u[i] += K * (observables[:, i - 1] - z[i])
-        P[i] -= K * CP_i
-    end
-    return copy(z), copy(u), copy(P), loglik
-end
-
 function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix, u0_mean,
-                              u0_variance_vech, observables, D, tspan)
+                              u0_variance_vech, observables, R, tspan)
     # hardcoded right now for tspan = (0, T) for T+1 points
     T = tspan[2]
     @assert tspan[1] == 0
@@ -125,7 +85,6 @@ function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractM
     # u0 prior taken from params
     u0_variance_cholesky = unvech_5(u0_variance_vech)
     u0_variance = u0_variance_cholesky * u0_variance_cholesky'
-    R = D.Σ
     B_prod = B * B'
 
     u = u0_mean
@@ -274,10 +233,11 @@ u0_var_vech = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 
                                                                      D_offdiag).logpdf, u0_var_vech) rtol = 1.4e-5
 end
 
+D_kalman_cov = Diagonal(abs2.(ones(4) * 0.1))
 @testset "covariance prior manual" begin
     z, u, P, loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
                                            observables_kalman,
-                                           D_kalman, [0, T])
+                                           D_kalman_cov, [0, T])
     sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
                            D_kalman)
     @test sol.logpdf ≈ loglik
@@ -285,7 +245,7 @@ end
     @test sol.u[end] ≈ u
     @test sol.P[end] ≈ P
     #test_rrule(Zygote.ZygoteRuleConfig(),
-    #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, D_kalman, [0, T])[4],
+    #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, D_kalman_cov, [0, T])[4],
     #           A_kalman,
     #           B_kalman, C_kalman,
     #           u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
@@ -294,11 +254,11 @@ end
                            C_kalman,
                            u0_mean,
                            u0_var_vech, observables_kalman,
-                           D_kalman)
+                           D_kalman_cov)
 
     @test grad_values[1] ≈
           finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
                                                                u0_var_vech,
                                                                observables_kalman,
-                                                               D_kalman, [0, T])[4], A_kalman) rtol = 1e-2
+                                                               D_kalman_cov, [0, T])[4], A_kalman) rtol = 1e-2
 end
