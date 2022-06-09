@@ -75,6 +75,11 @@ T = 20
     #                              observables_kalman,
     #                              R_kalman, [0, T])
 
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> solve_manual_cov_lik(args..., B_kalman, C_kalman, u0_mean, u0_var_vech,
+                                                 observables_kalman, R_kalman, [0, T]),
+               A_kalman; rrule_f = rrule_via_ad, check_inferred = false)
+
     grad_values = gradient((args...) -> solve_manual_cov_lik(args..., [0, T]), A_kalman,
                            B_kalman,
                            C_kalman,
