@@ -12,7 +12,7 @@ end
 # CRTU has problems with generating random MvNormal, so just testing diagonals
 function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
-                                      u0_prior = MvNormal(u0, diagm(ones(length(u0)))),
+                                      u0_prior_mean = u0, u0_prior_var = diagm(ones(length(u0))),
                                       noise = nothing, observables, kwargs...)
     return solve(problem).logpdf
 end
@@ -22,7 +22,7 @@ A_rbc = [0.9568351489231076 6.209371005755285;
          3.0153731819288737e-18 0.20000000000000007]
 B_rbc = reshape([0.0; -0.01], 2, 1) # make sure B is a matrix
 C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
-D_rbc = MvNormal(Diagonal(abs2.([0.1, 0.1])))
+D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
 observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),
@@ -55,11 +55,13 @@ end
 @testset "basic kalman inference" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
                                    observables_noise = D_rbc, observables = observables_rbc,
-                                   u0_prior = MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))))
+                                   u0_prior_mean = u0_rbc,
+                                   u0_prior_var = diagm(ones(length(u0_rbc))))
     @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-                                      C = C_rbc, observables_noise = D_rbc,
-                                      observables = observables_rbc,
-                                      u0_prior = MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))))
+                                      C = C_rbc,
+                                      observables_noise = D_rbc, observables = observables_rbc,
+                                      u0_prior_mean = u0_rbc,
+                                      u0_prior_var = diagm(ones(length(u0_rbc))))
 
     sol = solve(prob)
     @inferred solve(prob)
@@ -102,7 +104,7 @@ end
 A_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A.csv"), ',')
 B_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_B.csv"), ',')
 C_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C.csv"), ',')
-D_FVGQ = MvNormal(Diagonal(abs2.(ones(6) * 1e-3)))
+D_FVGQ = abs2.(ones(6) * 1e-3)
 
 observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
                                     "test/data/FVGQ20_observables.csv"), ',')' |> collect
@@ -135,10 +137,10 @@ end
 
 @testset "basic kalman failure" begin
     A = [1e20 0.0; 1e20 0.0]
-    u0_prior = MvNormal(u0_rbc, diagm(1e10 * ones(length(u0_rbc))))
+    u0_prior_var = diagm(1e10 * ones(length(u0_rbc)))
     prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
                                    observables_noise = D_rbc, observables = observables_rbc,
-                                   u0_prior)
+                                   u0_prior_mean = u0_rbc, u0_prior_var)
     sol = solve(prob)
     @test sol.logpdf ≈ -Inf
     @test sol.retcode != :Success
@@ -146,11 +148,11 @@ end
 
 @testset "basic kalman failure gradient" begin
     A = [1e20 0.0; 1e20 0.0]
-    u0_prior = MvNormal(u0_rbc, diagm(1e10 * ones(length(u0_rbc))))
+    u0_prior_var = diagm(1e10 * ones(length(u0_rbc)))
     function fail_kalman(B_rbc)
         prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
                                        observables_noise = D_rbc, observables = observables_rbc,
-                                       u0_prior)
+                                       u0_prior_mean = u0_rbc, u0_prior_var)
         return solve(prob).logpdf
     end
     @test gradient(fail_kalman, B_rbc)[1] ≈ [0.0; 0.0;;] # but hopefully gradients are ignored!

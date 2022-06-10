@@ -2,17 +2,28 @@
 maybe_logpdf(observables_noise, observables::Nothing, t, z) = 0.0
 maybe_logpdf(observables_noise, observables, t, z) = logpdf(observables_noise,
                                                             view(observables, :, t) - z)
+# Utilities to get distribution for logpdf from observation error argument
+make_observables_noise(observables_noise::Nothing) = nothing
+make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
+make_observables_noise(observables_noise::AbstractVector) = MvNormal(Diagonal(observables_noise))
 
-function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType,P,NP,F,AType,BType,
+# Utilities to get covariance matrix from observation error argument for kalman filter.  e.g. vector is diagonal, etc.
+make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
+make_observables_covariance_matrix(observables_noise::AbstractVector) = Diagonal(observables_noise)
+
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,tType,
+                                                          P,NP,F,AType,BType,
                                                           CType,RType,ObsType,K},
                             alg::DirectIteration, args...;
-                            kwargs...) where {uType,uPriorType,tType,P,NP,F,AType,BType,CType,RType,
+                            kwargs...) where {uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,AType,
+                                              BType,CType,RType,
                                               ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
 
     # checks on bounds
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
+    observables_noise = make_observables_noise(prob.observables_noise)
 
     @assert size(noise, 1) == size(prob.B, 2)
     @assert size(noise, 2) == T - 1
@@ -32,7 +43,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorType,tType
         mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += maybe_logpdf(prob.observables_noise, prob.observables, t - 1, z[t])
+        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z[t])
     end
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(prob, alg, t_values, u; W = noise,
@@ -50,15 +61,15 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
+    observables_noise = make_observables_noise(prob.observables_noise)
+    @assert typeof(observables_noise) <: ZeroMeanDiagNormal  # can extend to more general in rrule
 
     # checks on bounds
     @assert size(noise, 1) == size(prob.B, 2)
     @assert maybe_check_size(prob.observables, 2, T - 1)
-
     @assert size(noise, 2) == T - 1
 
     @unpack A, B, C = prob
-
     u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
     z1 = C * prob.u0
     z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
@@ -73,7 +84,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
         mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += logpdf(observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
     t_values = prob.tspan[1]:prob.tspan[2]
     sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z, retcode = :Success)
@@ -97,9 +108,12 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
         Δu_temp = zero(u[1])
         Δz = zero(z[1])
 
+        # Assert checked above about being diagonal
+        observables_noise_cov = prob.observables_noise
+
         @views @inbounds for t in T:-1:2
             Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./
-                  diag(prob.observables_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+                  observables_noise_cov # This is using the vector directly.   More generally, it should be Σ^-1 * (z_obs - z)
             # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
             # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
             # rmul!(Δlogpdf, Δz)
@@ -128,47 +142,50 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     # checks on bounds
     @assert size(prob.observables, 2) == T - 1
 
-    @unpack A, B, C = prob
-    u0 = prob.u0_prior # use the prior, not the concretized u0
-    N = length(u0)
+    @unpack A, B, C, u0_prior_mean, u0_prior_var = prob
+    N = length(u0_prior_mean)
     L = size(C, 1)
 
     # TODO: move to internal algorithm cache
     # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
-    u = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
-    P = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
+    u = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
+    P = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
     z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
 
     # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
     # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
-    B_prod = Matrix{eltype(u0)}(undef, N, N)
-    u_mid = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # intermediate in u calculation
-    P_mid = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
+    B_prod = Matrix{eltype(u0_prior_var)}(undef, N, N)
+    u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
+    P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
     innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
-    K = [Matrix{eltype(u0)}(undef, N, L) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(L, Matrix{eltype(u0)}(undef, L, L),
-                                              Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef,
-                                                                                                         L,
-                                                                                                         L),
-                                                                                      'U', 0))
+    K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
+    CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
+    V = [PDMat{eltype(u0_prior_var),Matrix{eltype(u0_prior_var)}}(L,
+                                                                  Matrix{eltype(u0_prior_var)}(undef,
+                                                                                               L,
+                                                                                               L),
+                                                                  Cholesky{eltype(u0_prior_var),
+                                                                           Matrix{eltype(u0_prior_var)}}(Matrix{eltype(u0_prior_var)}(undef,
+                                                                                                                                      L,
+                                                                                                                                      L),
+                                                                                                         'U',
+                                                                                                         0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
-    # The following line could be cov(prob.observables_noise) if the measurement error distribution is not MvNormal
-    R = prob.observables_noise.Σ # Extract covariance from noise distribution
+    R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
     mul!(B_prod, B, B')
 
     # Gaussian Prior
-    u[1] .= mean(u0)
-    P[1] .= cov(u0)
+    u[1] .= u0_prior_mean
+    P[1] .= u0_prior_var
     z[1] .= C * u[1]
 
     loglik = 0.0
 
     # temp buffers.  Could be moved into algorithm settings
-    temp_N_N = Matrix{eltype(u0)}(undef, N, N)
-    temp_L_L = Matrix{eltype(u0)}(undef, L, L)
-    temp_L_N = Matrix{eltype(u0)}(undef, L, N)
+    temp_N_N = Matrix{eltype(u0_prior_var)}(undef, N, N)
+    temp_L_L = Matrix{eltype(u0_prior_var)}(undef, L, L)
+    temp_L_N = Matrix{eltype(u0_prior_var)}(undef, L, N)
 
     retcode = :Failure
     try
@@ -234,50 +251,52 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     # checks on bounds
     @assert size(prob.observables, 2) == T - 1
 
-    @unpack A, B, C = prob
-    u0 = prob.u0_prior # use the prior, not the concretized u0    
-    N = length(u0)
+    @unpack A, B, C, u0_prior_mean, u0_prior_var = prob
+    N = length(u0_prior_mean)
     L = size(C, 1)
 
     # TODO: move to internal algorithm cache
     # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
-    B_prod = Matrix{eltype(u0)}(undef, N, N)
-    u = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
-    P = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
+    B_prod = Matrix{eltype(u0_prior_var)}(undef, N, N)
+    u = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
+    P = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
     z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
 
     # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
     # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
-    u_mid = [Vector{eltype(u0)}(undef, N) for _ in 1:T] # intermediate in u calculation
-    P_mid = [Matrix{eltype(u0)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
+    u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
+    P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
     innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
-    K = [Matrix{eltype(u0)}(undef, N, L) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0),Matrix{eltype(u0)}}(L, Matrix{eltype(u0)}(undef, L, L),
-                                              Cholesky{eltype(u0),Matrix{eltype(u0)}}(Matrix{eltype(u0)}(undef,
-                                                                                                         L,
-                                                                                                         L),
-                                                                                      'U', 0))
+    K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
+    CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
+    V = [PDMat{eltype(u0_prior_var),Matrix{eltype(u0_prior_var)}}(L,
+                                                                  Matrix{eltype(u0_prior_var)}(undef,
+                                                                                               L,
+                                                                                               L),
+                                                                  Cholesky{eltype(u0_prior_var),
+                                                                           Matrix{eltype(u0_prior_var)}}(Matrix{eltype(u0_prior_var)}(undef,
+                                                                                                                                      L,
+                                                                                                                                      L),
+                                                                                                         'U',
+                                                                                                         0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
-    # Gaussian Prior
-    # The following line could be cov(prob.observables_noise) if the measurement error distribution is not MvNormal
-    R = prob.observables_noise.Σ # Extract covariance from noise distribution
+    R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
     mul!(B_prod, B, B')
 
-    u[1] .= mean(u0)
-    P[1] .= cov(u0)
+    u[1] .= u0_prior_mean
+    P[1] .= u0_prior_var
     z[1] .= C * u[1]
 
     loglik = 0.0
 
     # temp buffers.  Could be moved into algorithm settings
-    temp_N_N = Matrix{eltype(u0)}(undef, N, N)
-    temp_L_L = Matrix{eltype(u0)}(undef, L, L)
-    temp_L_N = Matrix{eltype(u0)}(undef, L, N)
-    temp_N_L = Matrix{eltype(u0)}(undef, N, L)
-    temp_M = Vector{eltype(u0)}(undef, L)
-    temp_N = Vector{eltype(u0)}(undef, N)
+    temp_N_N = Matrix{eltype(u0_prior_var)}(undef, N, N)
+    temp_L_L = Matrix{eltype(u0_prior_var)}(undef, L, L)
+    temp_L_N = Matrix{eltype(u0_prior_var)}(undef, L, N)
+    temp_N_L = Matrix{eltype(u0_prior_var)}(undef, N, L)
+    temp_M = Vector{eltype(u0_prior_var)}(undef, L)
+    temp_N = Vector{eltype(u0_prior_var)}(undef, N)
     retcode = :Failure
     try
         @inbounds for t in 2:T
@@ -414,10 +433,9 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
                 mul!(Δu, A', Δu_mid)
             end
         end
-        ΔΣ = Tangent{typeof(prob.u0_prior.Σ)}(; mat = ΔP, chol = NoTangent(), dim = NoTangent()) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
-                                      u0_prior = Tangent{typeof(prob.u0_prior)}(; μ = Δu, Σ = ΔΣ)),
+                                      u0_prior_mean = Δu, u0_prior_var = ΔP),
                 NoTangent(), map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb

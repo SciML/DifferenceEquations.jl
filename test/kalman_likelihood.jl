@@ -7,9 +7,10 @@ using FiniteDiff: finite_difference_gradient
 # inv_vech in dssm repo manually with slices instead of given code
 # in diffeq turn the cholesky pdef check off in fvgq in linear.jl
 
-function solve_kalman(A, B, C, u0, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
-                                      u0_prior = MvNormal(u0, diagm(ones(length(u0)))),
+function solve_kalman(A, B, C, u0_prior_mean, u0_prior_var, observables, D; kwargs...)
+    problem = LinearStateSpaceProblem(A, B, u0_prior_mean, (0, size(observables, 2)); C,
+                                      observables_noise = D,
+                                      u0_prior_mean, u0_prior_var,
                                       noise = nothing, observables, kwargs...)
     return solve(problem)
 end
@@ -30,23 +31,22 @@ function solve_kalman_cov(A, B, C, u0_mean, u0_variance_vech, observables, D; kw
     u0_variance = u0_variance_cholesky * u0_variance_cholesky'
     problem = LinearStateSpaceProblem(A, B, zeros(length(u0_mean)), (0, size(observables, 2)); C,
                                       observables_noise = D,
-                                      u0_prior = MvNormal(u0_mean, u0_variance),
+                                      u0_prior_mean = u0_mean, u0_prior_var = u0_variance,
                                       noise = nothing, observables, kwargs...)
     return solve(problem)
 end
 
-function solve_manual(observables, A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix,
-                      D::MvNormal, u0, tspan)
+get_matrix(R::AbstractVector) = Diagonal(R)
+get_matrix(R::AbstractMatrix) = R
+function solve_manual(observables, A, B, C, R_raw, u0_mean, u0_variance, tspan)
     # hardcoded right now for tspan = (0, T) for T+1 points
     T = tspan[2]
     @assert tspan[1] == 0
     @assert size(observables)[2] == T # i.e. we do not calculate the likelihood of the initial condition
 
     # Gaussian Prior
-    u0_mean = u0.μ
-    u0_variance = u0.Σ
-    R = D.Σ
     B_prod = B * B'
+    R = get_matrix(R_raw)
 
     # TODO: when saveall = false, etc. don't allocate everything, or at least don't save it
     u = Zygote.Buffer(Vector{Vector{Float64}}(undef, T + 1)) # prior mean
@@ -74,8 +74,7 @@ function solve_manual(observables, A::AbstractMatrix, B::AbstractMatrix, C::Abst
     return copy(z), copy(u), copy(P), loglik
 end
 
-function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix, u0_mean,
-                              u0_variance_vech, observables, R, tspan)
+function solve_manual_cov_lik(A, B, C, u0_mean, u0_variance_vech, observables, R_raw, tspan)
     # hardcoded right now for tspan = (0, T) for T+1 points
     T = tspan[2]
     @assert tspan[1] == 0
@@ -86,6 +85,7 @@ function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractM
     u0_variance_cholesky = unvech_5(u0_variance_vech)
     u0_variance = u0_variance_cholesky * u0_variance_cholesky'
     B_prod = B * B'
+    R = get_matrix(R_raw)
 
     u = u0_mean
     P = u0_variance
@@ -122,8 +122,9 @@ C_kalman = [0.0979797 0.114992 0.0964536 0.110065 0.0946794;
             0.110095 0.0856981 0.0841296 0.0981172 0.0811817;
             0.109134 0.103406 0.112622 0.0925896 0.112384;
             0.0848231 0.0821602 0.099332 0.113586 0.115105]
-D_kalman = MvNormal(Diagonal(abs2.(ones(4) * 0.1)))
-u0_kalman = zeros(5)
+D_kalman = abs2.(ones(4) * 0.1)
+u0_mean_kalman = zeros(5)
+u0_var_kalman = diagm(ones(length(u0_mean_kalman)))
 
 observables_kalman = readdlm(joinpath(pkgdir(DifferenceEquations),
                                       "test/data/Kalman_observables.csv"), ',')' |> collect
@@ -131,57 +132,65 @@ T = 200
 
 @testset "basic test, non-square matrices" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_kalman,
-                                   MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
-    sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_kalman)
-    @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman,
+                                   u0_mean_kalman, u0_var_kalman, [0, T])
+    sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
+                       observables_kalman, D_kalman)
+    @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
+                           observables_kalman,
                            D_kalman)
     @test sol.logpdf ≈ loglik
     @test sol.logpdf ≈ 329.7550738722514
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
-    gradient((args...) -> solve_kalman(args..., observables_kalman, D_kalman).logpdf, A_kalman,
+    gradient((args...) -> solve_kalman(args..., u0_var_kalman, observables_kalman, D_kalman).logpdf,
+             A_kalman,
              B_kalman,
-             C_kalman, u0_kalman)
+             C_kalman, u0_mean_kalman)
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> solve_kalman(args..., observables_kalman, D_kalman).logpdf, A_kalman,
+               (args...) -> solve_kalman(args..., u0_var_kalman, observables_kalman,
+                                         D_kalman).logpdf, A_kalman,
                B_kalman, C_kalman,
-               u0_kalman; rrule_f = rrule_via_ad, check_inferred = false)
+               u0_mean_kalman; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
-D_offdiag = MvNormal([0.01 0.0 0.0 0.0;
-                      0.0 0.02 0.005 0.01;
-                      0.0 0.005 0.03 0.0;
-                      0.0 0.01 0.0 0.04])
+D_offdiag = [0.01 0.0 0.0 0.0;
+             0.0 0.02 0.005 0.01;
+             0.0 0.005 0.03 0.0;
+             0.0 0.01 0.0 0.04]
 @testset "off-diagonal D" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_offdiag,
-                                   MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
-    sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman, D_offdiag)
-    @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_kalman, observables_kalman,
+                                   u0_mean_kalman, u0_var_kalman, [0, T])
+    sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
+                       observables_kalman, D_offdiag)
+    @inferred solve_kalman(A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
+                           observables_kalman,
                            D_offdiag)
     @test sol.logpdf ≈ loglik
     @test sol.logpdf ≈ 124.86949661078718
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
-    gradient((args...) -> solve_kalman(args..., observables_kalman, D_offdiag).logpdf, A_kalman,
+    gradient((args...) -> solve_kalman(args..., u0_var_kalman, observables_kalman, D_offdiag).logpdf,
+             A_kalman,
              B_kalman,
-             C_kalman, u0_kalman)
+             C_kalman, u0_mean_kalman)
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> solve_kalman(args..., observables_kalman, D_offdiag).logpdf, A_kalman,
+               (args...) -> solve_kalman(args..., u0_var_kalman, observables_kalman,
+                                         D_offdiag).logpdf, A_kalman,
                B_kalman, C_kalman,
-               u0_kalman; rrule_f = rrule_via_ad, check_inferred = false)
+               u0_mean_kalman; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
 @testset "direct rrule" begin
     z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman, D_kalman,
-                                   MvNormal(u0_kalman, diagm(ones(length(u0_kalman)))), [0, T])
-    problem = LinearStateSpaceProblem(A_kalman, B_kalman, u0_kalman,
+                                   u0_mean_kalman, u0_var_kalman, [0, T])
+    problem = LinearStateSpaceProblem(A_kalman, B_kalman, u0_mean_kalman,
                                       (0, size(observables_kalman, 2));
                                       C = C_kalman, observables_noise = D_kalman,
-                                      u0_prior = MvNormal(u0_kalman,
-                                                          diagm(ones(length(u0_kalman)))),
+                                      u0_prior_mean = u0_mean_kalman, u0_prior_var = u0_var_kalman,
                                       observables = observables_kalman)
+
     sol, pb = ChainRulesCore.rrule(DiffEqBase.solve, problem, KalmanFilter())
     @test sol.logpdf ≈ loglik
     @test sol.logpdf ≈ 329.7550738722514
@@ -233,35 +242,36 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855, 0.6
                                                                 D_offdiag).logpdf, u0_var_vech) rtol = 1.4e-5
 end
 
-R = [0.01 0.0 0.0 0.0;
-     0.0 0.02 0.005 0.01;
-     0.0 0.005 0.03 0.0;
-     0.0 0.01 0.0 0.04]
-@testset "covariance prior manual" begin
-    loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
-                                  observables_kalman,
-                                  R, [0, T])
-    sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
-                           D_offdiag)
-    @test sol.logpdf ≈ loglik
-    #@test sol.z[end] ≈ z
-    #@test sol.u[end] ≈ u
-    #@test sol.P[end] ≈ P
-    #test_rrule(Zygote.ZygoteRuleConfig(),
-    #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, R, [0, T]),
-    #           A_kalman,
-    #           B_kalman, C_kalman,
-    #           u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
-    grad_values = gradient((args...) -> solve_manual_cov_lik(args..., [0, T]), A_kalman,
-                           B_kalman,
-                           C_kalman,
-                           u0_mean,
-                           u0_var_vech, observables_kalman,
-                           R)
+# JAMES TODO:  NOT SURE WHAT IS GOING ON HERE.  DO WE NEED THIS ANYMORE????  ONLY TESTING THE MANUAL
+# R = [0.01 0.0 0.0 0.0;
+#      0.0 0.02 0.005 0.01;
+#      0.0 0.005 0.03 0.0;
+#      0.0 0.01 0.0 0.04]
+# @testset "covariance prior manual" begin
+#     loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
+#                                   observables_kalman,
+#                                   R, [0, T])
+#     sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
+#                            R)
+#     @test sol.logpdf ≈ loglik
+#     #@test sol.z[end] ≈ z
+#     #@test sol.u[end] ≈ u
+#     #@test sol.P[end] ≈ P
+#     #test_rrule(Zygote.ZygoteRuleConfig(),
+#     #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, R, [0, T]),
+#     #           A_kalman,
+#     #           B_kalman, C_kalman,
+#     #           u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
+#     grad_values = gradient((args...) -> solve_manual_cov_lik(args..., [0, T]), A_kalman,
+#                            B_kalman,
+#                            C_kalman,
+#                            u0_mean,
+#                            u0_var_vech, observables_kalman,
+#                            R)
 
-    @test grad_values[1] ≈
-          finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
-                                                               u0_var_vech,
-                                                               observables_kalman,
-                                                               R, [0, T]), A_kalman) rtol = 1e-7
-end
+#     @test grad_values[1] ≈
+#           finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
+#                                                                u0_var_vech,
+#                                                                observables_kalman,
+#                                                                R, [0, T]), A_kalman) rtol = 1e-7
+# end

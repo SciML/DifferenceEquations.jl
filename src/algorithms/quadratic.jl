@@ -1,12 +1,15 @@
 
-function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorType,tType,P,NP,F,A0Type,
+function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,
+                                                             tType,P,NP,F,A0Type,
                                                              A1Type,A2Type,BType,C0Type,C1Type,
                                                              C2Type,RType,ObsType,K},
                             alg::DirectIteration, args...;
-                            kwargs...) where {uType,uPriorType,tType,P,NP,F,A0Type,A1Type,A2Type,
+                            kwargs...) where {uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,
+                                              A0Type,A1Type,A2Type,
                                               BType,C0Type,C1Type,C2Type,RType,ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
+    observables_noise = make_observables_noise(prob.observables_noise)
     # checks on bounds
     @assert size(noise, 1) == size(prob.B, 2)
     @assert size(noise, 2) == T - 1
@@ -40,7 +43,7 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorType,tT
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += maybe_logpdf(prob.observables_noise, prob.observables, t - 1, z[t])
+        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z[t])
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]
@@ -54,6 +57,9 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
     @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
     # checks on bounds
+    observables_noise = make_observables_noise(prob.observables_noise)
+    @assert typeof(observables_noise) <: ZeroMeanDiagNormal  # can extend to more general in rrule
+
     @assert size(noise, 1) == size(prob.B, 2)
     @assert maybe_check_size(prob.observables, 2, T - 1)
     @assert size(noise, 2) == T - 1
@@ -86,7 +92,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(prob.observables_noise, view(prob.observables, :, t - 1) - z[t])
+        loglik += logpdf(observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
     t_values = prob.tspan[1]:prob.tspan[2]
     sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, retcode = :Success)
@@ -119,9 +125,12 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
         A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
         C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
 
+        # Assert checked above about being diagonal
+        observables_noise_cov = prob.observables_noise
+
         @views @inbounds for t in T:-1:2
             Δz = Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./
-                 diag(prob.observables_noise.Σ) # More generally, it should be Σ^-1 * (z_obs - z)
+                 observables_noise_cov # More generally, it should be Σ^-1 * (z_obs - z)
 
             # inplace adoint of quadratic form with accumulation
             quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
