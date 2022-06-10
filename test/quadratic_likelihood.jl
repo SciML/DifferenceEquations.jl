@@ -20,7 +20,7 @@ C_0_rbc = [7.824904812740593e-5, 0.0]
 C_1_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 C_2_rbc = cat([-0.00018554166974717046 0.0025652363153049716; 0.0 0.0],
               [0.002565236315304951 0.3132705036896446; 0.0 0.0]; dims = 3)
-D_2_rbc = MvNormal(Diagonal(abs2.([0.1, 0.1])))
+D_2_rbc = abs2.([0.1, 0.1])
 u0_2_rbc = zeros(2)
 
 observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),
@@ -76,7 +76,7 @@ C_1_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_1.c
 C_2_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_2.csv"), ',')
 C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ))
 # D_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "FVGQ_D.csv"); header = false)))
-D_2_FVGQ = MvNormal(Diagonal(abs2.(ones(6) * 1e-3)))
+D_2_FVGQ = abs2.(ones(6) * 1e-3)
 u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
 
 observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
@@ -90,10 +90,31 @@ noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_n
                              u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ) ≈
           -1.473244794713955e10
     @inferred joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ,
-                                 C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ)
-    gradient((args...) -> joint_likelihood_2(args..., observables_FVGQ, D_FVGQ), A_0_FVGQ, A_1_FVGQ,
+                                 C_2_FVGQ,
+                                 u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ)
+    gradient((args...) -> joint_likelihood_2(args..., observables_2_FVGQ, D_2_FVGQ), A_0_FVGQ,
+             A_1_FVGQ,
              A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ)
-    #test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> joint_likelihood_2(args..., observables, D),
-    #    A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise; rrule_f = rrule_via_ad,
-    #    check_inferred = false)
+
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (A_0_FVGQ, C_1_FVGQ, u0_2_FVGQ) -> joint_likelihood_2(A_0_FVGQ,
+                                                                     A_1_FVGQ,
+                                                                     A_2_FVGQ,
+                                                                     B_2_FVGQ,
+                                                                     C_0_FVGQ,
+                                                                     C_1_FVGQ,
+                                                                     C_2_FVGQ,
+                                                                     u0_2_FVGQ,
+                                                                     noise_2_FVGQ,
+                                                                     observables_2_FVGQ,
+                                                                     D_2_FVGQ),
+               A_0_FVGQ, C_1_FVGQ, u0_2_FVGQ;
+               rrule_f = rrule_via_ad, check_inferred = false)
+
+    # A little slow to run all of them all every time.  Important occasionally, though, since tests the gradient wrt the noise
+    # test_rrule(Zygote.ZygoteRuleConfig(),
+    #            (args...) -> joint_likelihood_2(args..., observables_FVGQ, D_FVGQ), A_0_FVGQ,
+    #            A_1_FVGQ,
+    #            A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ;
+    #            rrule_f = rrule_via_ad, check_inferred = false)
 end

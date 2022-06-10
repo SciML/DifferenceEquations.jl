@@ -17,5 +17,6 @@ DiffEqBase.solve(prob::AbstractStateSpaceProblem; kwargs...) = DiffEqBase.solve(
                                                                                 kwargs...)
 DiffEqBase.solve(prob::AbstractStateSpaceProblem, alg::Nothing, args...; kwargs...) = DiffEqBase.solve(prob,
                                                                                                        default_alg(prob),
-                                                                                                       args...;kwargshandle = DiffEqBase.KeywordArgSilent
+                                                                                                       args...;
+                                                                                                       kwargshandle = DiffEqBase.KeywordArgSilent,
                                                                                                        kwargs...)

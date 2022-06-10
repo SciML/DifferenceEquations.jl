@@ -13,7 +13,7 @@ C_0_rbc = [7.824904812740593e-5, 0.0]
 C_1_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 C_2_rbc = cat([-0.00018554166974717046 0.0025652363153049716; 0.0 0.0],
               [0.002565236315304951 0.3132705036896446; 0.0 0.0]; dims = 3)
-D_2_rbc = MvNormal(Diagonal(abs2.([0.1, 0.1])))
+D_2_rbc = abs2.([0.1, 0.1])
 u0_2_rbc = zeros(2)
 
 observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),
