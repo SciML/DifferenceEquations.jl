@@ -9,7 +9,7 @@ A_rbc = [0.9568351489231076 6.209371005755285;
          3.0153731819288737e-18 0.20000000000000007]
 B_rbc = reshape([0.0; -0.01], 2, 1) # make sure B is a matrix
 C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
-D_rbc = MvNormal(Diagonal(abs2.([0.1, 0.1])))
+D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
 observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),

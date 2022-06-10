@@ -2,9 +2,14 @@
 maybe_logpdf(observables_noise, observables::Nothing, t, z) = 0.0
 maybe_logpdf(observables_noise, observables, t, z) = logpdf(observables_noise,
                                                             view(observables, :, t) - z)
+# Utilities to get distribution for logpdf from observation error argument
 make_observables_noise(observables_noise::Nothing) = nothing
 make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
-make_observables_noise(observables_noise::AbstractVector) = MvNormal(observables_noise)
+make_observables_noise(observables_noise::AbstractVector) = MvNormal(Diagonal(observables_noise))
+
+# Utilities to get covariance matrix from observation error argument for kalman filter.  e.g. vector is diagonal, etc.
+make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
+make_observables_covariance_matrix(observables_noise::AbstractVector) = Diagonal(observables_noise)
 
 function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,tType,
                                                           P,NP,F,AType,BType,
@@ -167,7 +172,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
                                                                                                          0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
-    R = prob.observables_noise # assume a matrix for now.  Later can make more general
+    R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
     mul!(B_prod, B, B')
 
     # Gaussian Prior
@@ -248,7 +253,6 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
 
     @unpack A, B, C, u0_prior_mean, u0_prior_var = prob
     N = length(u0_prior_mean)
-    N = length(u0)
     L = size(C, 1)
 
     # TODO: move to internal algorithm cache
@@ -277,7 +281,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
                                                                                                          0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
-    R = prob.observables_noise # assume a matrix for now.  Later can make more general
+    R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
     mul!(B_prod, B, B')
 
     u[1] .= u0_prior_mean
@@ -429,7 +433,6 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
                 mul!(Δu, A', Δu_mid)
             end
         end
-        ΔΣ = Tangent{typeof(prob.u0_prior.Σ)}(; mat = ΔP, chol = NoTangent(), dim = NoTangent()) # TODO: This is not exactly correct since it doesn't do the "chol".  Add to prevent misuse.
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
                                       u0_prior_mean = Δu, u0_prior_var = ΔP),
