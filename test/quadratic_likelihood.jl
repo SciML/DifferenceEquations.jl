@@ -76,7 +76,7 @@ C_1_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_1.c
 C_2_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_2.csv"), ',')
 C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ))
 # D_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "FVGQ_D.csv"); header = false)))
-D_2_FVGQ = abs2.(ones(6) * 1e-3)
+D_2_FVGQ = ones(6) * 1e-3
 u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
 
 observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
@@ -88,7 +88,7 @@ noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_n
 @testset "quadratic FVGQ joint likelihood" begin
     @test joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
                              u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ) ≈
-          -1.473244794713955e10
+          -1.4728927648336522e7
     @inferred joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ,
                                  C_2_FVGQ,
                                  u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ)

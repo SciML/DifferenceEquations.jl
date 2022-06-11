@@ -104,7 +104,7 @@ end
 A_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A.csv"), ',')
 B_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_B.csv"), ',')
 C_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C.csv"), ',')
-D_FVGQ = abs2.(ones(6) * 1e-3)
+D_FVGQ = ones(6) * 1e-3
 
 observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
                                     "test/data/FVGQ20_observables.csv"), ',')' |> collect
@@ -115,7 +115,7 @@ u0_FVGQ = zeros(size(A_FVGQ, 1))
 
 @testset "linear FVGQ joint likelihood" begin
     @test joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ,
-                             D_FVGQ) ≈ -1.4648817357717388e9
+                             D_FVGQ) ≈ -1.4613614369686982e6
     @inferred joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ,
                                  D_FVGQ)
     test_rrule(Zygote.ZygoteRuleConfig(),
@@ -125,14 +125,20 @@ end
 
 @testset "linear FVGQ Kalman" begin
     # Note: set rtol to be higher than the default case because of huge gradient numbers
-    @test kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, D_FVGQ) ≈
-          -108.52706300389917
+    # D_FVGQ = 
+    # @test kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ, abs2.(ones(6) * 1e-3)) ≈
+    #       -108.52706300389917
+    @test kalman_likelihood(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, observables_FVGQ,
+                            D_FVGQ) ≈
+          2253.0905386483046
+
     gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ,
              C_FVGQ, u0_FVGQ)
 
-    # TODO: this is not turned on because the numbers explode.  Need better unit test data to be interior
-    # test_rrule(Zygote.ZygoteRuleConfig(), (args...) -> kalman_likelihood(args..., observables, D),
-    #            A, B, C, u0; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-5)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ),
+               A_FVGQ, B_FVGQ,
+               C_FVGQ, u0_FVGQ; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1e-8)
 end
 
 @testset "basic kalman failure" begin
