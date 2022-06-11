@@ -1,7 +1,7 @@
 name = "DifferenceEquations"
 uuid = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
 authors = ["various contributors"]
-version = "0.4.15"
+version = "0.4.16"
 
 [deps]
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
@@ -16,7 +16,7 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
-CPUSummary = "=0.1.8"
+CPUSummary = "0.1.22"
 ChainRulesCore = "1"
 CommonSolve = "0.2"
 DiffEqBase = "6.89"
