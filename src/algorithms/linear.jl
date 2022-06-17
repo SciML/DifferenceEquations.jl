@@ -1,7 +1,14 @@
+Base.@propagate_inbounds @inline maybe_logpdf(observables_noise, observables, t::Integer, z, s::Integer) = logpdf(observables_noise,
+                                                                                                                  view(observables,
+                                                                                                                       :,
+                                                                                                                       t) -
+                                                                                                                  z[s])
 
-maybe_logpdf(observables_noise, observables::Nothing, t, z) = 0.0
-maybe_logpdf(observables_noise, observables, t, z) = logpdf(observables_noise,
-                                                            view(observables, :, t) - z)
+maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z, s::Integer) = 0.0
+maybe_logpdf(observables_noise, observables, t::Integer, z::Nothing, s::Integer) = 0.0
+maybe_logpdf(observables_noise::Nothing, observables, t::Integer, z, s::Integer) = 0.0
+maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z, s::Integer) = 0.0
+
 # Utilities to get distribution for logpdf from observation error argument
 make_observables_noise(observables_noise::Nothing) = nothing
 make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
@@ -11,7 +18,7 @@ make_observables_noise(observables_noise::AbstractVector) = MvNormal(Diagonal(ob
 make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
 make_observables_covariance_matrix(observables_noise::AbstractVector) = Diagonal(observables_noise)
 
-#Add in observation noise to the output if simulated
+#Add in observation noise to the output if simulated (i.e, observables not given) and there is observation_noise provided
 function maybe_add_observation_noise!(z, observables_noise::Distribution, observables::Nothing)
     # add noise to the vector of vectors componentwise
     for z_val in z
@@ -53,7 +60,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,u
         mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
-        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z[t])
+        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
     end
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
