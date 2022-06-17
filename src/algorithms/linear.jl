@@ -1,13 +1,34 @@
+# Temporary.  Eventually, move to sciml NoiseProcess with better rng support/etc.
+get_concrete_noise(prob, noise, B, T) = noise # maybe do a promotion to an AbstractVectorOfVector type
+get_concrete_noise(prob, noise, B::Nothing, T) = nothing # if no noise matrix given, do not create noise
+get_concrete_noise(prob, noise::Nothing, B::Nothing, T) = nothing # if no noise matrix given, do not create noise
+get_concrete_noise(prob, noise::Nothing, B, T) = randn(eltype(B), size(B, 2), T) # default is unit Gaussian
+get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size(B, 2), T) # iid
+
+# Utility functions to conditionally check size if not-nothing
+maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
+maybe_check_size(m::Nothing, index, val) = true
+
+maybe_check_size(m1::AbstractArray, index1, m2::AbstractArray, index2) = (size(m1, index1) ==
+                                                                          size(m2, index2))
+maybe_check_size(m1::Nothing, index1, m2, index2) = true
+maybe_check_size(m1, index1, m2::Nothing, index2) = true
+maybe_check_size(m1::Nothing, index1, m2::Nothing, index2) = true
+
 Base.@propagate_inbounds @inline maybe_logpdf(observables_noise, observables, t::Integer, z, s::Integer) = logpdf(observables_noise,
                                                                                                                   view(observables,
                                                                                                                        :,
                                                                                                                        t) -
                                                                                                                   z[s])
-
+# Don't accumulate likelihoods if no observations or observatino noise
 maybe_logpdf(observables_noise, observables::Nothing, t::Integer, z, s::Integer) = 0.0
 maybe_logpdf(observables_noise, observables, t::Integer, z::Nothing, s::Integer) = 0.0
 maybe_logpdf(observables_noise::Nothing, observables, t::Integer, z, s::Integer) = 0.0
 maybe_logpdf(observables_noise::Nothing, observables::Nothing, t::Integer, z, s::Integer) = 0.0
+
+# If no noise process is given, don't add in noise in simulation
+Base.@propagate_inbounds @inline maybe_muladd!(x, B, noise, t) = mul!(x, B, view(noise, :, t), 1, 1)
+Base.@propagate_inbounds @inline maybe_muladd!(x, B::Nothing, noise, t) = nothing
 
 # Utilities to get distribution for logpdf from observation error argument
 make_observables_noise(observables_noise::Nothing) = nothing
@@ -42,8 +63,8 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,u
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
     observables_noise = make_observables_noise(prob.observables_noise)
 
-    @assert size(noise, 1) == size(prob.B, 2)
-    @assert size(noise, 2) == T - 1
+    @assert maybe_check_size(noise, 1, prob.B, 2)
+    @assert maybe_check_size(noise, 2, T - 1)
     @assert maybe_check_size(prob.observables, 2, T - 1)
 
     u = [zero(prob.u0) for _ in 1:T]
@@ -57,7 +78,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,u
     loglik = 0.0
     @inbounds for t in 2:T
         mul!(u[t], A, u[t - 1])
-        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
+        maybe_muladd!(u[t], B, noise, t - 1) # was:  mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
         mul!(z[t], C, u[t])
         loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)

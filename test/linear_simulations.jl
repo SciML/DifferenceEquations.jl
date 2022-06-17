@@ -101,3 +101,24 @@ end
     @test maximum(maximum.(sol_tiny_obs_noise.z - sol_no_noise.z)) < 1e-7  # still some noise 
     @test maximum(maximum.(sol_tiny_obs_noise.z - sol_no_noise.z)) > 0.0  # but not zero
 end
+
+@testset "basic inference, no noise, no observations and no with observation noise" begin
+    T = 5
+    B_no_noise = zeros(2, 2)
+    u0 = [1.0, 0.5]
+    sol_no_noise = solve(LinearStateSpaceProblem(A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
+                                                 syms = [:a, :b]))
+
+    #Now literally pass in no noise in B with a nothing
+    prob = LinearStateSpaceProblem(A_rbc, nothing, u0, (0, T); C = C_rbc,
+                                   syms = [:a, :b])
+    @inferred LinearStateSpaceProblem(A_rbc, nothing, u0, (0, T); C = C_rbc,
+                                      syms = [:a, :b])
+
+    sol_nothing_noise = solve(prob)
+    @inferred solve(prob)
+
+    @test sol_no_noise.z ≈ sol_nothing_noise.z
+    @test sol_no_noise.u ≈ sol_nothing_noise.u
+    @test sol_nothing_noise.W === nothing
+end
