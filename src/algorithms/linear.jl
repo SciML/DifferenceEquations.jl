@@ -11,6 +11,16 @@ make_observables_noise(observables_noise::AbstractVector) = MvNormal(Diagonal(ob
 make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
 make_observables_covariance_matrix(observables_noise::AbstractVector) = Diagonal(observables_noise)
 
+#Add in observation noise to the output if simulated
+function maybe_add_observation_noise!(z, observables_noise::Distribution, observables::Nothing)
+    # add noise to the vector of vectors componentwise
+    for z_val in z
+        z_val .+= rand(observables_noise)
+    end
+    return nothing
+end
+maybe_add_observation_noise!(z, observables_noise, observables) = nothing  #otherwise do nothing
+
 function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,tType,
                                                           P,NP,F,AType,BType,
                                                           CType,RType,ObsType,K},
@@ -45,6 +55,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,u
         mul!(z[t], C, u[t])
         loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z[t])
     end
+    maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(prob, alg, t_values, u; W = noise,
                           logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
@@ -86,6 +97,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
         mul!(z[t], C, u[t])
         loglik += logpdf(observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
+    maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
     sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z, retcode = :Success)
 

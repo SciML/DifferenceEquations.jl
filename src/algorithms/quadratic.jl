@@ -46,9 +46,10 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorMeanTyp
         loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z[t])
     end
 
+    maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(prob, alg, t_values, u; W = noise,
-                          logpdf = ObsType <: Nothing ? nothing : loglik, retcode = :Success)
+                          logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
 end
 
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSpaceProblem,
@@ -95,7 +96,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
         loglik += logpdf(observables_noise, view(prob.observables, :, t - 1) - z[t])
     end
     t_values = prob.tspan[1]:prob.tspan[2]
-    sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, retcode = :Success)
+    maybe_add_observation_noise!(z, observables_noise, prob.observables)
+    sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z, retcode = :Success)
 
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
