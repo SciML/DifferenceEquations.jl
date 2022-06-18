@@ -72,10 +72,63 @@ function no_observables_sum(A, B, C, u0, noise; kwargs...)
     sol = solve(problem, DirectIteration())
     return sol.W[1, 2] + sol.W[1, 4] + sol.z[2][2]
 end
-@test no_observables_sum(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) ≈
-      -0.08892781958364693
-gradient((args...) -> no_observables_sum(args...), A_rbc, B_rbc, C_rbc,
-         u0_rbc, noise_rbc)
-test_rrule(Zygote.ZygoteRuleConfig(),
-           (args...) -> no_observables_sum(args...), A_rbc, B_rbc,
-           C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+@testset "no observables gradient" begin
+    @test no_observables_sum(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) ≈
+          -0.08892781958364693
+    gradient((args...) -> no_observables_sum(args...), A_rbc, B_rbc, C_rbc,
+             u0_rbc, noise_rbc)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> no_observables_sum(args...), A_rbc, B_rbc,
+               C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+end
+function no_noise(A, C, u0; kwargs...)
+    problem = LinearStateSpaceProblem(A, nothing, u0, (0, 5); C, kwargs...)
+    sol = solve(problem, DirectIteration())
+    # u = sol.u # bugs with u
+    return sol.z[2][2]# + u[2][2]
+end
+@testset "no noise" begin
+    u_nonzero = [1.1, 0.2]
+    @test no_noise(A_rbc, C_rbc, u_nonzero) ≈ 2.2943928649664755
+    gradient((args...) -> no_noise(args...), A_rbc, C_rbc,
+             u_nonzero)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> no_noise(args...), A_rbc, C_rbc, u_nonzero; rrule_f = rrule_via_ad,
+               check_inferred = false)
+end
+
+function no_observation_equation(A, u0; kwargs...)
+    problem = LinearStateSpaceProblem(A, nothing, u0, (0, 5); kwargs...)
+    sol = solve(problem, DirectIteration())
+    u = sol.u # bugs with u
+    return u[2][2] + u[4][1]
+end
+@testset "no observation equation" begin
+    u_nonzero = [1.1, 0.2]
+    @test no_observation_equation(A_rbc, u_nonzero) ≈ 2.4279222804056597
+    gradient((args...) -> no_observation_equation(args...), A_rbc,
+             u_nonzero)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> no_observation_equation(args...), A_rbc, u_nonzero;
+               rrule_f = rrule_via_ad,
+               check_inferred = false)
+end
+
+function no_observation_equation_noise(A, B, u0; kwargs...)
+    problem = LinearStateSpaceProblem(A, B, u0, (0, 5); kwargs...)
+    sol = solve(problem, DirectIteration())
+    u = sol.u # bugs with u
+    return u[2][2] + u[4][1]
+end
+@testset "no observation equation" begin
+    Random.seed!(1234) # inside function or else test_rrule gets different draws
+    u_nonzero = [1.1, 0.2]
+    @test no_observation_equation_noise(A_rbc, B_rbc, u_nonzero) ≈ 2.3898508744331406
+    gradient((args...) -> no_observation_equation_noise(args...), A_rbc, B_rbc,
+             u_nonzero)
+    # TODO: would need to have seeds set properly for this to work.  Otherwise Finite Diff gets new draws
+    # test_rrule(Zygote.ZygoteRuleConfig(),
+    #            (args...) -> no_observation_equation_noise(args...), A_rbc, B_rbc, u_nonzero;
+    #            rrule_f = rrule_via_ad,
+    #            check_inferred = false)
+end

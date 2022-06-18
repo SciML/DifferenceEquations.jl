@@ -97,7 +97,7 @@ maybe_add_Δ_logpdf!(Δz, Δlogpdf::Nothing, observables, z, t, observables_nois
 maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t, observables_noise_cov) = nothing
 maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t, observables_noise_cov) = nothing
 maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables::Nothing, z, t, observables_noise_cov) = nothing
-
+maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables::Nothing, z::Nothing, t, observables_noise_cov) = nothing
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
@@ -166,7 +166,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
                                                 ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
-    @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
+    # @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
 
     # checks on bounds
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
