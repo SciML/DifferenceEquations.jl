@@ -43,7 +43,7 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType,uPriorMeanTyp
         z[t] .= C_0
         mul!(z[t], C_1, u[t], 1, 1)
         quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z[t])
+        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
     end
 
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
