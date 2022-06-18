@@ -122,3 +122,23 @@ end
     @test sol_no_noise.u ≈ sol_nothing_noise.u
     @test sol_nothing_noise.W === nothing
 end
+
+@testset "no observation process" begin
+    Random.seed!(1234)
+    T = 5
+    u0 = [1.0, 0.5]
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0, (0, T); C = nothing,
+                                   syms = [:a, :b])
+    @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0, (0, T); C = nothing,
+                                      syms = [:a, :b])
+    sol = solve(prob)
+    @inferred solve(prob)
+
+    @test sol.z === nothing
+    @test sol.u ≈ [[1.0, 0.5], [4.06152065180075, 0.10359728906823484],
+                   [4.5294797207351944, 0.009847372889361128], [4.395111394835915, 0.006165370747260727],
+                   [4.243680140369242, -0.005956025225207233], [4.023519148749289, -0.005393676822979223]]
+    @test sol.W ≈
+          [-0.3597289068234817 1.0872084924285859 -0.4195896169388487 0.7189099374659392 0.4202471777937789]
+    @test sol.logpdf === nothing
+end
