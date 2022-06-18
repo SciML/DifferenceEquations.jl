@@ -51,6 +51,12 @@ function maybe_add_observation_noise!(z, observables_noise::Distribution, observ
 end
 maybe_add_observation_noise!(z, observables_noise, observables) = nothing  #otherwise do nothing
 
+#Maybe add observation noise, if observables and their adjoints given
+function maybe_add_Δ!(Δz, Δsol_z::AbstractVector, t)
+    return Δz .+= Δsol_z[t]
+end
+maybe_add_Δ!(Δz, Δsol_z, t) = nothing
+
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
@@ -135,16 +141,9 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z, retcode = :Success)
 
     function solve_pb(Δsol)
-        # Currently only changes in the logpdf are supported in the rrule
-        @assert Δsol.u == ZeroTangent()
         @assert Δsol.W == ZeroTangent()
-        @assert Δsol.z == ZeroTangent()
 
         Δlogpdf = Δsol.logpdf
-        if iszero(Δlogpdf)
-            return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
-                    map(_ -> NoTangent(), args)...)
-        end
         ΔA = zero(A)
         ΔB = zero(B)
         ΔC = zero(C)
@@ -153,7 +152,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
         Δu_temp = zero(u[1])
         Δz = zero(z[1])
 
-        # Assert checked above about being diagonal
+        # Assert checked above about being diagonal and Normal
         observables_noise_cov = prob.observables_noise
 
         @views @inbounds for t in T:-1:2
@@ -162,9 +161,11 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
             # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
             # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
             # rmul!(Δlogpdf, Δz)
+            maybe_add_Δ!(Δz, Δsol.z, t)  # only accumulate if not NoTangent and if observables provided
 
             copy!(Δu_temp, Δu)
             mul!(Δu_temp, C', Δz, 1, 1)
+            maybe_add_Δ!(Δu_temp, Δsol.u, t)  # only accumulate if not NoTangent and if observables provided
             mul!(Δu, A', Δu_temp)
             mul!(view(Δnoise, :, t - 1), B', Δu_temp)
             # Now, deal with the coefficients
