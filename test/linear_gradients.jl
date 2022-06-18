@@ -65,3 +65,17 @@ end
                (args...) -> W_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
+
+# Versions without observations
+function no_observables_sum(A, B, C, u0, noise; kwargs...)
+    problem = LinearStateSpaceProblem(A, B, u0, (0, size(noise_rbc, 2)); C, noise, kwargs...)
+    sol = solve(problem, DirectIteration())
+    return sol.W[1, 2] + sol.W[1, 4] + sol.z[2][2]
+end
+@test no_observables_sum(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc) ≈
+      -0.08892781958364693
+gradient((args...) -> no_observables_sum(args...), A_rbc, B_rbc, C_rbc,
+         u0_rbc, noise_rbc)
+test_rrule(Zygote.ZygoteRuleConfig(),
+           (args...) -> no_observables_sum(args...), A_rbc, B_rbc,
+           C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
