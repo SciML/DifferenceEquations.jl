@@ -10,6 +10,7 @@ using RecursiveArrayTools
 using SciMLBase: @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution
 using DiffEqBase
 using DiffEqBase: __solve
+using SciMLBase: build_solution
 
 include("matrix_vector_of_vectors.jl")
 include("utilities.jl")

@@ -17,11 +17,13 @@ struct StateSpaceSolution{T,N,uType,uType2,DType,tType,randType,P,A,IType,DE,Pos
     z::zType
 end
 
-function build_solution(prob::AbstractStateSpaceProblem, alg, t, u; P = nothing, logpdf = nothing,
-                        W = nothing, timeseries_errors = length(u) > 2, dense = false,
-                        dense_errors = dense, calculate_error = true,
-                        interp = SciMLBase.ConstantInterpolation(t, u), retcode = :Default,
-                        destats = nothing, z = nothing, kwargs...)
+function SciMLBase.build_solution(prob::AbstractStateSpaceProblem, alg, t, u; P = nothing,
+                                  logpdf = nothing,
+                                  W = nothing, timeseries_errors = length(u) > 2, dense = false,
+                                  dense_errors = dense, calculate_error = true,
+                                  interp = SciMLBase.ConstantInterpolation(t, u),
+                                  retcode = :Default,
+                                  destats = nothing, z = nothing, kwargs...)
     T = eltype(eltype(u))
     N = length((size(prob.u0)..., length(u)))
 

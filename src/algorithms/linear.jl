@@ -53,10 +53,16 @@ maybe_add_observation_noise!(z, observables_noise, observables) = nothing  #othe
 
 #Maybe add observation noise, if observables and their adjoints given
 function maybe_add_Δ!(Δz, Δsol_z::AbstractVector, t)
-    return Δz .+= Δsol_z[t]
+    Δz .+= Δsol_z[t]
+    return nothing
 end
 maybe_add_Δ!(Δz, Δsol_z, t) = nothing
 
+function maybe_add_Δ_slice!(Δz, Δsol_A::AbstractMatrix, t)
+    Δz .+= view(Δsol_A, :, t)
+    return nothing
+end
+maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
@@ -96,7 +102,8 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,u
     end
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(prob, alg, t_values, u; W = noise,
+
+    return build_solution(prob, alg, t_values, u; W = prob.noise,
                           logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
 end
 
@@ -106,18 +113,27 @@ end
 
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
 #                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
-                              alg::DirectIteration, args...; kwargs...)
+function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
+                              prob::LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,
+                                                            tType,
+                                                            P,NP,F,AType,BType,
+                                                            CType,RType,ObsType,K},
+                              alg::DirectIteration, args...;
+                              kwargs...) where {uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,
+                                                AType,
+                                                BType,CType,RType,
+                                                ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
-    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
-    observables_noise = make_observables_noise(prob.observables_noise)
-    @assert typeof(observables_noise) <: ZeroMeanDiagNormal  # can extend to more general in rrule
+    @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
 
     # checks on bounds
-    @assert size(noise, 1) == size(prob.B, 2)
+    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
+    observables_noise = make_observables_noise(prob.observables_noise)
+    @assert typeof(observables_noise) <: Union{ZeroMeanDiagNormal,Nothing}  # can extend to more general in rrule later
+
+    @assert maybe_check_size(noise, 1, prob.B, 2)
+    @assert maybe_check_size(noise, 2, T - 1)
     @assert maybe_check_size(prob.observables, 2, T - 1)
-    @assert size(noise, 2) == T - 1
 
     @unpack A, B, C = prob
     u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
@@ -125,29 +141,30 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
 
     # Initialize
+    u = [zero(prob.u0) for _ in 1:T]
     u[1] .= prob.u0
-    z[1] .= z1
+
+    z = allocate_z(prob, C, prob.u0, T)
+    maybe_mul!(z, 1, C, u, 1)  # update the first of z if it isn't nothing
 
     loglik = 0.0
     @inbounds for t in 2:T
         mul!(u[t], A, u[t - 1])
-        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
+        maybe_muladd!(u[t], B, noise, t - 1) # was:  mul!(u[t], B, view(noise, :, t - 1), 1, 1)
 
-        mul!(z[t], C, u[t])
-        loglik += logpdf(observables_noise, view(prob.observables, :, t - 1) - z[t])
+        maybe_mul!(z, t, C, u, t)  # does mul!(z[t], C, u[t]) if C is not nothing
+        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
     end
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
-    sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z, retcode = :Success)
-
+    sol = build_solution(prob, alg, t_values, u; W = noise,
+                         logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
     function solve_pb(Δsol)
-        @assert Δsol.W == ZeroTangent()
-
-        Δlogpdf = Δsol.logpdf
+        Δlogpdf = Δsol.logpdf # a ZeroGradient if not provided, which is a noop in most cases
         ΔA = zero(A)
         ΔB = zero(B)
         ΔC = zero(C)
-        Δnoise = similar(noise)
+        Δnoise = zeros(size(noise, 1), size(noise, 2))
         Δu = zero(u[1])
         Δu_temp = zero(u[1])
         Δz = zero(z[1])
@@ -168,7 +185,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
             maybe_add_Δ!(Δu_temp, Δsol.u, t)  # only accumulate if not NoTangent and if observables provided
             mul!(Δu, A', Δu_temp)
             mul!(view(Δnoise, :, t - 1), B', Δu_temp)
-            # Now, deal with the coefficients
+            maybe_add_Δ_slice!(view(Δnoise, :, t - 1), Δsol.W, t - 1)
             mul!(ΔA, Δu_temp, u[t - 1]', 1, 1)
             mul!(ΔB, Δu_temp, view(noise, :, t - 1)', 1, 1)
             mul!(ΔC, Δz, u[t]', 1, 1)
