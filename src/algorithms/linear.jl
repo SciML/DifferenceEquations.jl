@@ -27,10 +27,28 @@ maybe_logpdf(observables_noise, observable, t, z, s) = 0.0
 
 # If no noise process is given, don't add in noise in simulation
 Base.@propagate_inbounds @inline maybe_muladd!(x, B, noise, t) = mul!(x, B, view(noise, :, t), 1, 1)
-Base.@propagate_inbounds @inline maybe_muladd!(x, B::Nothing, noise, t) = nothing
+maybe_muladd!(x, B::Nothing, noise, t) = nothing
 
-maybe_mul!(x, t, A, y, s) = mul!(x[t], A, y[s])
+Base.@propagate_inbounds @inline maybe_muladd!(x, A, B) = mul!(x, A, B, 1, 1)
+maybe_muladd!(x, A::Nothing, B) = nothing
+
+# need transpose versions for gradients
+Base.@propagate_inbounds @inline maybe_muladd_transpose!(x, C, Δz) = mul!(x, C', Δz, 1, 1)
+maybe_muladd_transpose!(x, C::Nothing, Δz) = nothing
+Base.@propagate_inbounds @inline function maybe_muladd_transpose!(ΔB::AbstractMatrix, Δu_temp,
+                                                                  noise::AbstractMatrix, t)
+    mul!(ΔB, Δu_temp, view(noise, :, t)', 1, 1)
+    return nothing
+end
+maybe_muladd_transpose!(ΔB, Δu_temp, noise, t) = nothing
+Base.@propagate_inbounds @inline maybe_mul!(x, t, A, y, s) = mul!(x[t], A, y[s])
 maybe_mul!(x::Nothing, t, A, y, s) = nothing
+# Need transpose versions for rrule
+Base.@propagate_inbounds @inline maybe_mul_transpose!(x, t, A, y, s) = mul!(x[t], A', y[s])
+maybe_mul_transpose!(x::Nothing, t, A, y, s) = nothing
+Base.@propagate_inbounds @inline maybe_mul_transpose!(Δnoise, t, B, y) = mul!(view(Δnoise, :, t),
+                                                                              B', y)
+maybe_mul_transpose!(Δnoise::Nothing, t, B, y) = nothing
 
 # Utilities to get distribution for logpdf from observation error argument
 make_observables_noise(observables_noise::Nothing) = nothing
@@ -58,12 +76,17 @@ Base.@propagate_inbounds @inline function maybe_add_Δ!(Δz, Δsol_z::AbstractVe
 end
 maybe_add_Δ!(Δz, Δsol_z, t) = nothing
 
-Base.@propagate_inbounds @inline function maybe_add_Δ_slice!(Δz, Δsol_A::AbstractMatrix, t)
-    Δz .+= view(Δsol_A, :, t)
+Base.@propagate_inbounds @inline function maybe_add_Δ_slice!(Δnoise::AbstractMatrix,
+                                                             ΔW::AbstractMatrix, t)
+    Δnoise[:, t] .+= view(ΔW, :, t)
     return nothing
 end
 maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
 
+# Don't add logpdf if nothing
+# TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
+# ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
+# rmul!(Δlogpdf, Δz)
 Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z, t,
                                                               observables_noise_cov)
     Δz .= Δlogpdf * (view(observables, :, t - 1) - z[t]) ./
@@ -75,6 +98,12 @@ maybe_add_Δ_logpdf!(Δz, Δlogpdf::Nothing, observables, z, t, observables_nois
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
+
+# Maybe zero
+maybe_zero(A::AbstractArray) = zero(A)
+maybe_zero(A::Nothing) = nothing
+maybe_zero(A::AbstractArray, i::Int64) = zero(A[i])
+maybe_zero(A::Nothing, i) = nothing
 
 function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,tType,
                                                           P,NP,F,AType,BType,
@@ -133,6 +162,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
                                                 BType,CType,RType,
                                                 ObsType,K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+    @unpack A, B, C = prob
     @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
 
     # checks on bounds
@@ -143,11 +173,6 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     @assert maybe_check_size(noise, 1, prob.B, 2)
     @assert maybe_check_size(noise, 2, T - 1)
     @assert maybe_check_size(prob.observables, 2, T - 1)
-
-    @unpack A, B, C = prob
-    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
-    z1 = C * prob.u0
-    z = [zero(z1) for _ in 1:T] # TODO: move to internal algorithm cache
 
     # Initialize
     u = [zero(prob.u0) for _ in 1:T]
@@ -166,39 +191,34 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     end
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
+
     sol = build_solution(prob, alg, t_values, u; W = noise,
                          logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
     function solve_pb(Δsol)
         ΔA = zero(A)
-        ΔB = zero(B)
-        ΔC = zero(C)
-        Δnoise = zeros(size(noise, 1), size(noise, 2))
+        ΔB = maybe_zero(B)
+        ΔC = maybe_zero(C)
+        Δnoise = maybe_zero(noise)
         Δu = zero(u[1])
         Δu_temp = zero(u[1])
-        Δz = zero(z[1])
+        Δz = maybe_zero(z, 1)
 
         # Assert checked above about being diagonal and Normal
         observables_noise_cov = prob.observables_noise
 
         @views @inbounds for t in T:-1:2
-            # Δz .= Δsol.logpdf * (view(prob.observables, :, t - 1) - z[t]) ./
-            #       observables_noise_cov # This is using the vector directly.   More generally, it should be Σ^-1 * (z_obs - z)
-
             maybe_add_Δ_logpdf!(Δz, Δsol.logpdf, prob.observables, z, t, observables_noise_cov)
-            # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
-            # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
-            # rmul!(Δlogpdf, Δz)
             maybe_add_Δ!(Δz, Δsol.z, t)  # only accumulate if not NoTangent and if observables provided
 
             copy!(Δu_temp, Δu)
-            mul!(Δu_temp, C', Δz, 1, 1)
+            maybe_muladd_transpose!(Δu_temp, C, Δz) # mul!(Δu_temp, C', Δz, 1, 1)
             maybe_add_Δ!(Δu_temp, Δsol.u, t)  # only accumulate if not NoTangent and if observables provided
             mul!(Δu, A', Δu_temp)
-            mul!(view(Δnoise, :, t - 1), B', Δu_temp)
-            maybe_add_Δ_slice!(view(Δnoise, :, t - 1), Δsol.W, t - 1)
+            maybe_mul_transpose!(Δnoise, t - 1, B, Δu_temp)
+            maybe_add_Δ_slice!(Δnoise, Δsol.W, t - 1)
             mul!(ΔA, Δu_temp, u[t - 1]', 1, 1)
-            mul!(ΔB, Δu_temp, view(noise, :, t - 1)', 1, 1)
-            mul!(ΔC, Δz, u[t]', 1, 1)
+            maybe_muladd_transpose!(ΔB, Δu_temp, noise, t - 1)
+            maybe_muladd!(ΔC, Δz, u[t]')
         end
         return (NoTangent(),
                 Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
