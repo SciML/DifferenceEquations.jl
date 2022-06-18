@@ -52,17 +52,26 @@ end
 maybe_add_observation_noise!(z, observables_noise, observables) = nothing  #otherwise do nothing
 
 #Maybe add observation noise, if observables and their adjoints given
-function maybe_add_Δ!(Δz, Δsol_z::AbstractVector, t)
+Base.@propagate_inbounds @inline function maybe_add_Δ!(Δz, Δsol_z::AbstractVector, t)
     Δz .+= Δsol_z[t]
     return nothing
 end
 maybe_add_Δ!(Δz, Δsol_z, t) = nothing
 
-function maybe_add_Δ_slice!(Δz, Δsol_A::AbstractMatrix, t)
+Base.@propagate_inbounds @inline function maybe_add_Δ_slice!(Δz, Δsol_A::AbstractMatrix, t)
     Δz .+= view(Δsol_A, :, t)
     return nothing
 end
 maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
+
+Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z, t,
+                                                              observables_noise_cov)
+    Δz .= Δlogpdf * (view(observables, :, t - 1) - z[t]) ./
+          observables_noise_cov
+    return nothing
+end
+maybe_add_Δ_logpdf!(Δz, Δlogpdf::Nothing, observables, z, t, observables_noise_cov) = nothing
+
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
@@ -103,7 +112,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,u
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
 
-    return build_solution(prob, alg, t_values, u; W = prob.noise,
+    return build_solution(prob, alg, t_values, u; W = noise,
                           logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
 end
 
@@ -160,7 +169,6 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     sol = build_solution(prob, alg, t_values, u; W = noise,
                          logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
     function solve_pb(Δsol)
-        Δlogpdf = Δsol.logpdf # a ZeroGradient if not provided, which is a noop in most cases
         ΔA = zero(A)
         ΔB = zero(B)
         ΔC = zero(C)
@@ -173,8 +181,10 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
         observables_noise_cov = prob.observables_noise
 
         @views @inbounds for t in T:-1:2
-            Δz .= Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./
-                  observables_noise_cov # This is using the vector directly.   More generally, it should be Σ^-1 * (z_obs - z)
+            # Δz .= Δsol.logpdf * (view(prob.observables, :, t - 1) - z[t]) ./
+            #       observables_noise_cov # This is using the vector directly.   More generally, it should be Σ^-1 * (z_obs - z)
+
+            maybe_add_Δ_logpdf!(Δz, Δsol.logpdf, prob.observables, z, t, observables_noise_cov)
             # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
             # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
             # rmul!(Δlogpdf, Δz)

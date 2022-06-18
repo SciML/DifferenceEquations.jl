@@ -19,41 +19,49 @@ T = 5
 observables_rbc = observables_rbc[:, 1:T]
 noise_rbc = noise_rbc[:, 1:T]
 
-function observables_sum(A, B, C, u0, noise, observables, D; kwargs...)
+function z_sum(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
                                       noise, observables, kwargs...)
     sol = solve(problem, DirectIteration())
     return sol.z[5][1] + sol.z[3][2]
 end
-
-@test observables_sum(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
-      -0.09008162336682057
-gradient((args...) -> observables_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
-         u0_rbc, noise_rbc)
-test_rrule(Zygote.ZygoteRuleConfig(),
-           (args...) -> observables_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
-           C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
-
+@testset "mean_z test" begin
+    @test z_sum(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
+          -0.09008162336682057
+    gradient((args...) -> z_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+             u0_rbc, noise_rbc)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> z_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+               C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+end
 function u_sum(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
                                       noise, observables, kwargs...)
     sol = solve(problem, DirectIteration())
-    return sol[3][1] + sol[3][2] # + sol.u[2][2] + sol[2,1]
+    u = sol.u  # Zygote bug, must use separate name, also passes Nothing for Δsol so requires workarounds
+    return u[3][1] + u[3][2]
+    # BROKEN?  ZYGOTE BUG?  Seems to give the wrong Δsol type when calling the pullback
+    #    return sol.u[3][1] + sol.u[3][2]  #+  sol[3][1] + sol[3][2] + sol[2,1]
 end
-@test u_sum(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈ -0.08780558376240931
-# BROKEN?  ZYGOTE BUG?  Seems to give the wrong Δsol type when calling the pullback
-# gradient((args...) -> u_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
-#          u0_rbc, noise_rbc)
-
+@testset "u test" begin
+    @test u_sum(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
+          -0.08780558376240931
+    gradient((args...) -> u_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+             u0_rbc, noise_rbc)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> u_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+               C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+end
 function W_sum(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
                                       noise, observables, kwargs...)
     sol = solve(problem, DirectIteration())
     return sol.W[1, 2] + sol.W[1, 4] + sol.z[2][2]
 end
-
-gradient((args...) -> W_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
-         u0_rbc, noise_rbc)
-test_rrule(Zygote.ZygoteRuleConfig(),
-           (args...) -> W_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
-           C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+@testset "W test" begin
+    gradient((args...) -> W_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+             u0_rbc, noise_rbc)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> W_sum(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+               C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
+end
