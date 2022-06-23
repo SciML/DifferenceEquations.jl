@@ -4,15 +4,18 @@ using DiffEqBase
 using FiniteDiff: finite_difference_gradient
 
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
+    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C,
+                                      observables_noise = D,
                                       noise, observables, kwargs...)
     return solve(problem, DirectIteration()).logpdf
 end
 
 # CRTU has problems with generating random MvNormal, so just testing diagonals
 function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
-    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables_noise = D,
-                                      u0_prior_mean = u0, u0_prior_var = diagm(ones(length(u0))),
+    problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C,
+                                      observables_noise = D,
+                                      u0_prior_mean = u0,
+                                      u0_prior_var = diagm(ones(length(u0))),
                                       noise = nothing, observables, kwargs...)
     return solve(problem).logpdf
 end
@@ -25,9 +28,11 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),
+observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
+                                   "test/data/RBC_observables.csv"),
                           ',')' |> collect
-noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |>
+noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
+                    ',')' |>
             collect
 # Data and Noise
 T = 5
@@ -35,11 +40,13 @@ observables_rbc = observables_rbc[:, 1:T]
 noise_rbc = noise_rbc[:, 1:T]
 
 @testset "basic inference" begin
-    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+                                   C = C_rbc,
                                    observables_noise = D_rbc, noise = noise_rbc,
                                    observables = observables_rbc)
     @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-                                      C = C_rbc, observables_noise = D_rbc, noise = noise_rbc,
+                                      C = C_rbc, observables_noise = D_rbc,
+                                      noise = noise_rbc,
                                       observables = observables_rbc)
 
     sol = solve(prob)
@@ -49,17 +56,20 @@ noise_rbc = noise_rbc[:, 1:T]
     @inferred DiffEqBase.get_concrete_problem(prob, false)
 
     joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
-    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)
+    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc,
+                                 D_rbc)
 end
 
 @testset "basic kalman inference" begin
-    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+                                   C = C_rbc,
                                    observables_noise = D_rbc, observables = observables_rbc,
                                    u0_prior_mean = u0_rbc,
                                    u0_prior_var = diagm(ones(length(u0_rbc))))
     @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
                                       C = C_rbc,
-                                      observables_noise = D_rbc, observables = observables_rbc,
+                                      observables_noise = D_rbc,
+                                      observables = observables_rbc,
                                       u0_prior_mean = u0_rbc,
                                       u0_prior_var = diagm(ones(length(u0_rbc))))
 
@@ -73,22 +83,28 @@ end
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
 end
 
-gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+         C_rbc,
          u0_rbc, noise_rbc)
 
 @testset "linear rbc joint likelihood" begin
-    @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) ≈
+    @test joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc,
+                             D_rbc) ≈
           -690.9407412360038
-    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc) # 
-    gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+    @inferred joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc,
+                                 D_rbc) # 
+    gradient((args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+             C_rbc,
              u0_rbc, noise_rbc)
 
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+               (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc,
+               B_rbc,
                C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
-gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
+         C_rbc,
          u0_rbc)
 
 @testset "linear rbc kalman likelihood" begin
@@ -96,7 +112,8 @@ gradient((args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc,
           -607.3698273765538
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc, C_rbc,
+               (args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc,
+               B_rbc, C_rbc,
                u0_rbc; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
@@ -109,17 +126,20 @@ D_FVGQ = ones(6) * 1e-3
 observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
                                     "test/data/FVGQ20_observables.csv"), ',')' |> collect
 
-noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ',')' |>
+noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
+                     ',')' |>
              collect
 u0_FVGQ = zeros(size(A_FVGQ, 1))
 
 @testset "linear FVGQ joint likelihood" begin
     @test joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ,
                              D_FVGQ) ≈ -1.4613614369686982e6
-    @inferred joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ, observables_FVGQ,
+    @inferred joint_likelihood_1(A_FVGQ, B_FVGQ, C_FVGQ, u0_FVGQ, noise_FVGQ,
+                                 observables_FVGQ,
                                  D_FVGQ)
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> joint_likelihood_1(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ,
+               (args...) -> joint_likelihood_1(args..., observables_FVGQ, D_FVGQ), A_FVGQ,
+               B_FVGQ,
                C_FVGQ, u0_FVGQ, noise_FVGQ; rrule_f = rrule_via_ad, check_inferred = false)
 end
 
@@ -132,7 +152,8 @@ end
                             D_FVGQ) ≈
           2253.0905386483046
 
-    gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ, B_FVGQ,
+    gradient((args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ,
+             B_FVGQ,
              C_FVGQ, u0_FVGQ)
 
     test_rrule(Zygote.ZygoteRuleConfig(),
@@ -144,7 +165,8 @@ end
 @testset "basic kalman failure" begin
     A = [1e20 0.0; 1e20 0.0]
     u0_prior_var = diagm(1e10 * ones(length(u0_rbc)))
-    prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
+    prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+                                   C = C_rbc,
                                    observables_noise = D_rbc, observables = observables_rbc,
                                    u0_prior_mean = u0_rbc, u0_prior_var)
     sol = solve(prob)
@@ -156,8 +178,10 @@ end
     A = [1e20 0.0; 1e20 0.0]
     u0_prior_var = diagm(1e10 * ones(length(u0_rbc)))
     function fail_kalman(B_rbc)
-        prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2)); C = C_rbc,
-                                       observables_noise = D_rbc, observables = observables_rbc,
+        prob = LinearStateSpaceProblem(A, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+                                       C = C_rbc,
+                                       observables_noise = D_rbc,
+                                       observables = observables_rbc,
                                        u0_prior_mean = u0_rbc, u0_prior_var)
         return solve(prob).logpdf
     end

@@ -21,7 +21,8 @@ D_kalman = MvNormal(Diagonal(abs2.(ones(4) * 0.1)))
 u0_kalman = zeros(5)
 
 T = 200
-prob = LinearStateSpaceProblem(A_kalman, B_kalman, u0_kalman, (0, T); C = C_kalman, syms = [:a, :b])
+prob = LinearStateSpaceProblem(A_kalman, B_kalman, u0_kalman, (0, T); C = C_kalman,
+                               syms = [:a, :b])
 sol = solve(prob)
 writedlm("test/data/Kalman_observables.csv", sol.z[2:201], ",")
 writedlm("test/data/Kalman_noise.csv", transpose(sol.W), ",")
