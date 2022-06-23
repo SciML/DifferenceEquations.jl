@@ -11,22 +11,30 @@ get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size
 maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
 maybe_check_size(m::Nothing, index, val) = true
 
-maybe_check_size(m1::AbstractArray, index1, m2::AbstractArray, index2) = (size(m1, index1) ==
-                                                                          size(m2, index2))
+function maybe_check_size(m1::AbstractArray, index1, m2::AbstractArray, index2)
+    (size(m1, index1) ==
+     size(m2, index2))
+end
 maybe_check_size(m1::Nothing, index1, m2, index2) = true
 maybe_check_size(m1, index1, m2::Nothing, index2) = true
 maybe_check_size(m1::Nothing, index1, m2::Nothing, index2) = true
 
-Base.@propagate_inbounds @inline maybe_logpdf(observables_noise::Distribution, observables::AbstractMatrix, t, z::AbstractVector, s) = logpdf(observables_noise,
-                                                                                                                                              view(observables,
-                                                                                                                                                   :,
-                                                                                                                                                   t) -
-                                                                                                                                              z[s])
+Base.@propagate_inbounds @inline function maybe_logpdf(observables_noise::Distribution,
+                                                       observables::AbstractMatrix, t,
+                                                       z::AbstractVector, s)
+    logpdf(observables_noise,
+           view(observables,
+                :,
+                t) -
+           z[s])
+end
 # Don't accumulate likelihoods if no observations or observatino noise
 maybe_logpdf(observables_noise, observable, t, z, s) = 0.0
 
 # If no noise process is given, don't add in noise in simulation
-Base.@propagate_inbounds @inline maybe_muladd!(x, B, noise, t) = mul!(x, B, view(noise, :, t), 1, 1)
+Base.@propagate_inbounds @inline function maybe_muladd!(x, B, noise, t)
+    mul!(x, B, view(noise, :, t), 1, 1)
+end
 maybe_muladd!(x, B::Nothing, noise, t) = nothing
 
 Base.@propagate_inbounds @inline maybe_muladd!(x, A, B) = mul!(x, A, B, 1, 1)
@@ -35,7 +43,8 @@ maybe_muladd!(x, A::Nothing, B) = nothing
 # need transpose versions for gradients
 Base.@propagate_inbounds @inline maybe_muladd_transpose!(x, C, Δz) = mul!(x, C', Δz, 1, 1)
 maybe_muladd_transpose!(x, C::Nothing, Δz) = nothing
-Base.@propagate_inbounds @inline function maybe_muladd_transpose!(ΔB::AbstractMatrix, Δu_temp,
+Base.@propagate_inbounds @inline function maybe_muladd_transpose!(ΔB::AbstractMatrix,
+                                                                  Δu_temp,
                                                                   noise::AbstractMatrix, t)
     mul!(ΔB, Δu_temp, view(noise, :, t)', 1, 1)
     return nothing
@@ -46,21 +55,28 @@ maybe_mul!(x::Nothing, t, A, y, s) = nothing
 # Need transpose versions for rrule
 Base.@propagate_inbounds @inline maybe_mul_transpose!(x, t, A, y, s) = mul!(x[t], A', y[s])
 maybe_mul_transpose!(x::Nothing, t, A, y, s) = nothing
-Base.@propagate_inbounds @inline maybe_mul_transpose!(Δnoise, t, B, y) = mul!(view(Δnoise, :, t),
-                                                                              B', y)
+Base.@propagate_inbounds @inline function maybe_mul_transpose!(Δnoise, t, B, y)
+    mul!(view(Δnoise, :, t),
+         B', y)
+end
 maybe_mul_transpose!(Δnoise::Nothing, t, B, y) = nothing
 
 # Utilities to get distribution for logpdf from observation error argument
 make_observables_noise(observables_noise::Nothing) = nothing
 make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
-make_observables_noise(observables_noise::AbstractVector) = MvNormal(Diagonal(observables_noise))
+function make_observables_noise(observables_noise::AbstractVector)
+    MvNormal(Diagonal(observables_noise))
+end
 
 # Utilities to get covariance matrix from observation error argument for kalman filter.  e.g. vector is diagonal, etc.
 make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
-make_observables_covariance_matrix(observables_noise::AbstractVector) = Diagonal(observables_noise)
+function make_observables_covariance_matrix(observables_noise::AbstractVector)
+    Diagonal(observables_noise)
+end
 
 #Add in observation noise to the output if simulated (i.e, observables not given) and there is observation_noise provided
-function maybe_add_observation_noise!(z, observables_noise::Distribution, observables::Nothing)
+function maybe_add_observation_noise!(z, observables_noise::Distribution,
+                                      observables::Nothing)
     # add noise to the vector of vectors componentwise
     for z_val in z
         z_val .+= rand(observables_noise)
@@ -87,17 +103,31 @@ maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
 # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
 # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
 # rmul!(Δlogpdf, Δz)
-Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z, t,
+Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z,
+                                                              t,
                                                               observables_noise_cov)
     Δz .= Δlogpdf * (view(observables, :, t - 1) - z[t]) ./
           observables_noise_cov
     return nothing
 end
-maybe_add_Δ_logpdf!(Δz, Δlogpdf::Nothing, observables, z, t, observables_noise_cov) = nothing
-maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t, observables_noise_cov) = nothing
-maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t, observables_noise_cov) = nothing
-maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables::Nothing, z, t, observables_noise_cov) = nothing
-maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables::Nothing, z::Nothing, t, observables_noise_cov) = nothing
+function maybe_add_Δ_logpdf!(Δz, Δlogpdf::Nothing, observables, z, t, observables_noise_cov)
+    nothing
+end
+function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t,
+                             observables_noise_cov)
+    nothing
+end
+function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t,
+                             observables_noise_cov)
+    nothing
+end
+function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables::Nothing, z, t, observables_noise_cov)
+    nothing
+end
+function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables::Nothing,
+                             z::Nothing, t, observables_noise_cov)
+    nothing
+end
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
@@ -108,13 +138,15 @@ maybe_zero(A::Nothing) = nothing
 maybe_zero(A::AbstractArray, i::Int64) = zero(A[i])
 maybe_zero(A::Nothing, i) = nothing
 
-function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,tType,
-                                                          P,NP,F,AType,BType,
-                                                          CType,RType,ObsType,K},
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType, uPriorMeanType,
+                                                          uPriorVarType, tType,
+                                                          P, NP, F, AType, BType,
+                                                          CType, RType, ObsType, K},
                             alg::DirectIteration, args...;
-                            kwargs...) where {uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,AType,
-                                              BType,CType,RType,
-                                              ObsType,K}
+                            kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
+                                              P, NP, F, AType,
+                                              BType, CType, RType,
+                                              ObsType, K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
 
@@ -145,7 +177,8 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType,uPriorMeanType,u
     t_values = prob.tspan[1]:prob.tspan[2]
 
     return build_solution(prob, alg, t_values, u; W = noise,
-                          logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
+                          logpdf = ObsType <: Nothing ? nothing : loglik, z,
+                          retcode = :Success)
 end
 
 # Ideally hook into existing sensitity dispatching
@@ -155,15 +188,17 @@ end
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
 #                                             sensealg, u0, p, args...; kwargs...)
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
-                              prob::LinearStateSpaceProblem{uType,uPriorMeanType,uPriorVarType,
+                              prob::LinearStateSpaceProblem{uType, uPriorMeanType,
+                                                            uPriorVarType,
                                                             tType,
-                                                            P,NP,F,AType,BType,
-                                                            CType,RType,ObsType,K},
+                                                            P, NP, F, AType, BType,
+                                                            CType, RType, ObsType, K},
                               alg::DirectIteration, args...;
-                              kwargs...) where {uType,uPriorMeanType,uPriorVarType,tType,P,NP,F,
+                              kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
+                                                P, NP, F,
                                                 AType,
-                                                BType,CType,RType,
-                                                ObsType,K}
+                                                BType, CType, RType,
+                                                ObsType, K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
     # @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
@@ -171,7 +206,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     # checks on bounds
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
     observables_noise = make_observables_noise(prob.observables_noise)
-    @assert typeof(observables_noise) <: Union{ZeroMeanDiagNormal,Nothing}  # can extend to more general in rrule later
+    @assert typeof(observables_noise) <: Union{ZeroMeanDiagNormal, Nothing}  # can extend to more general in rrule later
 
     @assert maybe_check_size(noise, 1, prob.B, 2)
     @assert maybe_check_size(noise, 2, T - 1)
@@ -196,7 +231,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     t_values = prob.tspan[1]:prob.tspan[2]
 
     sol = build_solution(prob, alg, t_values, u; W = noise,
-                         logpdf = ObsType <: Nothing ? nothing : loglik, z, retcode = :Success)
+                         logpdf = ObsType <: Nothing ? nothing : loglik, z,
+                         retcode = :Success)
     function solve_pb(Δsol)
         ΔA = zero(A)
         ΔB = maybe_zero(B)
@@ -210,7 +246,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
         observables_noise_cov = prob.observables_noise
 
         @views @inbounds for t in T:-1:2
-            maybe_add_Δ_logpdf!(Δz, Δsol.logpdf, prob.observables, z, t, observables_noise_cov)
+            maybe_add_Δ_logpdf!(Δz, Δsol.logpdf, prob.observables, z, t,
+                                observables_noise_cov)
             maybe_add_Δ!(Δz, Δsol.z, t)  # only accumulate if not NoTangent and if observables provided
 
             copy!(Δu_temp, Δu)
@@ -232,7 +269,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     return sol, solve_pb
 end
 
-function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, args...; kwargs...)
+function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, args...;
+                            kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
 
     # checks on bounds
@@ -253,19 +291,27 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     B_prod = Matrix{eltype(u0_prior_var)}(undef, N, N)
     u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
     P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
+    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
+                  for _ in 1:T]
     K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0_prior_var),Matrix{eltype(u0_prior_var)}}(L,
-                                                                  Matrix{eltype(u0_prior_var)}(undef,
+    V = [PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(L,
+                                                                   Matrix{
+                                                                          eltype(u0_prior_var)
+                                                                          }(undef,
+                                                                            L,
+                                                                            L),
+                                                                   Cholesky{
+                                                                            eltype(u0_prior_var),
+                                                                            Matrix{
+                                                                                   eltype(u0_prior_var)
+                                                                                   }}(Matrix{
+                                                                                             eltype(u0_prior_var)
+                                                                                             }(undef,
                                                                                                L,
                                                                                                L),
-                                                                  Cholesky{eltype(u0_prior_var),
-                                                                           Matrix{eltype(u0_prior_var)}}(Matrix{eltype(u0_prior_var)}(undef,
-                                                                                                                                      L,
-                                                                                                                                      L),
-                                                                                                         'U',
-                                                                                                         0))
+                                                                                      'U',
+                                                                                      0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
@@ -362,19 +408,27 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
     u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
     P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T]
+    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
+                  for _ in 1:T]
     K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0_prior_var),Matrix{eltype(u0_prior_var)}}(L,
-                                                                  Matrix{eltype(u0_prior_var)}(undef,
+    V = [PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(L,
+                                                                   Matrix{
+                                                                          eltype(u0_prior_var)
+                                                                          }(undef,
+                                                                            L,
+                                                                            L),
+                                                                   Cholesky{
+                                                                            eltype(u0_prior_var),
+                                                                            Matrix{
+                                                                                   eltype(u0_prior_var)
+                                                                                   }}(Matrix{
+                                                                                             eltype(u0_prior_var)
+                                                                                             }(undef,
                                                                                                L,
                                                                                                L),
-                                                                  Cholesky{eltype(u0_prior_var),
-                                                                           Matrix{eltype(u0_prior_var)}}(Matrix{eltype(u0_prior_var)}(undef,
-                                                                                                                                      L,
-                                                                                                                                      L),
-                                                                                                         'U',
-                                                                                                         0))
+                                                                                      'U',
+                                                                                      0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.

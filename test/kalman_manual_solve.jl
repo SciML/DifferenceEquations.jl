@@ -5,17 +5,20 @@ using DelimitedFiles
 using DiffEqBase
 using FiniteDiff: finite_difference_gradient
 
-unvech_5(v) = LowerTriangular(hcat(v[1:5],
-                                   [zeros(1);
-                                    v[6:9]],
-                                   [zeros(2);
-                                    v[10:12]],
-                                   [zeros(3);
-                                    v[13:14]],
-                                   [zeros(4);
-                                    v[15]]))
+function unvech_5(v)
+    LowerTriangular(hcat(v[1:5],
+                         [zeros(1);
+                          v[6:9]],
+                         [zeros(2);
+                          v[10:12]],
+                         [zeros(3);
+                          v[13:14]],
+                         [zeros(4);
+                          v[15]]))
+end
 
-function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix, u0_mean,
+function solve_manual_cov_lik(A::AbstractMatrix, B::AbstractMatrix, C::AbstractMatrix,
+                              u0_mean,
                               u0_variance_vech, observables, R, tspan)
     # hardcoded right now for tspan = (0, T) for T+1 points
     T = tspan[2]
@@ -69,13 +72,15 @@ R_kalman = [0.01 0.0 0.0 0.0;
             0.0 0.02 0.005 0.01;
             0.0 0.005 0.03 0.0;
             0.0 0.01 0.0 0.04]
-u0_mean = [0.46278392661230217, -0.35157252508544934, -0.33952978655645105, -0.3486954393399204,
-           0.6934920135433433]
-u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855, 0.6799242624030147,
-               -0.7627861222280011, 0.1346800868329039, 0.46537792458084976,
-               -0.16223737917345768, 0.1772417632124954, 0.2722945202387173,
-               -0.3971349857502508, -0.1474011998331263, 0.18113754883619412,
-               0.13433861105247683, 0.029171596025489813]
+u0_mean = [0.46278392661230217, -0.35157252508544934, -0.33952978655645105,
+    -0.3486954393399204,
+    0.6934920135433433]
+u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855,
+    0.6799242624030147,
+    -0.7627861222280011, 0.1346800868329039, 0.46537792458084976,
+    -0.16223737917345768, 0.1772417632124954, 0.2722945202387173,
+    -0.3971349857502508, -0.1474011998331263, 0.18113754883619412,
+    0.13433861105247683, 0.029171596025489813]
 T = 200
 @testset "manual Kalman code" begin
     #loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
@@ -83,7 +88,8 @@ T = 200
     #                              R_kalman, [0, T])
 
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> solve_manual_cov_lik(args..., B_kalman, C_kalman, u0_mean, u0_var_vech,
+               (args...) -> solve_manual_cov_lik(args..., B_kalman, C_kalman, u0_mean,
+                                                 u0_var_vech,
                                                  observables_kalman, R_kalman, [0, T]),
                A_kalman; rrule_f = rrule_via_ad, check_inferred = false)
 
@@ -94,25 +100,26 @@ T = 200
                            u0_var_vech, observables_kalman,
                            R_kalman)
 
-    @test grad_values[1] ≈
-          finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
-                                                               u0_var_vech,
-                                                               observables_kalman,
-                                                               R_kalman, [0, T]), A_kalman) rtol = 1e-7
+    @test grad_values[1]≈
+    finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
+                                                         u0_var_vech,
+                                                         observables_kalman,
+                                                         R_kalman, [0, T]), A_kalman) rtol=1e-7
 
-    @test grad_values[4] ≈
-          finite_difference_gradient(u0_mean_vec -> solve_manual_cov_lik(A_kalman, B_kalman,
-                                                                         C_kalman,
-                                                                         u0_mean_vec,
-                                                                         u0_var_vech,
-                                                                         observables_kalman,
-                                                                         R_kalman, [0, T]), u0_mean) rtol = 1e-6
+    @test grad_values[4]≈
+    finite_difference_gradient(u0_mean_vec -> solve_manual_cov_lik(A_kalman, B_kalman,
+                                                                   C_kalman,
+                                                                   u0_mean_vec,
+                                                                   u0_var_vech,
+                                                                   observables_kalman,
+                                                                   R_kalman, [0, T]),
+                               u0_mean) rtol=1e-6
 
-    @test grad_values[5] ≈
-          finite_difference_gradient(u0_var -> solve_manual_cov_lik(A_kalman, B_kalman, C_kalman,
-                                                                    u0_mean,
-                                                                    u0_var,
-                                                                    observables_kalman,
-                                                                    R_kalman, [0, T]),
-                                     u0_var_vech) rtol = 2e-4
+    @test grad_values[5]≈
+    finite_difference_gradient(u0_var -> solve_manual_cov_lik(A_kalman, B_kalman, C_kalman,
+                                                              u0_mean,
+                                                              u0_var,
+                                                              observables_kalman,
+                                                              R_kalman, [0, T]),
+                               u0_var_vech) rtol=2e-4
 end

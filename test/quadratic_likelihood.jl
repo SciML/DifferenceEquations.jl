@@ -4,9 +4,12 @@ using DiffEqBase
 using FiniteDiff: finite_difference_gradient
 
 # joint case
-function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D; kwargs...)
-    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0, C_1,
-                                         C_2, observables_noise = D, noise, observables, kwargs...)
+function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables, D;
+                            kwargs...)
+    problem = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2));
+                                         C_0, C_1,
+                                         C_2, observables_noise = D, noise, observables,
+                                         kwargs...)
     return solve(problem).logpdf
 end
 
@@ -23,9 +26,11 @@ C_2_rbc = cat([-0.00018554166974717046 0.0025652363153049716; 0.0 0.0],
 D_2_rbc = abs2.([0.1, 0.1])
 u0_2_rbc = zeros(2)
 
-observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),
+observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
+                                     "test/data/RBC_observables.csv"),
                             ',')' |> collect
-noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |>
+noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
+                      ',')' |>
               collect
 
 # Data and Noise
@@ -35,13 +40,16 @@ noise_2_rbc = noise_2_rbc[:, 1:T]
 
 @testset "basic inference" begin
     prob = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
-                                      (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc, C_1 = C_1_rbc,
+                                      (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc,
+                                      C_1 = C_1_rbc,
                                       C_2 = C_2_rbc, observables_noise = D_2_rbc,
                                       noise = noise_2_rbc, observables = observables_2_rbc)
     @inferred QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
                                          (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc,
-                                         C_1 = C_1_rbc, C_2 = C_2_rbc, observables_noise = D_2_rbc,
-                                         noise = noise_2_rbc, observables = observables_2_rbc)
+                                         C_1 = C_1_rbc, C_2 = C_2_rbc,
+                                         observables_noise = D_2_rbc,
+                                         noise = noise_2_rbc,
+                                         observables = observables_2_rbc)
 
     DiffEqBase.get_concrete_problem(prob, false)
     @inferred DiffEqBase.get_concrete_problem(prob, false)
@@ -52,13 +60,17 @@ end
 
 @testset "quadratic rbc joint likelihood" begin
     @test joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc,
-                             u0_2_rbc, noise_2_rbc, observables_2_rbc, D_2_rbc) ≈ -690.81094364573
-    @inferred joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc,
+                             u0_2_rbc, noise_2_rbc, observables_2_rbc, D_2_rbc) ≈
+          -690.81094364573
+    @inferred joint_likelihood_2(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc,
+                                 C_2_rbc,
                                  u0_2_rbc, noise_2_rbc, observables_2_rbc, D_2_rbc) # would this catch inference problems in the solve?
-    gradient((args...) -> joint_likelihood_2(args..., observables_2_rbc, D_2_rbc), A_0_rbc, A_1_rbc,
+    gradient((args...) -> joint_likelihood_2(args..., observables_2_rbc, D_2_rbc), A_0_rbc,
+             A_1_rbc,
              A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc, noise_2_rbc)
     test_rrule(Zygote.ZygoteRuleConfig(),
-               (args...) -> joint_likelihood_2(args..., observables_2_rbc, D_2_rbc), A_0_rbc,
+               (args...) -> joint_likelihood_2(args..., observables_2_rbc, D_2_rbc),
+               A_0_rbc,
                A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc, noise_2_rbc;
                rrule_f = rrule_via_ad, check_inferred = false)
 end
@@ -82,17 +94,20 @@ u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
 observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations),
                                       "test/data/FVGQ20_observables.csv"), ',')' |> collect
 
-noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ',')' |>
+noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
+                       ',')' |>
                collect
 
 @testset "quadratic FVGQ joint likelihood" begin
-    @test joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
+    @test joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ,
+                             C_2_FVGQ,
                              u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ) ≈
           -1.4728927648336522e7
     @inferred joint_likelihood_2(A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ,
                                  C_2_FVGQ,
                                  u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ)
-    gradient((args...) -> joint_likelihood_2(args..., observables_2_FVGQ, D_2_FVGQ), A_0_FVGQ,
+    gradient((args...) -> joint_likelihood_2(args..., observables_2_FVGQ, D_2_FVGQ),
+             A_0_FVGQ,
              A_1_FVGQ,
              A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ)
 

@@ -16,19 +16,22 @@ C_2_rbc = cat([-0.00018554166974717046 0.0025652363153049716; 0.0 0.0],
 D_2_rbc = abs2.([0.1, 0.1])
 u0_2_rbc = zeros(2)
 
-observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"),
+observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
+                                     "test/data/RBC_observables.csv"),
                             ',')' |> collect
 
 # Data and Noise
 
 @testset "basic inference, simulated noise" begin
     prob = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
-                                      (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc, C_1 = C_1_rbc,
+                                      (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc,
+                                      C_1 = C_1_rbc,
                                       C_2 = C_2_rbc, observables_noise = D_2_rbc,
                                       observables = observables_2_rbc)
     @inferred QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
                                          (0, size(observables_2_rbc, 2)); C_0 = C_0_rbc,
-                                         C_1 = C_1_rbc, C_2 = C_2_rbc, observables_noise = D_2_rbc,
+                                         C_1 = C_1_rbc, C_2 = C_2_rbc,
+                                         observables_noise = D_2_rbc,
                                          observables = observables_2_rbc)
 
     sol = solve(prob)
@@ -52,12 +55,14 @@ end
     u0 = [1.0, 0.5]
     B_no_noise = reshape([0.0; 0.0], 2, 1)
 
-    prob_no_noise = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, u0, (0, T);
+    prob_no_noise = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, u0,
+                                               (0, T);
                                                C_0 = C_0_rbc, C_1 = C_1_rbc, C_2 = C_2_rbc)
 
     sol_no_noise = solve(prob_no_noise)
 
-    prob_obs_noise = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, u0, (0, T);
+    prob_obs_noise = QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, u0,
+                                                (0, T);
                                                 C_0 = C_0_rbc, C_1 = C_1_rbc, C_2 = C_2_rbc,
                                                 observables_noise = D_2_rbc)
     @inferred QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, u0, (0, T);
@@ -67,11 +72,15 @@ end
     @inferred solve(prob_obs_noise)
 
     # check that if the variance of the noise is tiny it is identical
-    sol_tiny_obs_noise = solve(QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, u0,
+    sol_tiny_obs_noise = solve(QuadraticStateSpaceProblem(A_0_rbc, A_1_rbc, A_2_rbc,
+                                                          B_no_noise, u0,
                                                           (0, T);
                                                           C_0 = C_0_rbc, C_1 = C_1_rbc,
                                                           C_2 = C_2_rbc,
-                                                          observables_noise = [1e-16, 1e-16]))
+                                                          observables_noise = [
+                                                              1e-16,
+                                                              1e-16,
+                                                          ]))
     @test maximum(maximum.(sol_tiny_obs_noise.z - sol_no_noise.z)) < 1e-7  # still some noise 
     @test maximum(maximum.(sol_tiny_obs_noise.z - sol_no_noise.z)) > 0.0  # but not zero
 end

@@ -2,13 +2,13 @@
 # Support for using a matrix as a AbstractVectorOfArray, especially iteration on A[i], etc.
 # Note that a proper implementation should probably work with an arbitrary Array, so that a 3-tensor
 # appears as a vector of matrices, etc.
-struct MatrixVectorOfArray{T,N,A} <: RecursiveArrayTools.AbstractVectorOfArray{T,N,A}
+struct MatrixVectorOfArray{T, N, A} <: RecursiveArrayTools.AbstractVectorOfArray{T, N, A}
     u::A # A <: AbstractMatrix{T} where size(u, 1) == N
 end
 
-Base.Array(VA::MatrixVectorOfArray{T,N,A}) where {T,N,A} = VA.u
+Base.Array(VA::MatrixVectorOfArray{T, N, A}) where {T, N, A} = VA.u
 
-MatrixVectorOfArray(mat::AbstractMatrix) = MatrixVectorOfArray{Float64,2,typeof(mat)}(mat)
+MatrixVectorOfArray(mat::AbstractMatrix) = MatrixVectorOfArray{Float64, 2, typeof(mat)}(mat)
 
 # Interface for the linear indexing. This is just a view of the underlying nested structure
 @inline Base.firstindex(VA::MatrixVectorOfArray) = firstindex(VA.u, 2)
@@ -19,44 +19,46 @@ MatrixVectorOfArray(mat::AbstractMatrix) = MatrixVectorOfArray{Float64,2,typeof(
 @inline Base.IteratorSize(VA::MatrixVectorOfArray) = Base.HasLength()
 # Linear indexing will be over the container elements, not the individual elements
 # unlike an true AbstractArray
-Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T,N}, I::Int) where {T,N}
+Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T, N},
+                                                I::Int) where {T, N}
     return view(VA.u, :, I)
 end
-Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T,N}, I::Colon) where {T,N}
+Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T, N},
+                                                I::Colon) where {T, N}
     return view(VA.u, :, I)
 end
-Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T,N}, i::Int,
-                                                ::Colon) where {T,N}
+Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T, N}, i::Int,
+                                                ::Colon) where {T, N}
     return [VA.u[i, j] for j in 1:length(VA)]
 end
-Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T,N},
-                                                ii::CartesianIndex) where {T,N}
+Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T, N},
+                                                ii::CartesianIndex) where {T, N}
     ti = Tuple(ii)
     i = last(ti)
     jj = CartesianIndex(Base.front(ti))
     return VA.u[jj, i]
 end
-Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T,N}, v,
-                                                 I::Int) where {T,N}
+Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T, N}, v,
+                                                 I::Int) where {T, N}
     return VA.u[:, I] = v
 end
-Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T,N}, v,
-                                                 I::Colon) where {T,N}
+Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T, N}, v,
+                                                 I::Colon) where {T, N}
     return VA.u[:, I] = v
 end
-Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T,N}, v,
-                                                 I::AbstractArray{Int}) where {T,N}
+Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T, N}, v,
+                                                 I::AbstractArray{Int}) where {T, N}
     return VA.u[:, I] = v
 end
-Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T,N}, v, i::Int,
-                                                 ::Colon) where {T,N}
+Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T, N}, v, i::Int,
+                                                 ::Colon) where {T, N}
     for j in 1:length(VA)
         VA.u[i, j] = v[j]
     end
     return v
 end
-Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T,N}, x,
-                                                 ii::CartesianIndex) where {T,N}
+Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T, N}, x,
+                                                 ii::CartesianIndex) where {T, N}
     ti = Tuple(ii)
     i = last(ti)
     jj = CartesianIndex(Base.front(ti))
@@ -65,11 +67,12 @@ end
 
 # Interface for the two-dimensional indexing, a more standard AbstractArray interface
 @inline Base.size(VA::MatrixVectorOfArray) = size(VA.u)
-Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T,N}, I::Int...) where {T,N}
+Base.@propagate_inbounds function Base.getindex(VA::MatrixVectorOfArray{T, N},
+                                                I::Int...) where {T, N}
     return VA.u[I...]
 end
-Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T,N}, v,
-                                                 I::Int...) where {T,N}
+Base.@propagate_inbounds function Base.setindex!(VA::MatrixVectorOfArray{T, N}, v,
+                                                 I::Int...) where {T, N}
     return VA.u[I...] = v
 end
 
@@ -100,7 +103,9 @@ Base.fill!(VA::MatrixVectorOfArray, x) = fill!(VA.u, x)
 function Base.show(io::IO, m::MIME"text/plain", x::MatrixVectorOfArray)
     return (println(io, summary(x), ':'); show(io, m, x.u))
 end
-Base.summary(A::MatrixVectorOfArray) = string("MatrixVectorOfArray{", eltype(A), ",", ndims(A), "}")
+function Base.summary(A::MatrixVectorOfArray)
+    string("MatrixVectorOfArray{", eltype(A), ",", ndims(A), "}")
+end
 
 Base.map(f, A::MatrixVectorOfArray) = map(f, eachcol(A.u))
 function Base.mapreduce(f, op, A::MatrixVectorOfArray)
