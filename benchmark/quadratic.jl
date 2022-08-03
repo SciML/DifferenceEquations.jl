@@ -6,7 +6,7 @@ function make_problem_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observables,
                         kwargs...)
     prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0,
                                       C_1,
-                                      C_2, observables_noise = MvNormal(Diagonal(abs2.(D))),
+                                      C_2, observables_noise = D,
                                       noise,
                                       observables, kwargs...)
     return prob.A_1[1, 1] + prob.B[1, 1]
@@ -16,7 +16,7 @@ function joint_likelihood_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, observab
                             kwargs...)
     prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0,
                                       C_1,
-                                      C_2, observables_noise = MvNormal(Diagonal(abs2.(D))),
+                                      C_2, observables_noise = D,
                                       noise,
                                       observables, kwargs...)
     return solve(prob).logpdf
@@ -26,7 +26,7 @@ function simulate_model_no_noise_2(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, observab
                                    kwargs...)
     prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0,
                                       C_1,
-                                      C_2, observables_noise = MvNormal(Diagonal(abs2.(D))),
+                                      C_2, observables_noise = D,
                                       observables, kwargs...)
     sol = solve(prob)
     return sol.retcode

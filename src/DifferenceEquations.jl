@@ -6,13 +6,14 @@ using LinearAlgebra
 using CommonSolve
 using UnPack
 using PDMats
-using RecursiveArrayTools
 using SciMLBase: @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution
 using DiffEqBase
 using DiffEqBase: __solve
 using SciMLBase: build_solution
 
-include("matrix_vector_of_vectors.jl")
+#using RecursiveArrayTools
+# include("matrix_vector_of_vectors.jl") # later add support for recursivearrays for noise/observations as vector-of-vector 
+
 include("utilities.jl")
 include("problems/state_space_problems.jl")
 include("solutions/state_space_solutions.jl")
