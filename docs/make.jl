@@ -2,21 +2,15 @@ using Documenter, DifferenceEquations
 
 include("pages.jl")
 
-makedocs(
-    sitename="DifferenceEquations.jl",
-    authors="Various Authors",
-    clean=true,
-    doctest=false,
-    modules=[DifferenceEquations],
+makedocs(sitename = "DifferenceEquations.jl",
+         authors = "Various Authors",
+         clean = true,
+         doctest = false,
+         modules = [DifferenceEquations],
+         format = Documenter.HTML(analytics = "UA-90474609-3",
+                                  assets = ["assets/favicon.ico"],
+                                  canonical = "https://DifferenceEquations.sciml.ai/stable/"),
+         pages = pages)
 
-    format=Documenter.HTML(analytics = "UA-90474609-3",
-                           assets=["assets/favicon.ico"],
-                           canonical="https://DifferenceEquations.sciml.ai/stable/"),
-
-    pages=pages
-)
-
-deploydocs(
-    repo="github.com/SciML/DifferenceEquations.jl";
-    push_preview=true
-)
+deploydocs(repo = "github.com/SciML/DifferenceEquations.jl";
+           push_preview = true)
