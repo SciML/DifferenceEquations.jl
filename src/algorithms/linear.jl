@@ -120,11 +120,24 @@ Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(Δz::AbstractArra
           observables_noise_cov
     return nothing
 end
-# Otherwise do nothing
-function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z, t, observables_noise_cov)
+function maybe_add_Δ_logpdf!(Δz, Δlogpdf::Nothing, observables, z, t, observables_noise_cov)
     nothing
 end
-
+function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t,
+                             observables_noise_cov)
+    nothing
+end
+function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t,
+                             observables_noise_cov)
+    nothing
+end
+function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables::Nothing, z, t, observables_noise_cov)
+    nothing
+end
+function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables::Nothing,
+                             z::Nothing, t, observables_noise_cov)
+    nothing
+end
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing

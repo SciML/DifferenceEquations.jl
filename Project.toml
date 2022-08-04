@@ -1,7 +1,7 @@
 name = "DifferenceEquations"
 uuid = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
 authors = ["various contributors"]
-version = "0.4.18"
+version = "0.4.17"
 
 [deps]
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
@@ -14,6 +14,7 @@ PDMats = "90014a1f-27ba-587c-ab20-58faa44d9150"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 
 [compat]
 CPUSummary = "0.1.22"
@@ -25,4 +26,5 @@ PDMats = "0.11"
 RecursiveArrayTools = "2.25"
 SciMLBase = "1.39"
 UnPack = "1"
+DocStringExtensions = "0.8, 0.9"
 julia = "1.6, 1.7"
