@@ -117,10 +117,6 @@ function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t
                              observables_noise_cov)
     nothing
 end
-function maybe_add_Δ_logpdf!(Δz::Nothing, Δlogpdf::Nothing, observables, z, t,
-                             observables_noise_cov)
-    nothing
-end
 function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables::Nothing, z, t, observables_noise_cov)
     nothing
 end
