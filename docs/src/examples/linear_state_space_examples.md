@@ -2,35 +2,19 @@
 
 This tutorial provides additional features for linear models
 
-!!! note
+At this point, the package only supports linear time-invariant models without a separate `p` vector.  The canonical form of the linear model is
 
-    This tutorial assumes you have read the [Ordinary Differential Equations tutorial](@ref ode_example), the mathematics of the [State Spaces Models](@ref state_space_types), and the more general [State Space Examples](@ref state_space_examples) tutorial.
-    
-    In addition, this package uses the `MatrixFreeOperator` in [DiffEqOperators.jl](https://github.com/SciML/DiffEqOperators.jl) to wrap the general linear equations.
+```math
+u_{n+1} = A u_n + B w_{n+1}
+```
 
-
-The canonical form of the linear model is
-
-$$
-u_{n+1} = A(p, t_n) u_n + B(p,t_n) w_{n+1}
-$$
 with
-$$
-z_n = C(p, t_n) u_n +  v_n
-$$
-
-where we will tend to use $v_n \sim N(0, R)$ and $w_{n+1} \sim N(0,I)$.
-
-
-However, we will implement  on the the linear-time invariant (LTI) version,
-$$
-u_{n+1} = A u_n +  B w_{n+1}
-$$
-with
-$$
+````math
 z_n = C u_n +  v_n
-$$
-and $v_n \sim N(0, R)$ where $A, B, C$ and $R$ may be parameterized by $p$.
+```
+
+and $v_n \sim N(0, D)$ and $w_{n+1} \sim N(0,I)$.
+
 
 ## Example 1: Linear (and Time-Invariant) State Space Model
 

@@ -1,4 +1,4 @@
-# State Space Examples
+# General State Space Examples
 
 
 This tutorial will introduce you to the functionality for solving discrete-time models with an observation equation. Other
