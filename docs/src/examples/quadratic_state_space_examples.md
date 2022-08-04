@@ -1,4 +1,4 @@
-# Linear State Space Examples
+# Quadratic State Space Examples
 
 This tutorial provides additional features for linear models
 

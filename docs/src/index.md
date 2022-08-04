@@ -48,13 +48,12 @@ A few notes on the structure:
 3. ``t_n`` is the current time at which the map is applied where ``t_n = t_0 + n*dt`` (with `dt=1` being the default).
 4. If $f, g, h$ are not functions of time, then it is a time-invariant state-space model.
 
-
 ## Current Status
-At this point, the package does not implement all variations on these methods.  A few notes
+At this point, the package does not cover all of the variations on these features. In particular,
 1. It only supports linear and quadratic $f, g, h$ functions.  General $f,g$ will be next.
 2. It only supports time-invariant functions
 3. There is limited support for non-Gaussian $w_n$ and $v_n$ processes.
-4. It doesn't support linear or quadratic functions parameterized by the $p$ vector for differentiation
+4. It does not support linear or quadratic functions parameterized by the $p$ vector for differentiation
 5. There are some hardcoded types which prevent it from working with fully generic arrays
 6. It does not support in-place vs. out-of-place, support static arrays, or matrix-free linear operators.
 7. While many functions in the SciML framework are working, support is incomplete.
