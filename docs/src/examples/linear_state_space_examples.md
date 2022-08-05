@@ -1,6 +1,6 @@
 # Linear State Space Examples
 
-This tutorial provides additional features for linear models
+This tutorial provides describes the support for linear and linear gaussian state space models.
 
 At this point, the package only supports linear time-invariant models without a separate `p` vector.  The canonical form of the linear model is
 
