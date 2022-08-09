@@ -26,7 +26,7 @@ function z_sum(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C,
                                       observables_noise = D,
                                       noise, observables, kwargs...)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem) # since noise provided, uses DirectIteration
     return sol.z[5][1] + sol.z[3][2]
 end
 @testset "mean_z test" begin
@@ -42,7 +42,7 @@ function u_sum(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C,
                                       observables_noise = D,
                                       noise, observables, kwargs...)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     u = sol.u  # Zygote bug, must use separate name, also passes Nothing for Δsol so requires workarounds
     return u[3][1] + u[3][2]
     # BROKEN?  ZYGOTE BUG?  Seems to give the wrong Δsol type when calling the pullback
@@ -61,7 +61,7 @@ function W_sum(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C,
                                       observables_noise = D,
                                       noise, observables, kwargs...)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     return sol.W[1, 2] + sol.W[1, 4] + sol.z[2][2]
 end
 @testset "W test" begin
@@ -76,7 +76,7 @@ end
 function no_observables_sum(A, B, C, u0, noise; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(noise_rbc, 2)); C, noise,
                                       kwargs...)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     return sol.W[1, 2] + sol.W[1, 4] + sol.z[2][2]
 end
 @testset "no observables gradient" begin
@@ -90,7 +90,7 @@ end
 end
 function no_noise(A, C, u0; kwargs...)
     problem = LinearStateSpaceProblem(A, nothing, u0, (0, 5); C, kwargs...)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     # u = sol.u # bugs with u
     return sol.z[2][2]# + u[2][2]
 end
@@ -107,7 +107,7 @@ end
 
 function no_observation_equation(A, u0; kwargs...)
     problem = LinearStateSpaceProblem(A, nothing, u0, (0, 5); kwargs...)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     u = sol.u # bugs with u
     return u[2][2] + u[4][1]
 end
@@ -134,7 +134,7 @@ end
 function no_observation_equation_noise(A, B, u0; kwargs...)
     setseed(1234)  # hack for reproducibility with finite diff
     problem = LinearStateSpaceProblem(A, B, u0, (0, 5); kwargs...)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     u = sol.u # bugs with u
     return u[2][2] + u[4][1]
 end
@@ -152,7 +152,7 @@ end
 function last_state_pass_noise(A, B, C, u0, noise)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(noise, 2)); C, noise,
                                       observables_noise = nothing, observables = nothing)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     return sol.u[end][2]
 end
 
@@ -171,7 +171,7 @@ end
 function last_observable_pass_noise(A, B, C, u0, noise)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(noise, 2)); C, noise,
                                       observables_noise = nothing, observables = nothing)
-    sol = solve(problem, DirectIteration())
+    sol = solve(problem)
     return sol.z[end][2]
 end
 @testset "last observable with noise, no observable noise" begin
