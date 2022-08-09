@@ -16,14 +16,21 @@ function default_alg(prob::LinearStateSpaceProblem{uType, uPriorMeanType, uPrior
                                                                               AbstractMatrix,
                                                                               tType, P,
                                                                               NP <: Nothing,
-                                                                              F, AType,
-                                                                              BType, CType,
+                                                                              F,
+                                                                              AType <:
+                                                                              AbstractMatrix,
+                                                                              BType <:
+                                                                              AbstractMatrix,
+                                                                              CType <:
+                                                                              AbstractMatrix,
                                                                               RType <:
                                                                               Union{
                                                                                     AbstractVector,
                                                                                     AbstractMatrix
                                                                                     },
-                                                                              ObsType, K}
+                                                                              ObsType <:
+                                                                              AbstractMatrix,
+                                                                              K}
     KalmanFilter()
 end
 

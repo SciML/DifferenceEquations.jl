@@ -7,7 +7,7 @@ function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C,
                                       observables_noise = D,
                                       noise, observables, kwargs...)
-    return solve(problem, DirectIteration()).logpdf
+    return solve(problem).logpdf
 end
 
 # CRTU has problems with generating random MvNormal, so just testing diagonals
