@@ -1,4 +1,5 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
+using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote,
+      Random, ChainRulesCore
 using DelimitedFiles
 using DiffEqBase
 using FiniteDiff: finite_difference_gradient
@@ -121,21 +122,68 @@ end
                check_inferred = false)
 end
 
+# Hack to set seeds within equation for finite-diff reproducibility
+# Makes it ignore the derivative
+setseed(x) = Random.seed!(x)
+function ChainRulesCore.rrule(::typeof(setseed), x)
+    Random.seed!(x)
+    pb(ȳ) = (ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent())
+    return nothing, pb
+end
+
 function no_observation_equation_noise(A, B, u0; kwargs...)
+    setseed(1234)  # hack for reproducibility with finite diff
     problem = LinearStateSpaceProblem(A, B, u0, (0, 5); kwargs...)
     sol = solve(problem, DirectIteration())
     u = sol.u # bugs with u
     return u[2][2] + u[4][1]
 end
 @testset "no observation equation" begin
-    Random.seed!(1234) # inside function or else test_rrule gets different draws
     u_nonzero = [1.1, 0.2]
     @test no_observation_equation_noise(A_rbc, B_rbc, u_nonzero) ≈ 2.3898508744331406
     gradient((args...) -> no_observation_equation_noise(args...), A_rbc, B_rbc,
              u_nonzero)
-    # TODO: would need to have seeds set properly for this to work.  Otherwise Finite Diff gets new draws
-    # test_rrule(Zygote.ZygoteRuleConfig(),
-    #            (args...) -> no_observation_equation_noise(args...), A_rbc, B_rbc, u_nonzero;
-    #            rrule_f = rrule_via_ad,
-    #            check_inferred = false)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (args...) -> no_observation_equation_noise(args...), A_rbc, B_rbc, u_nonzero;
+               rrule_f = rrule_via_ad,
+               check_inferred = false)
+end
+
+function last_state_pass_noise(A, B, C, u0, noise)
+    problem = LinearStateSpaceProblem(A, B, u0, (0, size(noise, 2)); C, noise,
+                                      observables_noise = nothing, observables = nothing)
+    sol = solve(problem, DirectIteration())
+    return sol.u[end][2]
+end
+
+@testset "last state with noise, no observable noise" begin
+    T = 20
+    noise = Matrix([1.0; zeros(T - 1)]')  # impulse
+    u_nonzero = [0.1, 0.2]
+    last_state_pass_noise(A_rbc, B_rbc, C_rbc, u_nonzero, noise)
+    gradient(last_state_pass_noise, A_rbc, B_rbc, C_rbc, u_nonzero, noise)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (u_nonzero) -> last_state_pass_noise(A_rbc, B_rbc, C_rbc, u_nonzero, noise),
+               u_nonzero;
+               rrule_f = rrule_via_ad,
+               check_inferred = false)
+end
+function last_observable_pass_noise(A, B, C, u0, noise)
+    problem = LinearStateSpaceProblem(A, B, u0, (0, size(noise, 2)); C, noise,
+                                      observables_noise = nothing, observables = nothing)
+    sol = solve(problem, DirectIteration())
+    return sol.z[end][2]
+end
+@testset "last observable with noise, no observable noise" begin
+    T = 20
+    noise = Matrix([1.0; zeros(T - 1)]')  # impulse
+    u_nonzero = [0.1, 0.2]
+    last_observable_pass_noise(A_rbc, B_rbc, C_rbc, u_nonzero, noise)
+    gradient(last_observable_pass_noise, A_rbc, B_rbc, C_rbc, u_nonzero, noise)
+    test_rrule(Zygote.ZygoteRuleConfig(),
+               (u_nonzero) -> last_observable_pass_noise(A_rbc, B_rbc, C_rbc, u_nonzero,
+                                                         noise),
+               u_nonzero;
+               rrule_f = rrule_via_ad,
+               check_inferred = false)
 end
