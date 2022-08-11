@@ -125,12 +125,14 @@ dev ..
 ```
 
 After that step, only `] activate docs` is required.  To generate documentation locally
-```
+
+```julia
  include("docs/make.jl")
- ```
+```
 
 Then to update the jldoctest output,
-```
+
+```julia
 using Documenter, DifferenceEquations
 doctest(DifferenceEquations, fix=true)
 ```
