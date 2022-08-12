@@ -1,143 +1,89 @@
 # Quadratic State Space Examples
 
-This tutorial provides additional features for linear models
+Second-order state-space models here have pruning as in [Andreasen, Fernandez-Villaverde, and Rubio-Ramirez (2017)](https://www.sas.upenn.edu/~jesusfv/Pruning.pdf).
+
+
+At this point, the package only supports linear time-invariant models without a separate `p` vector.  The canonical form is
+
+```math
+u_{n+1} = A_0 + A_1 u_n + u_n^{\top} A_2 u_n + B w_{n+1}
+```
+
+with
+
+```math
+z_n = C_0 + C_1 u_n + u_n^{\top} C_2 u_n +  v_n
+```
+
+and optionally $v_n \sim N(0, D)$ and $w_{n+1} \sim N(0,I)$.  If you pass noise into the solver, it no longer needs to be Gaussian.
+
 
 !!! note
+    Quadratic state-space models do not have the full feature coverage relative to the linear models.  In particular the auto-differentiation rules are only currently implemented for the `logpdf` required for estimation, and the simulation doesn't have much flexibility on which model elements can be missing.
 
-    This tutorial assumes you have read the [Ordinary Differential Equations tutorial](@ref ode_example), the mathematics of the [State Spaces Models](@ref state_space_types), and the more general [State Space Examples](@ref state_space_examples) tutorial.
-    
-    In addition, this package uses the `MatrixFreeOperator` in [DiffEqOperators.jl](https://github.com/SciML/DiffEqOperators.jl) to wrap the general linear equations.
+## Simulating a Quadratic (and Time-Invariant) State Space Model
 
+Creating a `QuadraticStateSpaceModel` is similar to the Linear version described previously.
+I 
+using DifferenceEquations, LinearAlgebra, Distributions, Random, Plots, DataFrames, Zygote, DiffEqBase
+A_0 =  [-7.824904812740593e-5, 0.0]
+A_1 = [0.95 6.2;
+     0.0  0.2]
+A_2 = cat([-0.0002 0.0334; 0.0 0.0],
+              [0.034 3.129; 0.0 0.0]; dims = 3)
+B = [0.0; 0.01;;] # matrix
+C_0 = [7.8e-5, 0.0]
+C_1 = [0.09 0.67;
+     1.00 0.00]
+C_2 = cat([-0.00019 0.0026; 0.0 0.0],
+    [0.0026 0.313; 0.0 0.0]; dims = 3)
+D = [0.01, 0.01] # diagonal observation noise
+u0 = zeros(2)
+T = 30
 
-The canonical form of the linear model is
-
-$$
-u_{n+1} = A(p, t_n) u_n + B(p,t_n) w_{n+1}
-$$
-with
-$$
-z_n = C(p, t_n) u_n +  v_n
-$$
-
-where we will tend to use $v_n \sim N(0, R)$ and $w_{n+1} \sim N(0,I)$.
-
-
-However, we will implement  on the the linear-time invariant (LTI) version,
-$$
-u_{n+1} = A u_n +  B w_{n+1}
-$$
-with
-$$
-z_n = C u_n +  v_n
-$$
-and $v_n \sim N(0, R)$ where $A, B, C$ and $R$ may be parameterized by $p$.
-
-## Example 1: Linear (and Time-Invariant) State Space Model
-
-Creating a `LinearStateSpaceProblem` and simulating it for a simple, linear equation.
-
-```julia
-using DifferentialEquations, LinearAlgebra, Distributions, Random, Plots
-A = [0.8 0.0; 0.1 0.7]
-B = Diagonal([0.1, 0.5])
-C = [0.5 0.5] # one observable
-R = [0.01]
-
-# Simulate data
-T = 10
-u₀=[0.0, 0.1]
-tspan = (0, T)
-
-prob = LinearStateSpaceProblem(A,B,u₀,tspan; C = C, R = R)
+prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T); C_0, C_1, C_2, observables_noise = D, syms = [:a, :b])
+sol = solve(prob)
 ```
 
-We can `solve` the model to simulate a path.  Since we have not provided the $w_t$ or $v_t$ sequence, it will simulate it using the default Gaussian draws.  The use of the algorithm `LinearGaussian()` is a specialization
-
-```julia
-sol = solve(prob, LinearGaussian())  # default algorithm is linear-gaussian iteration
-@show sol[1]  # This is the observation at the first time period.
-@show sol[1,:]  # the observation of the first value for all periods
-
-plot(sol)  # or plot(sol.z)
-```
-
-The `u` state is not-observable in the primary output.  To access the simulated values,
-
-```julia
-plot(sol.u)
-```
-
-!!! note
-
-    Since the output of the state space model is the observables, `sol[i,j]` refers to `sol.z[i,j]` instead of `sol.u[i,j]`
-
-Assuming that you chose to save the `noise` and the `observational_noise` (i.e. `solve(prob; save_noise = true, save_observational_noise = true`) are the defaults, then you can also access them through
-
-```julia
-plot(sol.W)  # noise on the evolution equation
-plot(sol.V)  # observational noise, if it exists.
-````
-
-## Example 2: Kalman Filter for LTI System
-
-Here, we will setup a `LinearStateSpaceProblem` with a prior, and calculate the likelihood of the observables using the `KalmanFilter` (which will be exact in this case since we provide a linear gaussian model).
-
-```julia
-p = [0.8, 0.05, 0.01]
-T = 10
-u₀_prior = MvNormal([0.0, 0.1], Diagonal([0.01, 0.01])
-tspan = (0, T)
-
-prob = LinearStateSpaceProblem(A, B, u₀_prior, tspan; C = C, R = R)  # prior for initial condition
-# Simulate some observables, where u0 is drawn from the prior
-sol_sim = solve(prob, LinearGaussian())
-z = sol_sim
-```
-
-Then, attach the observables, and calculate the likelihood,
-
-```julia
-prob = LinearStateSpaceProblem(A, B, u₀_prior, tspan; C = C, R = R, observables = z)
-sol = solve(prob, KalmanFilter(); save_everystep = true)
-@show sol.logpdf
-```
-
-Or, we can use the `sol` to extract the sequence of posteriors.
-
-```julia
-# Or to extract the posteriors
-plot(sol.t, [mean(posterior) for posterior in sol.posteriors])
-plot(sol.t, [cov(posterior) for posterior in  sol.posteriors])  # posterior covariance
-
-# TODO: add recipe of some sort?  posterior mean and the 5th/95th quantiles around it?
+As in the linear case, this model can be simulated and plotted
+```@example 2
 plot(sol)
 ```
 
-To run the filter without storing the intermediate values (e.g. if you only need the log likelihood), use the standard `solve` options - where `save_everystep = false` is the default.
-
-```julia
-sol = solve(prob, KalmanFilter(); save_everystep = false, save_posteriors = false)
-sol.t  # does not save all time periods and saves no posteriors
+And the observables and noise can be stored
+```@example 2
+observables = hcat(sol.z...)  # Observables required to be matrix.  Issue #55 
+observables = observables[:, 2:end] # see note above on likelihood and timing
+noise = sol.W
 ```
 
-Note: If we wish to run a smoother, we can replace the algorithm with `KalmanSmoother()`, which will update the `u` and `posteriors` on its back-pass.
+Ensembles work as well,
 
+```@example 2
+trajectories = 50
+u0_dist = MvNormal([1.0 0.1; 0.1 1.0])  # mean zero initial conditions
+prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0_dist, (0, T); C_0, C_1, C_2, observables_noise = D, syms = [:a, :b])
+ens_sol = solve(EnsembleProblem(prob), DirectIteration(), EnsembleThreads(); trajectories)
+summ = EnsembleSummary(ens_sol)  # calculate summarize statistics such as quantiles
+plot(summ)
+```
 
-## Example 3: Differentiating the Kalman Filter
+## Joint Likelihood with Noise
+To calculate the likelihood, the Kalman Filter is no longer applicable.  However, we can still calculate the joint likelihood we did in the linear examples.  Using the simulated observables and noise,
 
-We are then able to differentiate the filter.
-```julia
-function logpdf_KF(z, u₀, p)
-    # parameterize matrices
-    A = [p[1] 0.0; 0.1 0.7]
-    B = Diagonal([0.1, p[2]])
-    C = [0.5 0.5]
-    R = [p[3]]  # one observable
-
-    prob = LinearStateSpaceProblem(A, B, u₀,tspan; C=C, R=R)  # Gaussian noise
-    return solve(prob, KalmanFilter(), save_everystep = false).logpdf
+```@example 2
+function joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables)
+    prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables,2)); C_0, C_1, C_2, observables, observables_noise = D, noise)
+    return solve(prob).logpdf
 end
-gradient(p -> logpdf_KF(z, u₀, p), p)
+u0 = [0.0, 0.0]
+joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables)
 ```
+Which, in turn can itself be differentiated.
 
-Note that we have bound the initial prior but could have parameterized and differentiated that as well.
+```@example 2
+gradient((A_0, A_1, A_2, B, C_0, C_1, C_2, noise) -> joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables), A_0, A_1, A_2, B, C_0, C_1, C_2, noise)
+```
+Note that this is calculating the gradient of the likelihood with respect to the underlying canonical representations for the quadratic state space form, but also the entire noise vector.
+
+As in the linear case, this likelihood calculation can nested such that a separate differentiable function could generate the quadratic state space model and the gradients could be over a smaller set of structural parameters.

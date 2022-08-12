@@ -309,7 +309,7 @@ optprob = OptimizationProblem(optf, x0)
 optsol = solve(optprob,LBFGS())
 ```
 
-This "solves" the problem relatively quickly, despite the high-dimensionality.  However, from a statistics perspective note that this last optimization process does not do especially well in recovering the pseudotrue if you increase the prior variance on the `β` parameter.  Maximizing the posterior is usually the wrong thing to do in high-dimensions.
+This "solves" the problem relatively quickly, despite the high-dimensionality.  However, from a statistics perspective note that this last optimization process does not do especially well in recovering the pseudotrue if you increase the prior variance on the `β` parameter.  Maximizing the posterior is usually the wrong thing to do in high-dimensions because the mode is not a typical set.
 
 
 ## Caveats on Gradients and Performance

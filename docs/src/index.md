@@ -72,7 +72,7 @@ When the system is linear and the prior is gaussian, there is an exact likelihoo
 
 ## Current Status
 At this point, the package does not cover all of the variations on these features. In particular,
-1. It only supports linear and quadratic $f, g, h$ functions.  General $f,g$ will be next.
+1. It only supports linear and quadratic $f, g, h$ functions.  General $f,g$ simulation are relatively easy to add, but full SciML compliance would require experience with those APIs.  The custom rrule for those is also a straightforward variation on the existing linear version.
 2. It only supports time-invariant functions
 3. There is limited support for non-Gaussian $w_n$ and $v_n$ processes.
 4. It does not support linear or quadratic functions parameterized by the $p$ vector for differentiation
