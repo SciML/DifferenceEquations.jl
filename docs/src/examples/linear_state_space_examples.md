@@ -112,15 +112,17 @@ Gradients of other model elements (e.g. `.u` are also possible.  With this in mi
 
 ```@example 1
 function mean_u_1(A, B, C, noise, u0, T)
-    problem = LinearStateSpaceProblem(A, B, u0, (0, T); noise, syms = [:a, :b]) # leaving off observation equation
+    problem = LinearStateSpaceProblem(A, B, u0, (0, T); noise, syms = [:a, :b])
     sol = solve(problem)
-    u = sol.u # weird bug where temporary necessary to differentiate    
-    return mean( u[i][1] for i in 1:T) # can have nontrivial functions and even non-mutating loops
+    u = sol.u # see issue #75 workaround   
+    # can have nontrivial functions and even non-mutating loops 
+    return mean( u[i][1] for i in 1:T)
 end
 u0 = [0.0, 0.0]
 noise = sol.W # from simulation above
 mean_u_1(A, B, C, noise, u0, T)
-gradient((noise, u0)-> mean_u_1(A, B, C, noise, u0, T), noise, u0) # dropping a few arguments from derviative
+# dropping a few arguments from derivative
+gradient((noise, u0)-> mean_u_1(A, B, C, noise, u0, T), noise, u0) 
 ```
 
 ## Simulating Ensembles and Fixing Noise
@@ -160,11 +162,48 @@ sol.z # simulated observables with observation noise
 ```
 
 Next we will find the log likelihood of these simulated observables using the `u0` as a prior and with the true parameters.
-```@example 1
-observables = hcat(sol.z...)  # Right now, observables required to be matrix.  See https://github.com/SciML/DifferenceEquations.jl/issues/55 
-u0_prior_var = cov(u0)  # use covariance of distribution we drew from.  Mean zero by default.
 
-# new arguments: u0_prior_variance and observables.  The u0 argument is ignored for the filter
-prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables,)); C, observables, observables_noise = D, syms = [:a, :b], u0_prior_var)
-solve(prob, KalmanFilter())  # the KalmanFilter() is redundant here since it can select it manually given the priors.
+The new arguments we pass to the problem creation are `u0_prior_variance, u0_prior_mean,` and `observables`.  The `u0` is ignored for the filtering problem but must match the size.  The `KalmanFilter()` argument to the `solve` is unnecessary since it can select it manually given the priors and observables.
+
+```@example 1
+observables = hcat(sol.z...)  # Observables required to be matrix.  Issue #55 
+noise = copy(sol.W) # save for later
+u0_prior_mean = [0.0, 0.0]
+# use covariance of distribution we drew from
+u0_prior_var = cov(u0)  
+
+prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables,2)); C, observables, observables_noise = D, syms = [:a, :b], u0_prior_var, u0_prior_mean)
+sol = solve(prob, KalmanFilter())  
+# plot(sol) The `u` is the sequence of posterior means.
+sol.logpdf
+```
+
+Hence the `logpdf` provides the log likelihood marginalizing out the latent noise variables.
+
+As before, we can differentiate the kalman filter itself.
+```@example 1
+function kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables)
+    prob = LinearStateSpaceProblem(A, B, [0.0, 0.0], (0, size(observables,2)); C, observables, observables_noise = D, u0_prior_var, u0_prior_mean = [0.0, 0.0])
+    return solve(prob).logpdf  
+end
+kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables)
+# Find the gradient wrt the A, B, C and priors variance.
+gradient((A, B, C, u0_prior_var) -> kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables), A, B, C, u0_prior_var)
+```
+Some of the gradients, such as those for `observables` have not been implemented.
+As this is using reverse-mode AD it should be relatively efficient for large systems.
+## Joint Likelihood with Noise
+A key application of these methods is to find the joint likelihood of the latent variables (i.e., the `noise`) and the model definition.
+
+The actual calculation of the likelihood is trivial in that case, and just requires iteration of the linear system while accumulating the likelihood given the observation noise.
+
+Crucially, the differentiability with respect to the high-dimensional noise vector enables gradient-based sampling and estimation methods which would otherwise be infeasible.
+
+```@example 1
+function joint_likelihood(A, B, C, D, u0, noise, observables)
+    prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables,2)-1); C, observables, observables_noise = D, noise)
+    return solve(prob).logpdf
+end
+u0 = [0.0, 0.0]
+joint_likelihood(A, B, C, D, u0, noise, observables)
 ```
