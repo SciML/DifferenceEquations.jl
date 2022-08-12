@@ -4,3 +4,4 @@ Manifest.toml
 /.benchmarkci
 /benchmark/*.json
 LocalPreferences.toml
+docs/build

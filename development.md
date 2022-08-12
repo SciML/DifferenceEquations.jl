@@ -116,3 +116,18 @@ results_old = BenchmarkTools.load(output_path_old)[1]
 
 judge_results = judge(median(results_new), median(results_old)) # compare the median/etc.
 ```
+
+# Generating Documentation
+Activate the docs directory and then ensure it is using your local version
+```julia
+] activate docs
+dev ..
+```
+
+After that step, only `] activate docs` is required.  To generate documentation locally
+
+```julia
+include("docs/make.jl")
+```
+
+To visualize the generated documents during development on vscode, consider running the `> Live Preview: Start Server` and navigating to the `docs/build` directory.
