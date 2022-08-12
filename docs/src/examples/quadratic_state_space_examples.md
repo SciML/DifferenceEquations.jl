@@ -24,7 +24,8 @@ and optionally $v_n \sim N(0, D)$ and $w_{n+1} \sim N(0,I)$.  If you pass noise 
 ## Simulating a Quadratic (and Time-Invariant) State Space Model
 
 Creating a `QuadraticStateSpaceModel` is similar to the Linear version described previously.
-I 
+
+```@example 2
 using DifferenceEquations, LinearAlgebra, Distributions, Random, Plots, DataFrames, Zygote, DiffEqBase
 A_0 =  [-7.824904812740593e-5, 0.0]
 A_1 = [0.95 6.2;
@@ -46,6 +47,7 @@ sol = solve(prob)
 ```
 
 As in the linear case, this model can be simulated and plotted
+
 ```@example 2
 plot(sol)
 ```

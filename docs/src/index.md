@@ -53,18 +53,24 @@ If an algorithm is given for the filtering, then the return type of `solve` will
 
 ### Joint Likelihood
 In the case of a joint-likelihood where the `noise` (i.e. $w_t$) is given it is not a hidden markov model and the log likelihood simply accumulates the likelihood of each observation.  The timing is such that given a $u_0$ which is fixed (and often added to the likelihood separately) and there are observables $z \equiv \{z_1, \ldots z_N}$ and noise $w \equiv \{w_1, \ldots w_N\}$ then,
-$$
+
+```math
 \mathcal{L}(z, u_0, w) = \sum_{n=1}^N \log P\left(v_n, t_n, w_n\right) 
-$$
+```
+
 where
-$$
+
+```math
 v_t = z_n - h(u_n, p, t_n)\\
 u_{n+1} = f(u_n,p,t_n) + g(u_n,p,t_n) w_{n+1}
-$$
+```
+
 The density is In the case of the typical Gaussian errors, it would be
-$$
+
+```math
 z_n - h(u_n, p, t_n) ~ N(0, D)
-$$
+```
+
 Ultimately IID Gaussian observation noise is not required---though the package currently only supports gaussian observation noise with a diagonal covariance matrix, it could be adapted without significant changes.
 
 ### Linear Filtering for the Marginal Likelihood
