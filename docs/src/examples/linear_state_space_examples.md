@@ -208,12 +208,109 @@ Crucially, the differentiability with respect to the high-dimensional noise vect
 
 ```@example 1
 function joint_likelihood(A, B, C, D, u0, noise, observables)
-    prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables,2)-1); C, observables, observables_noise = D, noise)
+    prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables,2)); C, observables, observables_noise = D, noise)
     return solve(prob).logpdf
 end
 u0 = [0.0, 0.0]
 joint_likelihood(A, B, C, D, u0, noise, observables)
 ```
+
+And as always, this can be differentiated with respect to the state-space matrices and the noise.  Choosing a few parameters,
+```@example 1
+gradient((A, u0, noise) -> joint_likelihood(A, B, C, D, u0, noise, observables), A, u0, noise)
+```
+
+## Composition of State Space Models and AD
+While the above gradients have been with respect to the full state space objects `A, B`, etc. those themselves could be generated through a separate procedure and the whole object differentiated.  For example, lets repeat the above examples where we generate the `A` matrix from some sort of deep parameters.
+
+First we will generate some observations with a `generate_model` proxy---which could be replaced with something more complicated but still differentiable
+
+```@example 1
+function generate_model(β)
+    A = [β 6.2;
+        0.0  0.2]
+    B = Matrix([0.0  0.001]') # [0.0; 0.001;;] gives a zygote bug
+    C = [0.09 0.67;
+        1.00 0.00]
+    D = [0.01, 0.01]
+    return (;A,B,C,D)
+end
+
+function simulate_model(β, u0;T = 200)
+    mod = generate_model(β)
+    prob = LinearStateSpaceProblem(mod.A, mod.B, u0, (0, T); mod.C, observables_noise = mod.D)
+    sol = solve(prob) # simulates
+    observables = hcat(sol.z...)
+    observables = observables[:, 2:end] # see note above on likelihood and timing
+    return observables, sol.W
+end
+
+# Fix a "pseudo-true" and generate noise and observables
+β = 0.95
+u0 = [0.0, 0.0]
+observables, noise = simulate_model(β, u0)
+```
+
+Next, we will evaluate the marginal likelihood using the kalman filter for a particular `β` value,
+```@example 1
+function kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)
+    mod = generate_model(β) # generate model from structural parameters
+    prob = LinearStateSpaceProblem(mod.A, mod.B, u0, (0, size(observables,2)); mod.C, observables,      observables_noise = mod.D, u0_prior_var, u0_prior_mean)
+    return solve(prob).logpdf
+end
+u0_prior_mean = [0.0, 0.0]
+u0_prior_var = [1e-10 0.0;
+                0.0 1e-10]  # starting with degenerate prior
+kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)
+```
+
+Given the observation error we would not expect the pseudo-true to exactly maximimize the log likelihood.  To show this, we can optimize it using using the Optim package and using a gradient-based optimization routine
+
+```@example 1
+using Optimization, OptimizationOptimJL
+# Create a function to minimize only of β and use Zygote based gradients
+kalman_objective(β,p) = -kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)
+kalman_objective(0.95, nothing)
+gradient(β ->kalman_objective(β, nothing),β) # Verifying it can be differentiated
+
+
+optf = OptimizationFunction(kalman_objective, Optimization.AutoZygote())
+β0 = [0.91] # start off of the pseudotrue
+optprob = OptimizationProblem(optf, β0)
+optsol = solve(optprob,LBFGS())  # reverse-mode AD is overkill here
+```
+
+In this way, this package composes with others such as [DifferentiableStateSpaceModels.jl](https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl) which take a set of structural parameters and an expectational difference equation and generate a state-space model.
+
+
+Similarly, we can find the joint likelihood for a particular `β` value and noise.  Here we will add in prior.  Some form of a prior or regularization is generally necessary for these sorts of nonlinear models.
+```@example 1
+function joint_model_posterior(β, u0, noise, observables, noise_prior, β_prior)
+    mod = generate_model(β) # generate model from structural parameters
+    prob = LinearStateSpaceProblem(mod.A, mod.B, u0, (0, size(observables,2)); mod.C, observables,      observables_noise = mod.D, noise)
+    return solve(prob).logpdf + sum(logpdf.(noise_prior, noise)) + logpdf(β_prior, β) # posterior
+end
+u0 = [0.0, 0.0]
+noise_prior = Normal(0.0, 1.0)
+β_prior = Normal(β, 0.03) # prior local to the true value
+joint_model_posterior(β, u0, noise, observables, noise_prior, β_prior)
+```
+
+Which we can turn into a differntiable objective adding in a prior on the noise
+```@example 1
+joint_model_objective(x, p) = -joint_model_posterior(x[1], u0, Matrix(x[2:end]'), observables, noise_prior, β_prior) # extract noise and parameeter from vector
+x0 = vcat([0.95], noise[1,:])  # starting at the true noise
+joint_model_objective(x0, nothing)
+gradient(x ->joint_model_objective(x, nothing),x0) # Verifying it can be differentiated
+
+# optimize
+optf = OptimizationFunction(joint_model_objective, Optimization.AutoZygote())
+optprob = OptimizationProblem(optf, x0)
+optsol = solve(optprob,LBFGS())
+```
+
+This "solves" the problem relatively quickly, despite the high-dimensionality.  However, from a statistics perspective note that this last optimization process does not do especially well in recovering the pseudotrue if you increase the prior variance on the `β` parameter.  Maximizing the posterior is usually the wrong thing to do in high-dimensions.
+
 
 ## Caveats on Gradients and Performance
 

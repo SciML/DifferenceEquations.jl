@@ -130,9 +130,4 @@ After that step, only `] activate docs` is required.  To generate documentation 
 include("docs/make.jl")
 ```
 
-To update the jldoctest output in the docs,
-
-```julia
-using Documenter, DifferenceEquations
-doctest(DifferenceEquations, fix=true)
-```
+To visualize the generated documents during development on vscode, consider running the `> Live Preview: Start Server` and navigating to the `docs/build` directory.

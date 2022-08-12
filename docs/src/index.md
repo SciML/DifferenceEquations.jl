@@ -52,9 +52,9 @@ Certain `solve` algorithms will run a filter on the unobservable `u` states and 
 If an algorithm is given for the filtering, then the return type of `solve` will have access to a `logpdf` for the log likelihood.  In addition, the solution will provide information on the sequence of posteriors (and smoothed values, if required).
 
 ### Joint Likelihood
-In the case of a joint-likelihood where the `noise` (i.e. $w_t$) is given it is not a hidden markov model and the log likelihood simply accumulates the likelihood of each observation.
+In the case of a joint-likelihood where the `noise` (i.e. $w_t$) is given it is not a hidden markov model and the log likelihood simply accumulates the likelihood of each observation.  The timing is such that given a $u_0$ which is fixed (and often added to the likelihood separately) and there are observables $z \equiv \{z_1, \ldots z_N}$ and noise $w \equiv \{w_1, \ldots w_N\}$ then,
 $$
-\mathcal{L}(z, u_0, w) = \sum_{n=1}^N \log P\left(v_t, t_n\right) 
+\mathcal{L}(z, u_0, w) = \sum_{n=1}^N \log P\left(v_n, t_n, w_n\right) 
 $$
 where
 $$
@@ -65,10 +65,10 @@ The density is In the case of the typical Gaussian errors, it would be
 $$
 z_n - h(u_n, p, t_n) ~ N(0, D)
 $$
-In principle, though, Gaussian observation noise is not required---even if the package currently only supports gaussian observation noise with a diagonal covariance matrix.
+Ultimately IID Gaussian observation noise is not required---though the package currently only supports gaussian observation noise with a diagonal covariance matrix, it could be adapted without significant changes.
 
 ### Linear Filtering for the Marginal Likelihood
-When the system is linear and the prior is gaussian, there is an exact likelihood for the marginal likelihood using the [Kalman Filter](https://en.wikipedia.org/wiki/Kalman_filter#Marginal_likelihood).  Unlike the previous example, this is a marginal likelihood and not conditional on the noise, $w$.  That is, it finds $\mathcal{L}(z, u_0)$.
+When the system is linear and the prior is gaussian, there is an exact likelihood for the marginal likelihood using the [Kalman Filter](https://en.wikipedia.org/wiki/Kalman_filter#Marginal_likelihood).  Unlike the previous example, this is a marginal likelihood and not conditional on the noise, $w$.  See the [Kalman Filter Likelihood](https://en.wikipedia.org/wiki/Kalman_filter#Marginal_likelihood) for more details.
 
 ## Current Status
 At this point, the package does not cover all of the variations on these features. In particular,
@@ -80,7 +80,7 @@ At this point, the package does not cover all of the variations on these feature
 6. It does not support in-place vs. out-of-place, support static arrays, or matrix-free linear operators.
 7. While many functions in the SciML framework are working, support is incomplete.
 8. There is not complete coverage of gradients for the solution for all parameter inputs/etc.
-9. The package does not support non-gaussian observation noise and is not consistent with SciML noise process notation.
+9. The package does not support non-gaussian observation noise and is not consistent with SciML noise process data structures.
 10. Many cleanup steps are necessary for full SciML compliance (e.g., enable passing in vectors-of-vectors or noise/observations, standard sciml dispatching)
 
 To help contribute on filling in these features, see the [issues](https://github.com/SciML/DifferenceEquations.jl/issues).
