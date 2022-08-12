@@ -14,7 +14,7 @@ with
 z_n = C u_n +  v_n
 ```
 
-and optionally $v_n \sim N(0, D)$ and $w_{n+1} \sim N(0,I)$.  If you pass noise into the solver, it no longer needs to be gaussian.
+and optionally $v_n \sim N(0, D)$ and $w_{n+1} \sim N(0,I)$.  If you pass noise into the solver, it no longer needs to be Gaussian.  More generally, support could be added for $u_{n+1} = A(p,n) u_n + B(p,n) w_{n+1}$ where $p$ is a vector of differentiable parameters, and the $A$ and $B$ are potentially matrix-free operators.
 
 
 ## Simulating a Linear (and Time-Invariant) State Space Model
@@ -165,8 +165,12 @@ Next we will find the log likelihood of these simulated observables using the `u
 
 The new arguments we pass to the problem creation are `u0_prior_variance, u0_prior_mean,` and `observables`.  The `u0` is ignored for the filtering problem but must match the size.  The `KalmanFilter()` argument to the `solve` is unnecessary since it can select it manually given the priors and observables.
 
+!!! note
+    The timing convention is such that `observables` are expected to match the predictions starting at the second time period.  As the likelihood of the first element `u0` comes from a prior, the `observables` start at the next element, and hence the observables and noise sequences should be 1 less than the tspan 
+
 ```@example 1
 observables = hcat(sol.z...)  # Observables required to be matrix.  Issue #55 
+observables = observables[:, 2:end] # see note above on likelihood and timing
 noise = copy(sol.W) # save for later
 u0_prior_mean = [0.0, 0.0]
 # use covariance of distribution we drew from
@@ -183,15 +187,18 @@ Hence the `logpdf` provides the log likelihood marginalizing out the latent nois
 As before, we can differentiate the kalman filter itself.
 ```@example 1
 function kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables)
-    prob = LinearStateSpaceProblem(A, B, [0.0, 0.0], (0, size(observables,2)); C, observables, observables_noise = D, u0_prior_var, u0_prior_mean = [0.0, 0.0])
+    prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables,2)); C, observables, observables_noise = D, syms = [:a, :b], u0_prior_var, u0_prior_mean)
     return solve(prob).logpdf  
 end
 kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables)
 # Find the gradient wrt the A, B, C and priors variance.
 gradient((A, B, C, u0_prior_var) -> kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables), A, B, C, u0_prior_var)
 ```
-Some of the gradients, such as those for `observables` have not been implemented.
-As this is using reverse-mode AD it should be relatively efficient for large systems.
+
+!!! note
+    Some of the gradients, such as those for `observables`, have not been implemented so test carefully.  This is a general theme with gradients and `Zygote.jl` in general.  Your best friend in this process is the spectacular [ChainRulesTestUtils.jl](https://github.com/JuliaDiff/ChainRulesTestUtils.jl) package. See `test_rrule` usage in the [linear unit tests](https://github.com/SciML/DifferenceEquations.jl/blob/main/test/linear_gradients.jl).
+
+
 ## Joint Likelihood with Noise
 A key application of these methods is to find the joint likelihood of the latent variables (i.e., the `noise`) and the model definition.
 
@@ -207,3 +214,12 @@ end
 u0 = [0.0, 0.0]
 joint_likelihood(A, B, C, D, u0, noise, observables)
 ```
+
+## Caveats on Gradients and Performance
+
+A few notes on performance and gradients:
+1. As this is using reverse-mode AD it will be efficient for fairly large systems as long as the ultimate value of your differentiable program.  With a little extra work and unit tests, it could support structured matrices/etc. as well.
+2. Getting to much higher scales, where the `A,B,C,D` are so large that matrix-free operators is necessary, is feasible but will require generalizing those to LinearOperators.  This would be reasonably easy for the joint likelihood and feasible but possible for the Kalman filter
+3. At this point, there is no support for forward-mode auto-differentiation.  For smaller systems with a kalman filter, this should dominate the alternatives, and efficient forward-mode AD rules for the kalman filter exist (see the supplementary materials in the the [Differentiable State Space Models](https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl) paper).  However, it would be a significant amount of work to add end-to-end support and fulfill standard SciML interfaces, and perhaps waiting for [Enzyme](https://enzyme.mit.edu/julia/) or similar AD systems that provide both forward/reverse/mixed mode makes sense.
+4. Forward-mode AD is likely inappropriate for the joint-likelihood based models since the dimensionality of the noise is always large.
+5. The gradient rules are written using [ChainRules.jl](https://github.com/JuliaDiff/ChainRules.jl) so in theory they will work with any supporting AD.  In practice, though, Zygote is the most tested and other systems have inconsistent support on Julia at this time.
