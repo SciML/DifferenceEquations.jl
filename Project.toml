@@ -1,7 +1,7 @@
 name = "DifferenceEquations"
 uuid = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
 authors = ["various contributors"]
-version = "0.4.19"
+version = "0.5.1"
 
 [deps]
 CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
