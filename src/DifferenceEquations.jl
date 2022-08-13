@@ -11,9 +11,6 @@ using DiffEqBase
 using DiffEqBase: __solve
 using SciMLBase: build_solution
 
-#using RecursiveArrayTools
-# include("matrix_vector_of_vectors.jl") # later add support for recursivearrays for noise/observations as vector-of-vector 
-
 include("utilities.jl")
 include("problems/state_space_problems.jl")
 include("solutions/state_space_solutions.jl")

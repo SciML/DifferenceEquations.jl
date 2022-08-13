@@ -1,4 +1,5 @@
 
+# This should be ported over to use the "maybe" utilities of the linear model, which will expand the number of model variations that are available.
 function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType, uPriorMeanType,
                                                              uPriorVarType,
                                                              tType, P, NP, F, A0Type,
@@ -21,12 +22,14 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType, uPriorMeanTy
 
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
-    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)] # should be the native datastructure
-    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)] # should be the native datastructure
+    # These should be be the native datastructure and replace A_2 and C_2
+    # See https://github.com/SciML/DifferenceEquations.jl/issues/54
+    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)]
+    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)]
 
-    u_f = [zero(prob.u0) for _ in 1:T]  # TODO: move to internal algorithm cache
-    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
-    z = [zero(C_0) for _ in 1:T] # TODO: move to internal algorithm cache
+    u_f = [zero(prob.u0) for _ in 1:T]
+    u = [zero(prob.u0) for _ in 1:T]
+    z = [zero(C_0) for _ in 1:T]
 
     u[1] .= prob.u0
     u_f[1] .= prob.u0
@@ -57,6 +60,7 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType, uPriorMeanTy
                           retcode = :Success)
 end
 
+# Note: this repeats the primal calculation because so many of the internal buffers are useful for the rrule.  Refactoring could enable directly shared buffers.
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSpaceProblem,
                               alg::DirectIteration, args...; kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
@@ -72,12 +76,14 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
 
     @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
 
-    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)] # should be the native datastructure
-    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)] # should be the native datastructure
+    # These should be be the native datastructure and replace A_2 and C_2
+    # See https://github.com/SciML/DifferenceEquations.jl/issues/54
+    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)]
+    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)]
 
-    u_f = [zero(prob.u0) for _ in 1:T]  # TODO: move to internal algorithm cache
-    u = [zero(prob.u0) for _ in 1:T] # TODO: move to internal algorithm cache
-    z = [zero(C_0) for _ in 1:T] # TODO: move to internal algorithm cache
+    u_f = [zero(prob.u0) for _ in 1:T]
+    u = [zero(prob.u0) for _ in 1:T]
+    z = [zero(C_0) for _ in 1:T]
 
     u[1] .= prob.u0
     u_f[1] .= prob.u0

@@ -47,12 +47,12 @@ A few notes on the structure:
 4. If $f, g, h$ are not functions of time, then it is a time-invariant state-space model.
 
 ## Likelihood and Filtering Calculations
-Certain `solve` algorithms will run a filter on the unobservable `u` states and compare to the `observables` if provided.  In that case, it might do so (1) with unobservable `w_t` noise; or (2) conditioning on a particular sequence of $w_{t+1}$ shocks, where the likelihood depends on the unknown observational error `v_t`.
+Certain `solve` algorithms will run a filter on the unobservable `u` states and compare to the `observables` if provided.  In that case, it might do so (1) with unobservable $w_n$ noise; or (2) conditioning on a particular sequence of $w_{n+1}$ shocks, where the likelihood depends on the unknown observational error $v_n$.
 
 If an algorithm is given for the filtering, then the return type of `solve` will have access to a `logpdf` for the log likelihood.  In addition, the solution will provide information on the sequence of posteriors (and smoothed values, if required).
 
 ### Joint Likelihood
-In the case of a joint-likelihood where the `noise` (i.e. $w_t$) is given it is not a hidden markov model and the log likelihood simply accumulates the likelihood of each observation.  The timing is such that given a $u_0$ which is fixed (and often added to the likelihood separately) and there are observables $z \equiv \{z_1, \ldots z_N}$ and noise $w \equiv \{w_1, \ldots w_N\}$ then,
+In the case of a joint-likelihood where the `noise` (i.e. $w_n$) is given it is not a hidden markov model and the log likelihood simply accumulates the likelihood of each observation.  The timing is such that given a $u_0$ which is fixed (and often added to the likelihood separately) and there are observables $z \equiv \{z_1, \ldots z_N\}$ and noise $w \equiv \{w_1, \ldots w_N\}$ then,
 
 ```math
 \mathcal{L}(z, u_0, w) = \sum_{n=1}^N \log P\left(v_n, t_n, w_n\right) 
@@ -61,14 +61,14 @@ In the case of a joint-likelihood where the `noise` (i.e. $w_t$) is given it is 
 where
 
 ```math
-v_t = z_n - h(u_n, p, t_n)\\
+v_n = z_n - h(u_n, p, t_n)\\
 u_{n+1} = f(u_n,p,t_n) + g(u_n,p,t_n) w_{n+1}
 ```
 
-The density is In the case of the typical Gaussian errors, it would be
+The density, $P$, is in the case of the typical Gaussian errors, it would be
 
 ```math
-z_n - h(u_n, p, t_n) ~ N(0, D)
+z_n - h(u_n, p, t_n) \sim N(0, D)  = P
 ```
 
 Ultimately IID Gaussian observation noise is not required---though the package currently only supports gaussian observation noise with a diagonal covariance matrix, it could be adapted without significant changes.
