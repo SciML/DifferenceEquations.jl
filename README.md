@@ -16,6 +16,6 @@ Relative to existing solvers, this package is intended to provide **differentiab
 ## Tutorials and Documentation
 
 For information on using the package,
-[see the stable documentation](https://DifferenceEquations.sciml.ai/stable/). Use the
-[in-development documentation](https://DifferenceEquations.sciml.ai/dev/) for the version of
+[see the stable documentation](https://sciml.github.io/DifferenceEquations.jl/stable/). Use the
+[in-development documentation](https://sciml.github.io/DifferenceEquations.jl/dev/) for the version of
 the documentation, which contains the unreleased features.
