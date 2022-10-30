@@ -78,6 +78,40 @@ function solve_manual(observables, A, B, C, R_raw, u0_mean, u0_variance, tspan)
     return copy(z), copy(u), copy(P), loglik
 end
 
+function solve_manual_cov_lik(A, B, C, u0_mean, u0_variance_vech, observables, R_raw, tspan)
+    # hardcoded right now for tspan = (0, T) for T+1 points
+    T = tspan[2]
+    @assert tspan[1] == 0
+    @assert size(observables)[2] == T # i.e. we do not calculate the likelihood of the initial condition
+
+    # Gaussian Prior
+    # u0 prior taken from params
+    u0_variance_cholesky = unvech_5(u0_variance_vech)
+    u0_variance = u0_variance_cholesky * u0_variance_cholesky'
+    B_prod = B * B'
+    R = get_matrix(R_raw)
+
+    u = u0_mean
+    P = u0_variance
+    z = C * u
+    loglik = 0.0
+    for i in 2:(T + 1)
+        # Kalman iteration
+        u = A * u
+        P = A * P * A' + B_prod
+        z = C * u
+
+        CP_i = C * P
+        V_temp = CP_i * C' + R
+        V = (V_temp + V_temp') / 2
+        loglik += logpdf(MvNormal(z, V), observables[:, i - 1])
+        K = CP_i' / V  # gain
+        u += K * (observables[:, i - 1] - z)
+        P -= K * CP_i
+    end
+    return loglik
+end
+
 A_kalman = [0.0495388 0.0109918 0.0960529 0.0767147 0.0404643;
             0.020344 0.0627784 0.00865501 0.0394004 0.0601155;
             0.0260677 0.039467 0.0344606 0.033846 0.00224089;
@@ -219,4 +253,17 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855,
                                                           u0_var,
                                                           observables_kalman,
                                                           D_offdiag).logpdf, u0_var_vech) rtol=1.4e-5
+end
+
+R = [0.01 0.0 0.0 0.0;
+     0.0 0.02 0.005 0.01;
+     0.0 0.005 0.03 0.0;
+     0.0 0.01 0.0 0.04]
+@testset "covariance prior likelihood" begin
+    loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
+                                  observables_kalman,
+                                  R, [0, T])
+    sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
+                           R)
+    @test sol.logpdf ≈ loglik
 end
