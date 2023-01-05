@@ -255,36 +255,15 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855,
                                                           D_offdiag).logpdf, u0_var_vech) rtol=1.4e-5
 end
 
-# JAMES TODO:  NOT SURE WHAT IS GOING ON HERE.  DO WE NEED THIS ANYMORE????  ONLY TESTING THE MANUAL
-# R = [0.01 0.0 0.0 0.0;
-#      0.0 0.02 0.005 0.01;
-#      0.0 0.005 0.03 0.0;
-#      0.0 0.01 0.0 0.04]
-# @testset "covariance prior manual" begin
-#     loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
-#                                   observables_kalman,
-#                                   R, [0, T])
-#     sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
-#                            R)
-#     @test sol.logpdf ≈ loglik
-#     #@test sol.z[end] ≈ z
-#     #@test sol.u[end] ≈ u
-#     #@test sol.P[end] ≈ P
-#     #test_rrule(Zygote.ZygoteRuleConfig(),
-#     #           (args...) -> solve_manual_cov_lik(args..., observables_kalman, R, [0, T]),
-#     #           A_kalman,
-#     #           B_kalman, C_kalman,
-#     #           u0_mean, u0_var_vech; rrule_f = rrule_via_ad, check_inferred = false)
-#     grad_values = gradient((args...) -> solve_manual_cov_lik(args..., [0, T]), A_kalman,
-#                            B_kalman,
-#                            C_kalman,
-#                            u0_mean,
-#                            u0_var_vech, observables_kalman,
-#                            R)
-
-#     @test grad_values[1] ≈
-#           finite_difference_gradient(A -> solve_manual_cov_lik(A, B_kalman, C_kalman, u0_mean,
-#                                                                u0_var_vech,
-#                                                                observables_kalman,
-#                                                                R, [0, T]), A_kalman) rtol = 1e-7
-# end
+R = [0.01 0.0 0.0 0.0;
+     0.0 0.02 0.005 0.01;
+     0.0 0.005 0.03 0.0;
+     0.0 0.01 0.0 0.04]
+@testset "covariance prior likelihood" begin
+    loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
+                                  observables_kalman,
+                                  R, [0, T])
+    sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
+                           R)
+    @test sol.logpdf ≈ loglik
+end
