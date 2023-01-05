@@ -4,7 +4,6 @@ authors = ["various contributors"]
 version = "0.5.0"
 
 [deps]
-CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 CommonSolve = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
@@ -16,7 +15,6 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
-CPUSummary = "0.1.22"
 ChainRulesCore = "1"
 CommonSolve = "0.2"
 DiffEqBase = "6.89"
@@ -25,4 +23,4 @@ PDMats = "0.11"
 RecursiveArrayTools = "2.25"
 SciMLBase = "1.39"
 UnPack = "1"
-julia = "1.6, 1.7"
+julia = "1.6"
