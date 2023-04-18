@@ -135,7 +135,6 @@ maybe_zero(A::Nothing) = nothing
 maybe_zero(A::AbstractArray, i::Int64) = zero(A[i])
 maybe_zero(A::Nothing, i) = nothing
 
-
 # old quad and adjoint replaced by inplace accumulation versions.
 # function quad(A::AbstractArray{<:Number,3}, x)
 #     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
