@@ -216,7 +216,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
             lmul!(0.5, V[t].mat)
 
             copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
-            cholesky!(V[t].chol.factors, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
+            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
             innovation[t] .= prob.observables[:, t - 1] - z[t]
             loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
 
@@ -334,7 +334,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
             lmul!(0.5, V[t].mat)
 
             copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
-            cholesky!(V[t].chol.factors, Val(false); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
+            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
             innovation[t] .= prob.observables[:, t - 1] - z[t]
             loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
 

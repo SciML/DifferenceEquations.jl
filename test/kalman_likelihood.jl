@@ -263,7 +263,8 @@ R = [0.01 0.0 0.0 0.0;
     loglik = solve_manual_cov_lik(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
                                   observables_kalman,
                                   R, [0, T])
-    sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech, observables_kalman,
+    sol = solve_kalman_cov(A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
+                           observables_kalman,
                            R)
     @test sol.logpdf ≈ loglik
 end
