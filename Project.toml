@@ -1,7 +1,7 @@
 name = "DifferenceEquations"
 uuid = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
 authors = ["various contributors"]
-version = "0.5.2"
+version = "0.5.3"
 
 [deps]
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
@@ -21,6 +21,6 @@ DiffEqBase = "6.122"
 Distributions = "0.25"
 PDMats = "0.11"
 RecursiveArrayTools = "2.25"
-SciMLBase = "1.39"
+SciMLBase = "1.39, 2"
 UnPack = "1"
 julia = "1.8"
