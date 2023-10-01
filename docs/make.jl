@@ -4,11 +4,9 @@ include("pages.jl")
 
 makedocs(sitename = "DifferenceEquations.jl",
          authors = "Various Authors",
-         clean = true,
-         doctest = false,
+         clean = true, doctest = false, linkcheck = true,
          modules = [DifferenceEquations],
-         format = Documenter.HTML(analytics = "UA-90474609-3",
-                                  assets = ["assets/favicon.ico"],
+         format = Documenter.HTML(assets = ["assets/favicon.ico"],
                                   canonical = "https://DifferenceEquations.sciml.ai/stable/"),
          pages = pages)
 
