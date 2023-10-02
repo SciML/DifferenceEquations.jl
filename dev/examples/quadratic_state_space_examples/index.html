@@ -21,35 +21,35 @@ Interpolation: Piecewise constant interpolation
 t: 0:30
 u: 31-element Vector{Vector{Float64}}:
  [0.0, 0.0]
- [-7.824904812740593e-5, 0.006307770668101442]
- [0.039080089059017956, -0.0006433679779752689]
- [0.03305824751962664, 0.011932115558893343]
- [0.1057781463753411, -0.002684967776754195]
- [0.08376543225568203, -0.004296250767978644]
- [0.052894317281844835, -0.02291453021478628]
- [-0.0903377969619396, -0.011617158559100475]
- [-0.15743294241875908, 0.009159298612529164]
- [-0.09269286892473462, 0.011157182182891587]
+ [-7.824904812740593e-5, -0.014174871850179864]
+ [-0.08740809055709255, -0.00615055356795041]
+ [-0.12109611185589793, -0.008644703220822069]
+ [-0.16841497651087353, -0.013793586707912671]
+ [-0.24484585607466353, -0.016274880013945635]
+ [-0.33249934159879146, -0.0006449120210821188]
+ [-0.3199576418544229, -0.001472321415895394]
+ [-0.3131484037019908, -0.0022805909596383487]
+ [-0.31166404581699036, -0.013951779405343822]
  ⋮
- [-0.18393244023702818, 0.003198538912574793]
- [-0.15499856838790238, -0.009648608931012012]
- [-0.2067590358066032, -0.008097524587080535]
- [-0.24639293036974622, -0.02127846158646238]
- [-0.3643153606981452, 0.0014265698136077653]
- [-0.3373895335048327, 0.00012533087405712325]
- [-0.3198474899041235, -0.018542409828967505]
- [-0.41743640471025983, -0.014936634188731104]
- [-0.48816190150479927, 0.01251752532090473]</code></pre><p>As in the linear case, this model can be simulated and plotted</p><pre><code class="language-julia hljs">plot(sol)</code></pre><img src="50772b6f.svg" alt="Example block output"/><p>And the observables and noise can be stored</p><pre><code class="language-julia hljs">observables = hcat(sol.z...)  # Observables required to be matrix.  Issue #55
+ [-0.10533030327985089, 0.005065299480454417]
+ [-0.06869620323337455, 0.0033249753138056733]
+ [-0.04470723402639369, -0.009631893635391253]
+ [-0.10194734264997406, 0.005358208010471831]
+ [-0.06365746823738916, 0.0038831867956083156]
+ [-0.03644809419918198, -0.013356549859691468]
+ [-0.11692173579961067, 0.0008424355863319161]
+ [-0.10593823348227299, -0.006000485952596671]
+ [-0.13776841595933648, -0.0002286949399806532]</code></pre><p>As in the linear case, this model can be simulated and plotted</p><pre><code class="language-julia hljs">plot(sol)</code></pre><img src="3e449f12.svg" alt="Example block output"/><p>And the observables and noise can be stored</p><pre><code class="language-julia hljs">observables = hcat(sol.z...)  # Observables required to be matrix.  Issue #55
 observables = observables[:, 2:end] # see note above on likelihood and timing
 noise = sol.W</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1×30 Matrix{Float64}:
- 0.630777  -0.190492  1.20608  -0.507139  …  -1.85675  -1.12282  1.55049</code></pre><p>Ensembles work as well,</p><pre><code class="language-julia hljs">trajectories = 50
+ -1.41749  -0.331558  -0.741459  -1.20646  …  0.351375  -0.616897  0.0971402</code></pre><p>Ensembles work as well,</p><pre><code class="language-julia hljs">trajectories = 50
 u0_dist = MvNormal([1.0 0.1; 0.1 1.0])  # mean zero initial conditions
 prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0_dist, (0, T); C_0, C_1, C_2, observables_noise = D, syms = [:a, :b])
 ens_sol = solve(EnsembleProblem(prob), DirectIteration(), EnsembleThreads(); trajectories)
 summ = EnsembleSummary(ens_sol)  # calculate summarize statistics such as quantiles
-plot(summ)</code></pre><img src="6b043410.svg" alt="Example block output"/><h2 id="Joint-Likelihood-with-Noise"><a class="docs-heading-anchor" href="#Joint-Likelihood-with-Noise">Joint Likelihood with Noise</a><a id="Joint-Likelihood-with-Noise-1"></a><a class="docs-heading-anchor-permalink" href="#Joint-Likelihood-with-Noise" title="Permalink"></a></h2><p>To calculate the likelihood, the Kalman Filter is no longer applicable. However, we can still calculate the joint likelihood as we did in the linear examples. Using the simulated observables and noise,</p><pre><code class="language-julia hljs">function joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables)
+plot(summ)</code></pre><img src="2374da60.svg" alt="Example block output"/><h2 id="Joint-Likelihood-with-Noise"><a class="docs-heading-anchor" href="#Joint-Likelihood-with-Noise">Joint Likelihood with Noise</a><a id="Joint-Likelihood-with-Noise-1"></a><a class="docs-heading-anchor-permalink" href="#Joint-Likelihood-with-Noise" title="Permalink"></a></h2><p>To calculate the likelihood, the Kalman Filter is no longer applicable. However, we can still calculate the joint likelihood as we did in the linear examples. Using the simulated observables and noise,</p><pre><code class="language-julia hljs">function joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables)
     prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, size(observables,2)); C_0, C_1, C_2, observables, observables_noise = D, noise)
     return solve(prob).logpdf
 end
 u0 = [0.0, 0.0]
-joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">41.1677764942346</code></pre><p>Which, in turn, can itself be differentiated.</p><pre><code class="language-julia hljs">gradient((A_0, A_1, A_2, B, C_0, C_1, C_2, noise) -&gt; joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables), A_0, A_1, A_2, B, C_0, C_1, C_2, noise)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([-446.1332531603147, -3459.16628141972], [74.16027672853299 2.596202308774716; 488.88668655428575 14.498231166959673], [-16.119863978902824 -0.314245354662911; -102.7109948846519 -0.987009249380144;;; -0.314245354662911 -0.0554162352042066; -0.987009249380144 -0.42130201819666], [204.55505092982042; 1546.3070736732097;;], [60.59867569170513, -23.2761787691396], [-1.9820872239074563 -0.4056015940824349; 16.132712325700286 0.1384920623012938], [-0.04945637977333089 0.0767644381439087; -5.061865746001304 -0.21361897981986355;;; 0.0767644381439087 0.009497207824194068; -0.21361897981986355 0.002567205184616977], [0.6401086309164203 1.143264587214894 … 0.015235485543152603 -0.10249006979083275])</code></pre><p>Note that this is not only calculating the gradient of the likelihood with respect to the underlying canonical representations for the quadratic state space form, but also the entire noise vector.</p><p>As in the linear case, this likelihood calculation can be nested such that a separate differentiable function could generate the quadratic state space model, and the gradients could be over a smaller set of structural parameters.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear_state_space_examples/">« Linear State Space Examples</a><a class="docs-footer-nextpage" href="../general_state_space_examples/">General State Space Examples »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.1.0 on <span class="colophon-date" title="Monday 2 October 2023 00:53">Monday 2 October 2023</span>. Using Julia version 1.9.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">52.132114374670124</code></pre><p>Which, in turn, can itself be differentiated.</p><pre><code class="language-julia hljs">gradient((A_0, A_1, A_2, B, C_0, C_1, C_2, noise) -&gt; joint_likelihood_quad(A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables), A_0, A_1, A_2, B, C_0, C_1, C_2, noise)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([1167.2868610949088, 8833.8559120496], [-252.56634169812875 -1.2378537717286504; -2001.472325079127 -7.776738661028985], [74.81373141099117 -0.023454319916980694; 616.3211910468485 -0.1398907089497869;;; -0.023454319916980694 0.09563845531649422; -0.1398907089497869 0.7117904871699492], [-20.92614097367953; -717.8348945759076;;], [-24.41076664072108, 79.38210324218157], [19.61993746034289 -0.14421434524586854; -9.220488472252777 0.7256813516899148], [-7.710722779626398 -0.010186799382009361; 0.5403631418882978 -0.1806914702167702;;; -0.010186799382009361 -0.006235799645589475; -0.1806914702167702 0.012604911915031627], [1.5242070973989355 2.039912180759259 … 0.5637084756133872 0.06756870964874698])</code></pre><p>Note that this is not only calculating the gradient of the likelihood with respect to the underlying canonical representations for the quadratic state space form, but also the entire noise vector.</p><p>As in the linear case, this likelihood calculation can be nested such that a separate differentiable function could generate the quadratic state space model, and the gradients could be over a smaller set of structural parameters.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linear_state_space_examples/">« Linear State Space Examples</a><a class="docs-footer-nextpage" href="../general_state_space_examples/">General State Space Examples »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.1.0 on <span class="colophon-date" title="Monday 2 October 2023 00:57">Monday 2 October 2023</span>. Using Julia version 1.9.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
