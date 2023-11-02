@@ -68,7 +68,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
     @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
     # checks on bounds
     observables_noise = make_observables_noise(prob.observables_noise)
-    @assert typeof(observables_noise) <: ZeroMeanDiagNormal  # can extend to more general in rrule
+    @assert observables_noise isa ZeroMeanDiagNormal  # can extend to more general in rrule
 
     @assert size(noise, 1) == size(prob.B, 2)
     @assert maybe_check_size(prob.observables, 2, T - 1)
