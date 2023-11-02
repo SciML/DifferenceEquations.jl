@@ -69,7 +69,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     # checks on bounds
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
     observables_noise = make_observables_noise(prob.observables_noise)
-    @assert typeof(observables_noise) <: Union{ZeroMeanDiagNormal, Nothing}  # can extend to more general in rrule later
+    @assert observables_noise isa Union{ZeroMeanDiagNormal, Nothing}  # can extend to more general in rrule later
 
     @assert maybe_check_size(noise, 1, prob.B, 2)
     @assert maybe_check_size(noise, 2, T - 1)
