@@ -20,13 +20,13 @@ maybe_check_size(m1, index1, m2::Nothing, index2) = true
 maybe_check_size(m1::Nothing, index1, m2::Nothing, index2) = true
 
 Base.@propagate_inbounds @inline function maybe_logpdf(observables_noise::Distribution,
-                                                       observables::AbstractMatrix, t,
-                                                       z::AbstractVector, s)
+        observables::AbstractMatrix, t,
+        z::AbstractVector, s)
     logpdf(observables_noise,
-           view(observables,
-                :,
-                t) -
-           z[s])
+        view(observables,
+            :,
+            t) -
+        z[s])
 end
 # Don't accumulate likelihoods if no observations or observatino noise
 maybe_logpdf(observables_noise, observable, t, z, s) = 0.0
@@ -44,8 +44,8 @@ maybe_muladd!(x, A::Nothing, B) = nothing
 Base.@propagate_inbounds @inline maybe_muladd_transpose!(x, C, Δz) = mul!(x, C', Δz, 1, 1)
 maybe_muladd_transpose!(x, C::Nothing, Δz) = nothing
 Base.@propagate_inbounds @inline function maybe_muladd_transpose!(ΔB::AbstractMatrix,
-                                                                  Δu_temp,
-                                                                  noise::AbstractMatrix, t)
+        Δu_temp,
+        noise::AbstractMatrix, t)
     mul!(ΔB, Δu_temp, view(noise, :, t)', 1, 1)
     return nothing
 end
@@ -57,7 +57,7 @@ Base.@propagate_inbounds @inline maybe_mul_transpose!(x, t, A, y, s) = mul!(x[t]
 maybe_mul_transpose!(x::Nothing, t, A, y, s) = nothing
 Base.@propagate_inbounds @inline function maybe_mul_transpose!(Δnoise, t, B, y)
     mul!(view(Δnoise, :, t),
-         B', y)
+        B', y)
 end
 maybe_mul_transpose!(Δnoise::Nothing, t, B, y) = nothing
 
@@ -76,7 +76,7 @@ end
 
 #Add in observation noise to the output if simulated (i.e, observables not given) and there is observation_noise provided
 function maybe_add_observation_noise!(z, observables_noise::Distribution,
-                                      observables::Nothing)
+        observables::Nothing)
     # add noise to the vector of vectors componentwise
     for z_val in z
         z_val .+= rand(observables_noise)
@@ -93,7 +93,7 @@ end
 maybe_add_Δ!(Δz, Δsol_z, t) = nothing
 
 Base.@propagate_inbounds @inline function maybe_add_Δ_slice!(Δnoise::AbstractMatrix,
-                                                             ΔW::AbstractMatrix, t)
+        ΔW::AbstractMatrix, t)
     Δnoise[:, t] .+= view(ΔW, :, t)
     return nothing
 end
@@ -104,18 +104,18 @@ maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
 # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
 # rmul!(Δlogpdf, Δz)
 Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(Δz::AbstractArray{<:Real, 1},
-                                                              Δlogpdf::Number,
-                                                              observables::AbstractArray{
-                                                                                         <:Real,
-                                                                                         2},
-                                                              z::AbstractArray{T, 1},
-                                                              t,
-                                                              observables_noise_cov::AbstractArray{
-                                                                                                   <:Real,
-                                                                                                   1
-                                                                                                   }) where {
-                                                                                                             T
-                                                                                                             }
+        Δlogpdf::Number,
+        observables::AbstractArray{
+            <:Real,
+            2},
+        z::AbstractArray{T, 1},
+        t,
+        observables_noise_cov::AbstractArray{
+            <:Real,
+            1
+        }) where {
+        T
+}
     Δz .= Δlogpdf * (view(observables, :, t - 1) - z[t]) ./
           observables_noise_cov
     return nothing

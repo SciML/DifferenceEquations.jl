@@ -1,6 +1,6 @@
 struct StateSpaceSolution{T, N, uType, uType2, DType, tType, randType, P, A, IType, DE,
-                          PosteriorType,
-                          logpdfType, zType} <: SciMLBase.AbstractRODESolution{T, N, uType}
+    PosteriorType,
+    logpdfType, zType} <: SciMLBase.AbstractRODESolution{T, N, uType}
     u::uType
     u_analytic::uType2
     errors::DType
@@ -19,24 +19,24 @@ struct StateSpaceSolution{T, N, uType, uType2, DType, tType, randType, P, A, ITy
 end
 
 function SciMLBase.build_solution(prob::AbstractStateSpaceProblem, alg, t, u; P = nothing,
-                                  logpdf = nothing,
-                                  W = nothing, timeseries_errors = length(u) > 2,
-                                  dense = false,
-                                  dense_errors = dense, calculate_error = true,
-                                  interp = SciMLBase.ConstantInterpolation(t, u),
-                                  retcode = :Default,
-                                  stats = nothing, z = nothing, kwargs...)
+        logpdf = nothing,
+        W = nothing, timeseries_errors = length(u) > 2,
+        dense = false,
+        dense_errors = dense, calculate_error = true,
+        interp = SciMLBase.ConstantInterpolation(t, u),
+        retcode = :Default,
+        stats = nothing, z = nothing, kwargs...)
     T = eltype(eltype(u))
     N = length((size(prob.u0)..., length(u)))
 
     # TODO: add support for has_analytic in the future
     sol = StateSpaceSolution{T, N, typeof(u), Nothing, Nothing, typeof(t), typeof(W),
-                             typeof(prob),
-                             typeof(alg), typeof(interp), typeof(stats), typeof(P),
-                             typeof(logpdf),
-                             typeof(z)}(u, nothing, nothing, t, W, prob, alg, interp, dense,
-                                        0,
-                                        stats, retcode, P, logpdf, z)
+        typeof(prob),
+        typeof(alg), typeof(interp), typeof(stats), typeof(P),
+        typeof(logpdf),
+        typeof(z)}(u, nothing, nothing, t, W, prob, alg, interp, dense,
+        0,
+        stats, retcode, P, logpdf, z)
     return sol
 end
 

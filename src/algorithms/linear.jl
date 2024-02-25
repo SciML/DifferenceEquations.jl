@@ -1,15 +1,16 @@
 # See the utilities.jl for all of the "maybe" functions and other utilities.  Those provide ways for the same algorithm to implement various permutations of the model definitions
 # For example, B = nothing, noise = nothing, observables = nothing are all supported 
 
-function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType, uPriorMeanType,
-                                                          uPriorVarType, tType,
-                                                          P, NP, F, AType, BType,
-                                                          CType, RType, ObsType, K},
-                            alg::DirectIteration, args...;
-                            kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
-                                              P, NP, F, AType,
-                                              BType, CType, RType,
-                                              ObsType, K}
+function DiffEqBase.__solve(
+        prob::LinearStateSpaceProblem{uType, uPriorMeanType,
+            uPriorVarType, tType,
+            P, NP, F, AType, BType,
+            CType, RType, ObsType, K},
+        alg::DirectIteration, args...;
+        kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
+        P, NP, F, AType,
+        BType, CType, RType,
+        ObsType, K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
 
@@ -40,8 +41,8 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem{uType, uPriorMeanType,
     t_values = prob.tspan[1]:prob.tspan[2]
 
     return build_solution(prob, alg, t_values, u; W = noise,
-                          logpdf = ObsType <: Nothing ? nothing : loglik, z,
-                          retcode = :Success)
+        logpdf = ObsType <: Nothing ? nothing : loglik, z,
+        retcode = :Success)
 end
 
 # Ideally hook into existing sensitity dispatching
@@ -51,17 +52,17 @@ end
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
 #                                             sensealg, u0, p, args...; kwargs...)
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
-                              prob::LinearStateSpaceProblem{uType, uPriorMeanType,
-                                                            uPriorVarType,
-                                                            tType,
-                                                            P, NP, F, AType, BType,
-                                                            CType, RType, ObsType, K},
-                              alg::DirectIteration, args...;
-                              kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
-                                                P, NP, F,
-                                                AType,
-                                                BType, CType, RType,
-                                                ObsType, K}
+        prob::LinearStateSpaceProblem{uType, uPriorMeanType,
+            uPriorVarType,
+            tType,
+            P, NP, F, AType, BType,
+            CType, RType, ObsType, K},
+        alg::DirectIteration, args...;
+        kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
+        P, NP, F,
+        AType,
+        BType, CType, RType,
+        ObsType, K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
     # @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
@@ -94,8 +95,8 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
     t_values = prob.tspan[1]:prob.tspan[2]
 
     sol = build_solution(prob, alg, t_values, u; W = noise,
-                         logpdf = ObsType <: Nothing ? nothing : loglik, z,
-                         retcode = :Success)
+        logpdf = ObsType <: Nothing ? nothing : loglik, z,
+        retcode = :Success)
     function solve_pb(Δsol)
         ΔA = zero(A)
         ΔB = maybe_zero(B)
@@ -110,7 +111,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
         @views @inbounds for t in T:-1:2
             Δz = maybe_zero(z, 1) # zero out in case no logpdf but z observations available 
             maybe_add_Δ_logpdf!(Δz, Δsol.logpdf, prob.observables, z, t,
-                                observables_noise_cov)
+                observables_noise_cov)
             maybe_add_Δ!(Δz, Δsol.z, t)  # only accumulte if z provided
 
             copy!(Δu_temp, Δu)
@@ -124,16 +125,16 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
             maybe_muladd!(ΔC, Δz, u[t]')
         end
         return (NoTangent(),
-                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
-                                      observables = NoTangent(), # not implemented
-                                      observables_noise = NoTangent()), NoTangent(),
-                map(_ -> NoTangent(), args)...)
+            Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
+                observables = NoTangent(), # not implemented
+                observables_noise = NoTangent()), NoTangent(),
+            map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end
 
 function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, args...;
-                            kwargs...)
+        kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
 
     # checks on bounds
@@ -159,22 +160,22 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
     V = [PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(L,
-                                                                   Matrix{
-                                                                          eltype(u0_prior_var)
-                                                                          }(undef,
-                                                                            L,
-                                                                            L),
-                                                                   Cholesky{
-                                                                            eltype(u0_prior_var),
-                                                                            Matrix{
-                                                                                   eltype(u0_prior_var)
-                                                                                   }}(Matrix{
-                                                                                             eltype(u0_prior_var)
-                                                                                             }(undef,
-                                                                                               L,
-                                                                                               L),
-                                                                                      'U',
-                                                                                      0))
+             Matrix{
+                 eltype(u0_prior_var)
+             }(undef,
+                 L,
+                 L),
+             Cholesky{
+                 eltype(u0_prior_var),
+                 Matrix{
+                     eltype(u0_prior_var)
+                 }}(Matrix{
+                     eltype(u0_prior_var)
+                 }(undef,
+                     L,
+                     L),
+                 'U',
+                 0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
@@ -240,7 +241,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
 
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
-                          retcode)
+        retcode)
 end
 
 # NOTE: when moving to ._concrete_solve_adjoint will need to be careful to ensure the u0 sensitivity
@@ -250,7 +251,7 @@ end
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
 #                                             sensealg, u0, p, args...; kwargs...)
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
-                              alg::KalmanFilter, args...; kwargs...)
+        alg::KalmanFilter, args...; kwargs...)
     # Preallocate values
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
@@ -276,22 +277,22 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
     V = [PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(L,
-                                                                   Matrix{
-                                                                          eltype(u0_prior_var)
-                                                                          }(undef,
-                                                                            L,
-                                                                            L),
-                                                                   Cholesky{
-                                                                            eltype(u0_prior_var),
-                                                                            Matrix{
-                                                                                   eltype(u0_prior_var)
-                                                                                   }}(Matrix{
-                                                                                             eltype(u0_prior_var)
-                                                                                             }(undef,
-                                                                                               L,
-                                                                                               L),
-                                                                                      'U',
-                                                                                      0))
+             Matrix{
+                 eltype(u0_prior_var)
+             }(undef,
+                 L,
+                 L),
+             Cholesky{
+                 eltype(u0_prior_var),
+                 Matrix{
+                     eltype(u0_prior_var)
+                 }}(Matrix{
+                     eltype(u0_prior_var)
+                 }(undef,
+                     L,
+                     L),
+                 'U',
+                 0))
          for _ in 1:T] # preallocated buffers for cholesky and matrix itself
 
     R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
@@ -357,7 +358,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
     end
     t_values = prob.tspan[1]:prob.tspan[2]
     sol = build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
-                         retcode)
+        retcode)
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
@@ -369,7 +370,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
 
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
-                    map(_ -> NoTangent(), args)...)
+                map(_ -> NoTangent(), args)...)
         end
         # Buffers
         ΔP = zero(P[1])
@@ -447,9 +448,9 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpace
             end
         end
         return (NoTangent(),
-                Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
-                                      u0_prior_mean = Δu, u0_prior_var = ΔP),
-                NoTangent(), map(_ -> NoTangent(), args)...)
+            Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
+                u0_prior_mean = Δu, u0_prior_var = ΔP),
+            NoTangent(), map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end

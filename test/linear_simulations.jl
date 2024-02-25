@@ -13,18 +13,19 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
-                                   "test/data/RBC_observables.csv"),
-                          ',')' |> collect
+observables_rbc = readdlm(
+    joinpath(pkgdir(DifferenceEquations),
+        "test/data/RBC_observables.csv"),
+    ',')' |> collect
 # Data and Noise
 @testset "basic inference, simulated noise" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-                                   C = C_rbc,
-                                   observables_noise = D_rbc, observables = observables_rbc,
-                                   syms = [:a, :b])
+        C = C_rbc,
+        observables_noise = D_rbc, observables = observables_rbc,
+        syms = [:a, :b])
     @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-                                      C = C_rbc, observables_noise = D_rbc,
-                                      observables = observables_rbc, syms = [:a, :b])
+        C = C_rbc, observables_noise = D_rbc,
+        observables = observables_rbc, syms = [:a, :b])
 
     sol = solve(prob)
     @inferred solve(prob)
@@ -36,7 +37,7 @@ end
     T = 20
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc, syms = [:a, :b])
     @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
-                                      syms = [:a, :b])
+        syms = [:a, :b])
 
     sol = solve(prob)
     @inferred solve(prob)
@@ -67,7 +68,7 @@ end
 @testset "simulation with observations and noise, no observation noise" begin
     Random.seed!(1234)
     sol = solve(LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, 5); C = C_rbc,
-                                        observables_noise = D_rbc))
+        observables_noise = D_rbc))
     @test sol.u ≈
           [[0.0, 0.0], [0.0, 0.003597289068234817],
         [0.02233690243961772, -0.010152627110638895],
@@ -91,22 +92,22 @@ end
     B_no_noise = zeros(2, 2)
     u0 = [1.0, 0.5]
     prob_no_noise = LinearStateSpaceProblem(A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
-                                            syms = [:a, :b])
+        syms = [:a, :b])
 
     sol_no_noise = solve(prob_no_noise)
 
     prob_obs_noise = LinearStateSpaceProblem(A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
-                                             syms = [:a, :b], observables_noise = D_rbc)
+        syms = [:a, :b], observables_noise = D_rbc)
     @inferred LinearStateSpaceProblem(A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
-                                      syms = [:a, :b], observables_noise = D_rbc)
+        syms = [:a, :b], observables_noise = D_rbc)
     sol_obs_noise = solve(prob_obs_noise)
     @inferred solve(prob_obs_noise)
 
     # check that if the variance of the noise is tiny it is identical
     sol_tiny_obs_noise = solve(LinearStateSpaceProblem(A_rbc, B_no_noise, u0, (0, T);
-                                                       C = C_rbc,
-                                                       syms = [:a, :b],
-                                                       observables_noise = [1e-16, 1e-16]))
+        C = C_rbc,
+        syms = [:a, :b],
+        observables_noise = [1e-16, 1e-16]))
     @test maximum(maximum.(sol_tiny_obs_noise.z - sol_no_noise.z)) < 1e-7  # still some noise 
     @test maximum(maximum.(sol_tiny_obs_noise.z - sol_no_noise.z)) > 0.0  # but not zero
 end
@@ -116,13 +117,13 @@ end
     B_no_noise = zeros(2, 2)
     u0 = [1.0, 0.5]
     sol_no_noise = solve(LinearStateSpaceProblem(A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
-                                                 syms = [:a, :b]))
+        syms = [:a, :b]))
 
     #Now literally pass in no noise in B with a nothing
     prob = LinearStateSpaceProblem(A_rbc, nothing, u0, (0, T); C = C_rbc,
-                                   syms = [:a, :b])
+        syms = [:a, :b])
     @inferred LinearStateSpaceProblem(A_rbc, nothing, u0, (0, T); C = C_rbc,
-                                      syms = [:a, :b])
+        syms = [:a, :b])
 
     sol_nothing_noise = solve(prob)
     @inferred solve(prob)
@@ -137,9 +138,9 @@ end
     T = 5
     u0 = [1.0, 0.5]
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0, (0, T); C = nothing,
-                                   syms = [:a, :b])
+        syms = [:a, :b])
     @inferred LinearStateSpaceProblem(A_rbc, B_rbc, u0, (0, T); C = nothing,
-                                      syms = [:a, :b])
+        syms = [:a, :b])
     sol = solve(prob)
     @inferred solve(prob)
 

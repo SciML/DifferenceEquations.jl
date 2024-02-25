@@ -22,7 +22,7 @@ u0_kalman = zeros(5)
 
 T = 200
 prob = LinearStateSpaceProblem(A_kalman, B_kalman, u0_kalman, (0, T); C = C_kalman,
-                               syms = [:a, :b])
+    syms = [:a, :b])
 sol = solve(prob)
 writedlm("test/data/Kalman_observables.csv", sol.z[2:201], ",")
 writedlm("test/data/Kalman_noise.csv", transpose(sol.W), ",")

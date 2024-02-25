@@ -1,17 +1,18 @@
 
 # This should be ported over to use the "maybe" utilities of the linear model, which will expand the number of model variations that are available.
-function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType, uPriorMeanType,
-                                                             uPriorVarType,
-                                                             tType, P, NP, F, A0Type,
-                                                             A1Type, A2Type, BType, C0Type,
-                                                             C1Type,
-                                                             C2Type, RType, ObsType, K},
-                            alg::DirectIteration, args...;
-                            kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
-                                              P, NP, F,
-                                              A0Type, A1Type, A2Type,
-                                              BType, C0Type, C1Type, C2Type, RType, ObsType,
-                                              K}
+function DiffEqBase.__solve(
+        prob::QuadraticStateSpaceProblem{uType, uPriorMeanType,
+            uPriorVarType,
+            tType, P, NP, F, A0Type,
+            A1Type, A2Type, BType, C0Type,
+            C1Type,
+            C2Type, RType, ObsType, K},
+        alg::DirectIteration, args...;
+        kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
+        P, NP, F,
+        A0Type, A1Type, A2Type,
+        BType, C0Type, C1Type, C2Type, RType, ObsType,
+        K}
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
     observables_noise = make_observables_noise(prob.observables_noise)
@@ -56,13 +57,13 @@ function DiffEqBase.__solve(prob::QuadraticStateSpaceProblem{uType, uPriorMeanTy
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(prob, alg, t_values, u; W = noise,
-                          logpdf = ObsType <: Nothing ? nothing : loglik, z,
-                          retcode = :Success)
+        logpdf = ObsType <: Nothing ? nothing : loglik, z,
+        retcode = :Success)
 end
 
 # Note: this repeats the primal calculation because so many of the internal buffers are useful for the rrule.  Refactoring could enable directly shared buffers.
 function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSpaceProblem,
-                              alg::DirectIteration, args...; kwargs...)
+        alg::DirectIteration, args...; kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    
     @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
@@ -109,7 +110,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
     t_values = prob.tspan[1]:prob.tspan[2]
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     sol = build_solution(prob, alg, t_values, u; W = noise, logpdf = loglik, z,
-                         retcode = :Success)
+        retcode = :Success)
 
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
@@ -119,7 +120,7 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
         Δlogpdf = Δsol.logpdf
         if iszero(Δlogpdf)
             return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
-                    map(_ -> NoTangent(), args)...)
+                map(_ -> NoTangent(), args)...)
         end
         ΔA_0 = zero(A_0)
         ΔA_1 = zero(A_1)
@@ -177,13 +178,13 @@ function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSp
         end
 
         return (NoTangent(),
-                Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB,
-                                      C_0 = ΔC_0,
-                                      C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1],
-                                      noise = Δnoise,
-                                      observables = NoTangent(), # not implemented
-                                      observables_noise = NoTangent()), NoTangent(),
-                map(_ -> NoTangent(), args)...)
+            Tangent{typeof(prob)}(; A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB,
+                C_0 = ΔC_0,
+                C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1],
+                noise = Δnoise,
+                observables = NoTangent(), # not implemented
+                observables_noise = NoTangent()), NoTangent(),
+            map(_ -> NoTangent(), args)...)
     end
     return sol, solve_pb
 end

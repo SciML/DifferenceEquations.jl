@@ -1,10 +1,10 @@
 # General State Space Examples
 
 !!! note
+    
     This is a placeholder for future support for general nonlinear state-space problems. The basic implementation is a relatively simple variation on the linear version, where you call back into AD for the `f,g,h` calls in the `rrule` definition. Because of the mixture of AD calls and rules, it may make sense to wait for `Enzyme.jl` to be ready.
 
-
-A future feature, if anyone is interested in writing it, is full support for 
+A future feature, if anyone is interested in writing it, is full support for
 
 ```math
 u_{n+1} = f(u_n,p,t_n) + g(u_n,p,t_n) w_{n+1}
