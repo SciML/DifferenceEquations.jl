@@ -5,7 +5,7 @@ This package simulates for **initial value problems** for deterministic and stoc
 Relative to existing solvers, this package is intended to provide **differentiable solvers and filters**. For example, you can simulate a linear gaussian state space model and find the gradient of the solution with respect to the model primitives. Similarly, the likelihood for of Kalman Filter can itself be differentiated with respect to the underlying model primitives. This makes the package especially amenable to estimation and calibration, where the entire solution blocks become auto-differentiable.
 
 !!! note
-
+    
     Boundary value problems and difference-algebraic equations are not in scope. See [DifferentiableStateSpaceModels.jl](https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl) for experimental support for perturbation solutions and DSGEs.
 
 ## Installation
@@ -20,8 +20,8 @@ Pkg.add("DifferenceEquations")
 For additional functionality, you may want to add `Plots, DiffEqBase`. If you want to explore differentiable filters, you can install `Zygote`
 
 ## Mathematical Specification of a Discrete Problem
-For comparison, see the specifications of the deterministic [Discrete Problem](https://diffeq.sciml.ai/latest/types/discrete_types/#Mathematical-Specification-of-a-Discrete-Problem) (albeit with a small difference in timing conventions) and the [SDE Problem](https://diffeq.sciml.ai/latest/types/sde_types/). Other introductions can be found by [checking out DiffEqTutorials.jl](https://github.com/JuliaDiffEq/DiffEqTutorials.jl).
 
+For comparison, see the specifications of the deterministic [Discrete Problem](https://diffeq.sciml.ai/latest/types/discrete_types/#Mathematical-Specification-of-a-Discrete-Problem) (albeit with a small difference in timing conventions) and the [SDE Problem](https://diffeq.sciml.ai/latest/types/sde_types/). Other introductions can be found by [checking out DiffEqTutorials.jl](https://github.com/JuliaDiffEq/DiffEqTutorials.jl).
 
 The general class of problems intended to be supported in this package is to take an initial condition, $u_0$, and an evolution equation
 
@@ -41,17 +41,19 @@ where $v_n$ is noisy observation error and the size of $z_n$ may be different fr
 
 A few notes on the structure:
 
-1. Frequently, the $g$ provides the covariance structure, so a reasonable default is $w_{n+1} \sim N(0,I)$, and $v_n \sim N(0, D)$ is a common observation error for some covariance matrix $D$.
-2. If $f,g,h$ are all linear, the shocks are both gaussian, and the prior on the latent space is gaussian, then this is a linear gaussian state-space model. Kalman filters can be used to calculate marginal likelihoods, and simulations can be executed with very little overhead.
-3. ``t_n`` is the current time at which the map is applied, where ``t_n = t_0 + n*dt`` (with `dt=1` being the default).
-4. If $f, g, h$ are not functions of time, then it is a time-invariant state-space model.
+ 1. Frequently, the $g$ provides the covariance structure, so a reasonable default is $w_{n+1} \sim N(0,I)$, and $v_n \sim N(0, D)$ is a common observation error for some covariance matrix $D$.
+ 2. If $f,g,h$ are all linear, the shocks are both gaussian, and the prior on the latent space is gaussian, then this is a linear gaussian state-space model. Kalman filters can be used to calculate marginal likelihoods, and simulations can be executed with very little overhead.
+ 3. ``t_n`` is the current time at which the map is applied, where ``t_n = t_0 + n*dt`` (with `dt=1` being the default).
+ 4. If $f, g, h$ are not functions of time, then it is a time-invariant state-space model.
 
 ## Likelihood and Filtering Calculations
+
 Certain `solve` algorithms will run a filter on the unobservable `u` states and compare to the `observables` if provided. In that case, it might do so (1) with unobservable $w_n$ noise; or (2) conditioning on a particular sequence of $w_{n+1}$ shocks, where the likelihood depends on the unknown observational error $v_n$.
 
 If an algorithm is given for the filtering, then the return type of `solve` will have access to a `logpdf` for the log likelihood. In addition, the solution will provide information on the sequence of posteriors (and smoothed values, if required).
 
 ### Joint Likelihood
+
 In the case of a joint-likelihood where the `noise` (i.e. $w_n$) is given, it is not a hidden markov model and the log likelihood simply accumulates the likelihood of each observation. The timing is such that given a $u_0$ which is fixed (and often added to the likelihood separately), and observables $z \equiv \{z_1, \ldots z_N\}$ and noise $w \equiv \{w_1, \ldots w_N\}$ then,
 
 ```math
@@ -74,19 +76,22 @@ z_n - h(u_n, p, t_n) \sim N(0, D)  = P
 Ultimately, IID Gaussian observation noise is not required, and though the package currently only supports gaussian observation noise with a diagonal covariance matrix, it could be adapted without significant changes.
 
 ### Linear Filtering for the Marginal Likelihood
+
 When the system is linear and the prior is gaussian, there is an exact likelihood for the marginal likelihood using the [Kalman Filter](https://en.wikipedia.org/wiki/Kalman_filter#Marginal_likelihood). Unlike the previous example, this is a marginal likelihood and not conditional on the noise, $w$. See the [Kalman Filter Likelihood](https://en.wikipedia.org/wiki/Kalman_filter#Marginal_likelihood) for more details.
 
 ## Current Status
+
 At this point, the package does not cover all the variations on these features. In particular,
-1. It only supports linear and quadratic $f, g, h$ functions. General $f,g$ simulation are relatively easy to add, but full SciML compliance would require experience with those APIs. The custom rrule for those is also a straightforward variation on the existing linear version.
-2. It only supports time-invariant functions.
-3. There is limited support for non-Gaussian $w_n$ and $v_n$ processes.
-4. It does not support linear or quadratic functions parameterized by the $p$ vector for differentiation.
-5. There are some hard-coded types that prevent it from working with fully generic arrays.
-6. It does not support in-place vs. out-of-place, nor support static arrays, nor matrix-free linear operators.
-7. While many functions in the SciML framework are working, support is incomplete.
-8. There is no complete coverage of gradients for the solution for all parameter inputs/etc.
-9. The package does not support non-gaussian observation noise and is inconsistent with SciML noise process data structures.
+
+ 1. It only supports linear and quadratic $f, g, h$ functions. General $f,g$ simulation are relatively easy to add, but full SciML compliance would require experience with those APIs. The custom rrule for those is also a straightforward variation on the existing linear version.
+ 2. It only supports time-invariant functions.
+ 3. There is limited support for non-Gaussian $w_n$ and $v_n$ processes.
+ 4. It does not support linear or quadratic functions parameterized by the $p$ vector for differentiation.
+ 5. There are some hard-coded types that prevent it from working with fully generic arrays.
+ 6. It does not support in-place vs. out-of-place, nor support static arrays, nor matrix-free linear operators.
+ 7. While many functions in the SciML framework are working, support is incomplete.
+ 8. There is no complete coverage of gradients for the solution for all parameter inputs/etc.
+ 9. The package does not support non-gaussian observation noise and is inconsistent with SciML noise process data structures.
 10. Many cleanup steps are necessary for full SciML compliance (e.g., enable passing in vectors-of-vectors or noise/observations, standard SciML dispatching).
 
 To help contribute to filling in these features, see the [issues](https://github.com/SciML/DifferenceEquations.jl/issues).

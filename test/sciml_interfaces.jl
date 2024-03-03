@@ -12,11 +12,12 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations),
-                                   "test/data/RBC_observables.csv"),
-                          ',')' |> collect
+observables_rbc = readdlm(
+    joinpath(pkgdir(DifferenceEquations),
+        "test/data/RBC_observables.csv"),
+    ',')' |> collect
 noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
-                    ',')' |>
+    ',')' |>
             collect
 # Data and Noise
 T = 5
@@ -25,9 +26,9 @@ noise_rbc = noise_rbc[:, 1:T]
 
 @testset "Plotting given noise" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-                                   C = C_rbc,
-                                   observables_noise = D_rbc, noise = noise_rbc,
-                                   observables = observables_rbc, syms = (:a, :b))
+        C = C_rbc,
+        observables_noise = D_rbc, noise = noise_rbc,
+        observables = observables_rbc, syms = (:a, :b))
     sol = solve(prob)
     plot(sol)
 end
@@ -35,12 +36,12 @@ end
 @testset "Ensemble simulation and plotting given noise" begin
     # random initial conditions via the u0
     prob = LinearStateSpaceProblem(A_rbc, B_rbc,
-                                   MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
-                                   (0, size(observables_rbc, 2)); C = C_rbc,
-                                   observables_noise = D_rbc, noise = noise_rbc,
-                                   observables = observables_rbc, syms = (:a, :b))
+        MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
+        (0, size(observables_rbc, 2)); C = C_rbc,
+        observables_noise = D_rbc, noise = noise_rbc,
+        observables = observables_rbc, syms = (:a, :b))
     sol2 = solve(EnsembleProblem(prob), DirectIteration(), EnsembleThreads();
-                 trajectories = 10)
+        trajectories = 10)
     plot(sol2)
     summ = EnsembleSummary(sol2)
     plot(summ)
@@ -48,10 +49,10 @@ end
 
 @testset "Dataframes" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc,
-                                   MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
-                                   (0, size(observables_rbc, 2)); C = C_rbc,
-                                   observables_noise = D_rbc, noise = noise_rbc,
-                                   observables = observables_rbc, syms = (:a, :b))
+        MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
+        (0, size(observables_rbc, 2)); C = C_rbc,
+        observables_noise = D_rbc, noise = noise_rbc,
+        observables = observables_rbc, syms = (:a, :b))
     sol = solve(prob)
     df = DataFrame(sol)
     @test propertynames(df) == [:timestamp, :a, :b]
@@ -60,9 +61,9 @@ end
 
 @testset "Plotting simulating noise" begin
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-                                   C = C_rbc,
-                                   observables_noise = D_rbc, observables = observables_rbc,
-                                   syms = (:a, :b))
+        C = C_rbc,
+        observables_noise = D_rbc, observables = observables_rbc,
+        syms = (:a, :b))
     sol = solve(prob)
     plot(sol)
 end
@@ -70,11 +71,11 @@ end
 @testset "Ensemble simulation and plotting, simulating noise" begin
     # fixed initial condition, random noise
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-                                   C = C_rbc,
-                                   observables_noise = D_rbc, observables = observables_rbc,
-                                   syms = (:a, :b))
+        C = C_rbc,
+        observables_noise = D_rbc, observables = observables_rbc,
+        syms = (:a, :b))
     sol2 = solve(EnsembleProblem(prob), DirectIteration(), EnsembleThreads();
-                 trajectories = 10)
+        trajectories = 10)
     plot(sol2)
     summ = EnsembleSummary(sol2)
     plot(summ)
