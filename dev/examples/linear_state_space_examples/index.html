@@ -15,51 +15,51 @@ Interpolation: Piecewise constant interpolation
 t: 0:10
 u: 11-element Vector{Vector{Float64}}:
  [0.0, 0.0]
- [0.0, 0.000688656040798192]
- [0.004269667452948791, -0.016862502878978777]
- [-0.10049133376936706, -0.004280119670878914]
- [-0.12200350904034796, 0.012520586908254572]
- [-0.0382756947571522, 0.011520191693739856]
- [0.035063278481892515, 0.009307716554261717]
- [0.09101795719422054, 0.013637455068698135]
- [0.17101928076043793, 0.012284408600845011]
- [0.23863165004765508, -0.0006865618421688507]
- [0.22244338412382542, 0.002262009926239434]</code></pre><p>The <code>u</code> vector of the simulated solution can be plotted using the standard recipes, including the use of the optional <code>syms</code>. See the <a href="https://diffeq.sciml.ai/latest/basics/plot/">SciML docs</a> for more options.</p><pre><code class="language-julia hljs">plot(sol)</code></pre><img src="18f0a866.svg" alt="Example block output"/><p>By default, the solution provides an interface to access the simulated <code>u</code>.  That is, <code>sol.u[...] = sol[...]</code>,</p><pre><code class="language-julia hljs">sol[2]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
- 0.0
- 0.000688656040798192</code></pre><p>Or to get the first element of the last step</p><pre><code class="language-julia hljs">sol[end][1] #first element of last step</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.22244338412382542</code></pre><p>Finally, to extract the full vector</p><pre><code class="language-julia hljs">@show sol[2, :];  # whole second vector</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Float64}:
+ [0.0, -0.0066529695533883975]
+ [-0.041248411231008066, -0.0003260792780927083]
+ [-0.04120768219363245, -0.005171055886909522]
+ [-0.07120784458278986, 0.002074506231364348]
+ [-0.05478551371919141, -0.0009500929123929035]
+ [-0.05793681409006784, 0.014676418931937342]
+ [0.035953823992447086, 0.011935454170726788]
+ [0.10815594865133082, -0.009049269610703065]
+ [0.04664267963240527, 0.004410913620137401]
+ [0.0716582100956369, -0.0035250997437888073]</code></pre><p>The <code>u</code> vector of the simulated solution can be plotted using the standard recipes, including the use of the optional <code>syms</code>. See the <a href="https://diffeq.sciml.ai/latest/basics/plot/">SciML docs</a> for more options.</p><pre><code class="language-julia hljs">plot(sol)</code></pre><img src="a1027935.svg" alt="Example block output"/><p>By default, the solution provides an interface to access the simulated <code>u</code>.  That is, <code>sol.u[...] = sol[...]</code>,</p><pre><code class="language-julia hljs">sol[2]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
   0.0
-  0.000688656040798192
- -0.016862502878978777
- -0.004280119670878914
-  0.012520586908254572
-  0.011520191693739856
-  0.009307716554261717
-  0.013637455068698135
-  0.012284408600845011
- -0.0006865618421688507
-  0.002262009926239434</code></pre><p>The results for all of <code>sol.u</code> can be loaded in a dataframe, where the column names will be the (optionally) provided symbols.</p><pre><code class="language-julia hljs">df = DataFrame(sol)</code></pre><div><div style = "float: left;"><span>11×3 DataFrame</span></div><div style = "clear: both;"></div></div><div class = "data-frame" style = "overflow-x: scroll;"><table class = "data-frame" style = "margin-bottom: 6px;"><thead><tr class = "header"><th class = "rowNumber" style = "font-weight: bold; text-align: right;">Row</th><th style = "text-align: left;">timestamp</th><th style = "text-align: left;">a</th><th style = "text-align: left;">b</th></tr><tr class = "subheader headerLastRow"><th class = "rowNumber" style = "font-weight: bold; text-align: right;"></th><th title = "Int64" style = "text-align: left;">Int64</th><th title = "Float64" style = "text-align: left;">Float64</th><th title = "Float64" style = "text-align: left;">Float64</th></tr></thead><tbody><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">1</td><td style = "text-align: right;">0</td><td style = "text-align: right;">0.0</td><td style = "text-align: right;">0.0</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">2</td><td style = "text-align: right;">1</td><td style = "text-align: right;">0.0</td><td style = "text-align: right;">0.000688656</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">3</td><td style = "text-align: right;">2</td><td style = "text-align: right;">0.00426967</td><td style = "text-align: right;">-0.0168625</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">4</td><td style = "text-align: right;">3</td><td style = "text-align: right;">-0.100491</td><td style = "text-align: right;">-0.00428012</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">5</td><td style = "text-align: right;">4</td><td style = "text-align: right;">-0.122004</td><td style = "text-align: right;">0.0125206</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">6</td><td style = "text-align: right;">5</td><td style = "text-align: right;">-0.0382757</td><td style = "text-align: right;">0.0115202</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">7</td><td style = "text-align: right;">6</td><td style = "text-align: right;">0.0350633</td><td style = "text-align: right;">0.00930772</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">8</td><td style = "text-align: right;">7</td><td style = "text-align: right;">0.091018</td><td style = "text-align: right;">0.0136375</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">9</td><td style = "text-align: right;">8</td><td style = "text-align: right;">0.171019</td><td style = "text-align: right;">0.0122844</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">10</td><td style = "text-align: right;">9</td><td style = "text-align: right;">0.238632</td><td style = "text-align: right;">-0.000686562</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">11</td><td style = "text-align: right;">10</td><td style = "text-align: right;">0.222443</td><td style = "text-align: right;">0.00226201</td></tr></tbody></table></div><p>Other results, such as the simulated noise and observables, can be extracted from the solution</p><pre><code class="language-julia hljs">sol.z # observables</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Vector{Float64}}:
- [0.07436945270151463, -0.41665378079346704]
- [-0.5276407274598757, 0.10351473166383039]
- [0.1532359757091169, 0.05927964452344507]
- [-0.32663420820434774, 0.1433216236356193]
- [-0.007458713685336457, -0.35958713145660093]
- [0.3265714292567269, -0.03595562690045131]
- [0.08867773293970356, -0.10878777549313444]
- [0.43763517631525967, 0.24463069274900034]
- [-0.11064348686253359, -0.15982939433978866]
- [0.4084165717177303, 0.7351992369315381]
- [0.08119643043093605, 0.2757596196429262]</code></pre><pre><code class="language-julia hljs">sol.W # Simulated Noise</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1×10 Matrix{Float64}:
- 0.0688656  -1.70002  -0.0907619  1.33766  …  0.955692  -0.314344  0.239932</code></pre><p>We can also solve the model by passing in fixed noise, which will be useful for joint likelihoods. First, let&#39;s extract the noise from the previous solution, then rerun the simulation but with a different initial value</p><pre><code class="language-julia hljs">noise = sol.W
+ -0.0066529695533883975</code></pre><p>Or to get the first element of the last step</p><pre><code class="language-julia hljs">sol[end][1] #first element of last step</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.0716582100956369</code></pre><p>Finally, to extract the full vector</p><pre><code class="language-julia hljs">@show sol[2, :];  # whole second vector</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Float64}:
+  0.0
+ -0.0066529695533883975
+ -0.0003260792780927083
+ -0.005171055886909522
+  0.002074506231364348
+ -0.0009500929123929035
+  0.014676418931937342
+  0.011935454170726788
+ -0.009049269610703065
+  0.004410913620137401
+ -0.0035250997437888073</code></pre><p>The results for all of <code>sol.u</code> can be loaded in a dataframe, where the column names will be the (optionally) provided symbols.</p><pre><code class="language-julia hljs">df = DataFrame(sol)</code></pre><div><div style = "float: left;"><span>11×3 DataFrame</span></div><div style = "clear: both;"></div></div><div class = "data-frame" style = "overflow-x: scroll;"><table class = "data-frame" style = "margin-bottom: 6px;"><thead><tr class = "header"><th class = "rowNumber" style = "font-weight: bold; text-align: right;">Row</th><th style = "text-align: left;">timestamp</th><th style = "text-align: left;">a</th><th style = "text-align: left;">b</th></tr><tr class = "subheader headerLastRow"><th class = "rowNumber" style = "font-weight: bold; text-align: right;"></th><th title = "Int64" style = "text-align: left;">Int64</th><th title = "Float64" style = "text-align: left;">Float64</th><th title = "Float64" style = "text-align: left;">Float64</th></tr></thead><tbody><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">1</td><td style = "text-align: right;">0</td><td style = "text-align: right;">0.0</td><td style = "text-align: right;">0.0</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">2</td><td style = "text-align: right;">1</td><td style = "text-align: right;">0.0</td><td style = "text-align: right;">-0.00665297</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">3</td><td style = "text-align: right;">2</td><td style = "text-align: right;">-0.0412484</td><td style = "text-align: right;">-0.000326079</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">4</td><td style = "text-align: right;">3</td><td style = "text-align: right;">-0.0412077</td><td style = "text-align: right;">-0.00517106</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">5</td><td style = "text-align: right;">4</td><td style = "text-align: right;">-0.0712078</td><td style = "text-align: right;">0.00207451</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">6</td><td style = "text-align: right;">5</td><td style = "text-align: right;">-0.0547855</td><td style = "text-align: right;">-0.000950093</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">7</td><td style = "text-align: right;">6</td><td style = "text-align: right;">-0.0579368</td><td style = "text-align: right;">0.0146764</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">8</td><td style = "text-align: right;">7</td><td style = "text-align: right;">0.0359538</td><td style = "text-align: right;">0.0119355</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">9</td><td style = "text-align: right;">8</td><td style = "text-align: right;">0.108156</td><td style = "text-align: right;">-0.00904927</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">10</td><td style = "text-align: right;">9</td><td style = "text-align: right;">0.0466427</td><td style = "text-align: right;">0.00441091</td></tr><tr><td class = "rowNumber" style = "font-weight: bold; text-align: right;">11</td><td style = "text-align: right;">10</td><td style = "text-align: right;">0.0716582</td><td style = "text-align: right;">-0.0035251</td></tr></tbody></table></div><p>Other results, such as the simulated noise and observables, can be extracted from the solution</p><pre><code class="language-julia hljs">sol.z # observables</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Vector{Float64}}:
+ [-0.18714943809424156, -0.48925906447821027]
+ [-0.2620124140597859, -0.28657934793047346]
+ [-0.31424331659238075, 0.47538328392125406]
+ [-0.28995703759003366, 0.6626625996704064]
+ [-0.44638015131207326, -0.8941294896873483]
+ [-0.2858489925740556, -0.5752895881232579]
+ [0.2987040430465367, -0.12859444838078796]
+ [-0.17012177350159804, 0.017811035166601923]
+ [-0.013978447544399074, 0.0420250471332029]
+ [0.05838652708953471, 0.1990822575059309]
+ [-0.7513961009515336, 0.25007547718357326]</code></pre><pre><code class="language-julia hljs">sol.W # Simulated Noise</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1×10 Matrix{Float64}:
+ -0.665297  0.100451  -0.510584  0.310872  …  -1.14364  0.622077  -0.440728</code></pre><p>We can also solve the model by passing in fixed noise, which will be useful for joint likelihoods. First, let&#39;s extract the noise from the previous solution, then rerun the simulation but with a different initial value</p><pre><code class="language-julia hljs">noise = sol.W
 u0_2 = [0.1, 0.0]
 prob2 = LinearStateSpaceProblem(
     A, B, u0_2, (0, T); C, observables_noise = D, syms = [:a, :b], noise)
 sol2 = solve(prob2)
-plot(sol2)</code></pre><img src="47d7b5a5.svg" alt="Example block output"/><p>To construct an IRF we can take the model and perturb just the first element of the noise,</p><pre><code class="language-julia hljs">function irf(A, B, C, T = 20)
+plot(sol2)</code></pre><img src="11b4e234.svg" alt="Example block output"/><p>To construct an IRF we can take the model and perturb just the first element of the noise,</p><pre><code class="language-julia hljs">function irf(A, B, C, T = 20)
     noise = Matrix([1.0; zeros(T - 1)]&#39;)
     problem = LinearStateSpaceProblem(A, B, zeros(2), (0, T); C, noise, syms = [:a, :b])
     return solve(problem)
 end
-plot(irf(A, B, C))</code></pre><img src="8739df9e.svg" alt="Example block output"/><p>Let&#39;s find the 2nd observable at the end of the IRF.</p><pre><code class="language-julia hljs">function last_observable_irf(A, B, C)
+plot(irf(A, B, C))</code></pre><img src="827288e7.svg" alt="Example block output"/><p>Let&#39;s find the 2nd observable at the end of the IRF.</p><pre><code class="language-julia hljs">function last_observable_irf(A, B, C)
     sol = irf(A, B, C)
     return sol.z[end][2]  # return 2nd argument of last observable
 end
@@ -78,27 +78,27 @@ gradient((noise, u0) -&gt; mean_u_1(A, B, C, noise, u0, T), noise, u0)</code></p
 u0 = MvNormal([1.0 0.1; 0.1 1.0])  # mean zero initial conditions
 prob = LinearStateSpaceProblem(A, nothing, u0, (0, T); C)
 sol = solve(prob)
-plot(sol)</code></pre><img src="5945ec45.svg" alt="Example block output"/><p>With this, we can simulate an ensemble of solutions from different initial conditions (and we will turn back on the noise). The <code>EnsembleSummary</code> calculates a set of quantiles by default.</p><pre><code class="language-julia hljs">T = 10
+plot(sol)</code></pre><img src="a464e232.svg" alt="Example block output"/><p>With this, we can simulate an ensemble of solutions from different initial conditions (and we will turn back on the noise). The <code>EnsembleSummary</code> calculates a set of quantiles by default.</p><pre><code class="language-julia hljs">T = 10
 trajectories = 50
 prob = LinearStateSpaceProblem(A, B, u0, (0, T); C)
 sol = solve(EnsembleProblem(prob), DirectIteration(), EnsembleThreads(); trajectories)
 summ = EnsembleSummary(sol)  #calculate summarize statistics from the
-plot(summ)  # shows quantiles by default</code></pre><img src="bb785dbb.svg" alt="Example block output"/><h2 id="Observables-and-Marginal-Likelihood-using-a-Kalman-Filter"><a class="docs-heading-anchor" href="#Observables-and-Marginal-Likelihood-using-a-Kalman-Filter">Observables and Marginal Likelihood using a Kalman Filter</a><a id="Observables-and-Marginal-Likelihood-using-a-Kalman-Filter-1"></a><a class="docs-heading-anchor-permalink" href="#Observables-and-Marginal-Likelihood-using-a-Kalman-Filter" title="Permalink"></a></h2><p>If you provide <code>observables</code> and provide a distribution for the <code>observables_noise</code> then the model can provide a calculation of the likelihood.</p><p>The simplest case is if you use a gaussian prior and have gaussian observation noise. First, let&#39;s simulate some data with included observation noise. If passing in a matrix or vector, the <code>observables_noise</code> argument is intended to be the cholesky of the covariance matrix. At this point, only diagonal observation noise is allowed.</p><pre><code class="language-julia hljs">u0 = MvNormal([1.0 0.1; 0.1 1.0])  # draw from mean zero initial conditions
+plot(summ)  # shows quantiles by default</code></pre><img src="b926da3e.svg" alt="Example block output"/><h2 id="Observables-and-Marginal-Likelihood-using-a-Kalman-Filter"><a class="docs-heading-anchor" href="#Observables-and-Marginal-Likelihood-using-a-Kalman-Filter">Observables and Marginal Likelihood using a Kalman Filter</a><a id="Observables-and-Marginal-Likelihood-using-a-Kalman-Filter-1"></a><a class="docs-heading-anchor-permalink" href="#Observables-and-Marginal-Likelihood-using-a-Kalman-Filter" title="Permalink"></a></h2><p>If you provide <code>observables</code> and provide a distribution for the <code>observables_noise</code> then the model can provide a calculation of the likelihood.</p><p>The simplest case is if you use a gaussian prior and have gaussian observation noise. First, let&#39;s simulate some data with included observation noise. If passing in a matrix or vector, the <code>observables_noise</code> argument is intended to be the cholesky of the covariance matrix. At this point, only diagonal observation noise is allowed.</p><pre><code class="language-julia hljs">u0 = MvNormal([1.0 0.1; 0.1 1.0])  # draw from mean zero initial conditions
 T = 10
 prob = LinearStateSpaceProblem(A, B, u0, (0, T); C, observables_noise = D, syms = [:a, :b])
 sol = solve(prob)
 sol.z # simulated observables with observation noise</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Vector{Float64}}:
- [-0.17918936273726027, -0.8177982180317855]
- [-0.20849113054269486, 0.4821241413670956]
- [0.07741842065083897, 0.427862589874885]
- [0.2772846262140172, 0.20633549039605226]
- [0.4226856875157375, 1.2574131442325323]
- [-0.24178231445577392, 0.8493765191268396]
- [-0.07988491013938039, 0.9902558903071351]
- [0.5086943174338328, 0.8956443605700578]
- [0.6659425002176294, 0.03375147762307451]
- [0.3129864988881581, 0.5465156665158117]
- [-0.1568548468028047, 1.2237205867511283]</code></pre><p>Next, we will find the log likelihood of these simulated observables using <code>u0</code> as a prior and with the true parameters.</p><p>The new arguments we pass to the problem creation are <code>u0_prior_variance, u0_prior_mean,</code> and <code>observables</code>. The <code>u0</code> is ignored for the filtering problem, but must match the size. The <code>KalmanFilter()</code> argument to the <code>solve</code> is unnecessary since it can be selected automatically given the priors and observables.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The timing convention is such that <code>observables</code> are expected to match the predictions starting at the second time period. As the likelihood of the first element <code>u0</code> comes from a prior, the <code>observables</code> start at the next element, and hence the observables and noise sequences should be 1 less than the tspan.</p></div></div><pre><code class="language-julia hljs">observables = hcat(sol.z...)  # Observables required to be matrix.  Issue #55
+ [0.598475169829116, -1.0822256484943358]
+ [0.1329933415785443, 5.047461784579176]
+ [0.40911401600380315, 6.2466361975746745]
+ [0.6730333761302273, 5.485213123192824]
+ [0.513540597955876, 5.171856705187101]
+ [-0.019971275916727205, 4.916955261454044]
+ [0.26829145452798275, 4.382685757101418]
+ [0.48987759810652076, 4.204651144441524]
+ [0.7937912121382924, 4.230423809638505]
+ [0.4292808157026788, 3.877742308604573]
+ [-0.15897777524759493, 3.8992974828468716]</code></pre><p>Next, we will find the log likelihood of these simulated observables using <code>u0</code> as a prior and with the true parameters.</p><p>The new arguments we pass to the problem creation are <code>u0_prior_variance, u0_prior_mean,</code> and <code>observables</code>. The <code>u0</code> is ignored for the filtering problem, but must match the size. The <code>KalmanFilter()</code> argument to the <code>solve</code> is unnecessary since it can be selected automatically given the priors and observables.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The timing convention is such that <code>observables</code> are expected to match the predictions starting at the second time period. As the likelihood of the first element <code>u0</code> comes from a prior, the <code>observables</code> start at the next element, and hence the observables and noise sequences should be 1 less than the tspan.</p></div></div><pre><code class="language-julia hljs">observables = hcat(sol.z...)  # Observables required to be matrix.  Issue #55
 observables = observables[:, 2:end] # see note above on likelihood and timing
 noise = copy(sol.W) # save for later
 u0_prior_mean = [0.0, 0.0]
@@ -109,7 +109,7 @@ prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observabl
     observables_noise = D, syms = [:a, :b], u0_prior_var, u0_prior_mean)
 sol = solve(prob, KalmanFilter())
 # plot(sol) The `u` is the sequence of posterior means.
-sol.logpdf</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-13.133506541537763</code></pre><p>Hence, the <code>logpdf</code> provides the log likelihood marginalizing out the latent noise variables.</p><p>As before, we can differentiate the kalman filter itself.</p><pre><code class="language-julia hljs">function kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables)
+sol.logpdf</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-7.839964529508742</code></pre><p>Hence, the <code>logpdf</code> provides the log likelihood marginalizing out the latent noise variables.</p><p>As before, we can differentiate the kalman filter itself.</p><pre><code class="language-julia hljs">function kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables)
     prob = LinearStateSpaceProblem(A, B, u0, (0, size(observables, 2)); C, observables,
         observables_noise = D, syms = [:a, :b], u0_prior_var, u0_prior_mean)
     return solve(prob).logpdf
@@ -122,14 +122,14 @@ gradient(
     A,
     B,
     C,
-    u0_prior_var)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([18.092124114462163 -0.08557943074705607; 147.48874434831288 0.983895476516452], [2.6031834084741803; 40.92499449170501;;], [6.462496979912714 -0.023825488150595486; -1.2754140174150734 -0.044046160949398505], [-0.07553340019619885 0.7799187607015207; -0.9012189426902693 -0.4718377372054112])</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Some gradients, such as those for <code>observables</code>, have not been implemented, so test carefully. This is a general theme with gradients and <code>Zygote.jl</code> in general. Your best friend in this process is the spectacular <a href="https://github.com/JuliaDiff/ChainRulesTestUtils.jl">ChainRulesTestUtils.jl</a> package. See <code>test_rrule</code> usage in the <a href="https://github.com/SciML/DifferenceEquations.jl/blob/main/test/linear_gradients.jl">linear unit tests</a>.</p></div></div><h2 id="Joint-Likelihood-with-Noise"><a class="docs-heading-anchor" href="#Joint-Likelihood-with-Noise">Joint Likelihood with Noise</a><a id="Joint-Likelihood-with-Noise-1"></a><a class="docs-heading-anchor-permalink" href="#Joint-Likelihood-with-Noise" title="Permalink"></a></h2><p>A key application of these methods is to find the joint likelihood of the latent variables (i.e., the <code>noise</code>) and the model definition.</p><p>The actual calculation of the likelihood is trivial in that case, and just requires iteration of the linear system while accumulating the likelihood given the observation noise.</p><p>Crucially, the differentiability with respect to the high-dimensional noise vector enables gradient-based sampling and estimation methods that would otherwise be infeasible.</p><pre><code class="language-julia hljs">function joint_likelihood(A, B, C, D, u0, noise, observables)
+    u0_prior_var)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([-133.5095014493091 0.01625470364401546; -994.1287072958926 -17.60179936944906], [2.5912522479545523; 16.46829428759027;;], [-40.00627001093838 -0.6106697665931414; 3.6559842551553743 0.27602777474578843], [-0.033380711375140246 -0.0718773558763173; 0.2858994991572116 -0.24722736911425042])</code></pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>Some gradients, such as those for <code>observables</code>, have not been implemented, so test carefully. This is a general theme with gradients and <code>Zygote.jl</code> in general. Your best friend in this process is the spectacular <a href="https://github.com/JuliaDiff/ChainRulesTestUtils.jl">ChainRulesTestUtils.jl</a> package. See <code>test_rrule</code> usage in the <a href="https://github.com/SciML/DifferenceEquations.jl/blob/main/test/linear_gradients.jl">linear unit tests</a>.</p></div></div><h2 id="Joint-Likelihood-with-Noise"><a class="docs-heading-anchor" href="#Joint-Likelihood-with-Noise">Joint Likelihood with Noise</a><a id="Joint-Likelihood-with-Noise-1"></a><a class="docs-heading-anchor-permalink" href="#Joint-Likelihood-with-Noise" title="Permalink"></a></h2><p>A key application of these methods is to find the joint likelihood of the latent variables (i.e., the <code>noise</code>) and the model definition.</p><p>The actual calculation of the likelihood is trivial in that case, and just requires iteration of the linear system while accumulating the likelihood given the observation noise.</p><p>Crucially, the differentiability with respect to the high-dimensional noise vector enables gradient-based sampling and estimation methods that would otherwise be infeasible.</p><pre><code class="language-julia hljs">function joint_likelihood(A, B, C, D, u0, noise, observables)
     prob = LinearStateSpaceProblem(
         A, B, u0, (0, size(observables, 2)); C, observables, observables_noise = D, noise)
     return solve(prob).logpdf
 end
 u0 = [0.0, 0.0]
-joint_likelihood(A, B, C, D, u0, noise, observables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-21.637893547315862</code></pre><p>And as always, this can be differentiated with respect to the state-space matrices and the noise. Choosing a few parameters,</p><pre><code class="language-julia hljs">gradient(
-    (A, u0, noise) -&gt; joint_likelihood(A, B, C, D, u0, noise, observables), A, u0, noise)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([28.942086172504585 1.5458235140554295; 158.65350223135846 9.980635565967994], [40.69384702996906, 326.94478638790906], [3.0681944990897594 2.945058850125916 … 0.6301253569844538 -0.011927306605812076])</code></pre><h2 id="Composition-of-State-Space-Models-and-AD"><a class="docs-heading-anchor" href="#Composition-of-State-Space-Models-and-AD">Composition of State Space Models and AD</a><a id="Composition-of-State-Space-Models-and-AD-1"></a><a class="docs-heading-anchor-permalink" href="#Composition-of-State-Space-Models-and-AD" title="Permalink"></a></h2><p>While the above gradients have been with respect to the full state space objects <code>A, B</code>, etc. those themselves could be generated through a separate procedure and the whole object differentiated. For example, let&#39;s repeat the above examples where we generate the <code>A</code> matrix from some sort of deep parameters.</p><p>First, we will generate some observations with a <code>generate_model</code> proxy, which could be replaced with something more complicated but still differentiable</p><pre><code class="language-julia hljs">function generate_model(β)
+joint_likelihood(A, B, C, D, u0, noise, observables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-1185.1078766525466</code></pre><p>And as always, this can be differentiated with respect to the state-space matrices and the noise. Choosing a few parameters,</p><pre><code class="language-julia hljs">gradient(
+    (A, u0, noise) -&gt; joint_likelihood(A, B, C, D, u0, noise, observables), A, u0, noise)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([-90.52563586793134 -4.353483695771945; -521.7372931543744 -27.606445302959873], [375.60284243376253, 2996.329148709774], [27.25131937815565 23.70589211193122 … 2.472661536452844 -0.010303016357891895])</code></pre><h2 id="Composition-of-State-Space-Models-and-AD"><a class="docs-heading-anchor" href="#Composition-of-State-Space-Models-and-AD">Composition of State Space Models and AD</a><a id="Composition-of-State-Space-Models-and-AD-1"></a><a class="docs-heading-anchor-permalink" href="#Composition-of-State-Space-Models-and-AD" title="Permalink"></a></h2><p>While the above gradients have been with respect to the full state space objects <code>A, B</code>, etc. those themselves could be generated through a separate procedure and the whole object differentiated. For example, let&#39;s repeat the above examples where we generate the <code>A</code> matrix from some sort of deep parameters.</p><p>First, we will generate some observations with a <code>generate_model</code> proxy, which could be replaced with something more complicated but still differentiable</p><pre><code class="language-julia hljs">function generate_model(β)
     A = [β 6.2;
          0.0 0.2]
     B = Matrix([0.0 0.001]&#39;) # [0.0; 0.001;;] gives a zygote bug
@@ -152,7 +152,7 @@ end
 # Fix a &quot;pseudo-true&quot; and generate noise and observables
 β = 0.95
 u0 = [0.0, 0.0]
-observables, noise = simulate_model(β, u0)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([0.10127595356182206 -0.024609113186743685 … 0.06487461218233434 0.04292321185488964; -0.13778271696955888 0.13393708257606476 … 0.12056563952052002 0.014883598343291574], [0.018176069871371946 -0.4730246007469369 … -0.7794557550930142 0.9214006246074178])</code></pre><p>Next, we will evaluate the marginal likelihood using the kalman filter for a particular <code>β</code> value,</p><pre><code class="language-julia hljs">function kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)
+observables, noise = simulate_model(β, u0)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([-0.09954709114589842 0.005232798392808081 … 0.20762700975229048 0.05441666003670729; 0.009244093512761615 0.09910139963314891 … 0.11489849804601801 0.23434696840661354], [1.113706766440712 -0.23095703333715878 … -0.2006356175209672 -0.09819817554657458])</code></pre><p>Next, we will evaluate the marginal likelihood using the kalman filter for a particular <code>β</code> value,</p><pre><code class="language-julia hljs">function kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)
     mod = generate_model(β) # generate model from structural parameters
     prob = LinearStateSpaceProblem(
         mod.A, mod.B, u0, (0, size(observables, 2)); mod.C, observables,
@@ -162,7 +162,7 @@ end
 u0_prior_mean = [0.0, 0.0]
 u0_prior_var = [1e-10 0.0;
                 0.0 1e-10]  # starting with degenerate prior
-kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">344.79234944567605</code></pre><p>Given the observation error, we would not expect the pseudo-true to exactly maximize the log likelihood. To show this, we can optimize it using the Optim package, specifically using a gradient-based optimization routine</p><pre><code class="language-julia hljs">using Optimization, OptimizationOptimJL
+kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">339.974308955627</code></pre><p>Given the observation error, we would not expect the pseudo-true to exactly maximize the log likelihood. To show this, we can optimize it using the Optim package, specifically using a gradient-based optimization routine</p><pre><code class="language-julia hljs">using Optimization, OptimizationOptimJL
 # Create a function to minimize only of β and use Zygote based gradients
 function kalman_objective(β, p)
     -kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)
@@ -175,7 +175,7 @@ optf = OptimizationFunction(kalman_objective, Optimization.AutoZygote())
 optprob = OptimizationProblem(optf, β0)
 optsol = solve(optprob, LBFGS())  # reverse-mode AD is overkill here</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
 u: 1-element Vector{Float64}:
- 0.9017443062739691</code></pre><p>In this way, this package composes with others such as <a href="https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl">DifferentiableStateSpaceModels.jl</a> which takes a set of structural parameters and an expected difference equation to generate a state-space model.</p><p>Similarly, we can find the joint likelihood for a particular <code>β</code> value and noise. Here we will add in prior. Some form of prior or regularization is generally necessary for these sorts of nonlinear models.</p><pre><code class="language-julia hljs">function joint_model_posterior(β, u0, noise, observables, noise_prior, β_prior)
+ 0.9900786340744506</code></pre><p>In this way, this package composes with others such as <a href="https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl">DifferentiableStateSpaceModels.jl</a> which takes a set of structural parameters and an expected difference equation to generate a state-space model.</p><p>Similarly, we can find the joint likelihood for a particular <code>β</code> value and noise. Here we will add in prior. Some form of prior or regularization is generally necessary for these sorts of nonlinear models.</p><pre><code class="language-julia hljs">function joint_model_posterior(β, u0, noise, observables, noise_prior, β_prior)
     mod = generate_model(β) # generate model from structural parameters
     prob = LinearStateSpaceProblem(mod.A, mod.B, u0, (0, size(observables, 2)); mod.C,
         observables, observables_noise = mod.D, noise)
@@ -184,7 +184,7 @@ end
 u0 = [0.0, 0.0]
 noise_prior = Normal(0.0, 1.0)
 β_prior = Normal(β, 0.03) # prior local to the true value
-joint_model_posterior(β, u0, noise, observables, noise_prior, β_prior)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">72.99730522663975</code></pre><p>Which we can turn into a differentiable objective by adding in a prior on the noise</p><pre><code class="language-julia hljs">function joint_model_objective(x, p)
+joint_model_posterior(β, u0, noise, observables, noise_prior, β_prior)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">64.07140511636317</code></pre><p>Which we can turn into a differentiable objective by adding in a prior on the noise</p><pre><code class="language-julia hljs">function joint_model_objective(x, p)
     -joint_model_posterior(x[1], u0, Matrix(x[2:end]&#39;), observables, noise_prior, β_prior)
 end # extract noise and parameeter from vector
 x0 = vcat([0.95], noise[1, :])  # starting at the true noise
@@ -196,23 +196,23 @@ optf = OptimizationFunction(joint_model_objective, Optimization.AutoZygote())
 optprob = OptimizationProblem(optf, x0)
 optsol = solve(optprob, LBFGS())</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
 u: 201-element Vector{Float64}:
-  0.9703348498529548
- -0.2631009833134207
- -0.34481650957492754
- -0.25443401812840966
- -0.1312731785020191
- -0.03403984666672317
-  0.11057684825578572
-  0.1517571083902981
-  0.06643400558016863
-  0.09085314284637803
+  0.9974638076163224
+ -0.061918324475983354
+ -0.08909884072072614
+  0.051033663315531656
+  0.0317249889527825
+ -0.08397498660787954
+ -0.11553250279515634
+ -0.1130319864113659
+ -0.14445809898828096
+ -0.21706056871830864
   ⋮
-  0.2804294075050851
-  0.1251811256215313
-  0.04986464746693884
-  0.025142049629398568
-  4.3780048692044196e-5
-  0.04877085756691584
-  0.05062437614454295
-  7.967373041890623e-5
-  0.0027186404447827723</code></pre><p>This &quot;solves&quot; the problem relatively quickly, despite the high-dimensionality. However, from a statistics perspective note that this last optimization process does not do especially well in recovering the pseudotrue if you increase the prior variance on the <code>β</code> parameter. Maximizing the posterior is usually the wrong thing to do in high-dimensions because the mode is not a typical set.</p><h2 id="Caveats-on-Gradients-and-Performance"><a class="docs-heading-anchor" href="#Caveats-on-Gradients-and-Performance">Caveats on Gradients and Performance</a><a id="Caveats-on-Gradients-and-Performance-1"></a><a class="docs-heading-anchor-permalink" href="#Caveats-on-Gradients-and-Performance" title="Permalink"></a></h2><p>A few notes on performance and gradients:</p><ol><li>As this is using reverse-mode AD it will be efficient for fairly large systems as long as the ultimate value of your differentiable program. With a little extra work and unit tests, it could support structured matrices/etc. as well.</li><li>Getting to much higher scales, where the <code>A,B,C,D</code> are so large that matrix-free operators are necessary, is feasible but will require generalizing those to LinearOperators. This would be reasonably easy for joint likelihood and feasible but possible for the Kalman filter.</li><li>At this point, there is no support for forward-mode auto-differentiation. For smaller systems with a kalman filter, this should dominate the alternatives, and efficient forward-mode AD rules for the kalman filter exist (see the supplementary materials in the <a href="https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl">Differentiable State Space Models</a> paper). However, it would be a significant amount of work to add end-to-end support and fulfill standard SciML interfaces, and perhaps waiting for <a href="https://enzyme.mit.edu/julia/">Enzyme</a> or similar AD systems that provide both forward/reverse/mixed mode makes sense.</li><li>Forward-mode AD is likely inappropriate for the joint-likelihood based models, since the dimensionality of the noise is always large.</li><li>The gradient rules are written using <a href="https://github.com/JuliaDiff/ChainRules.jl">ChainRules.jl</a> so in theory they will work with any supporting AD. In practice, though, Zygote is the most tested, and other systems have inconsistent support for Julia at this time.</li></ol></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« DifferenceEquations.jl: Discrete-Time State Space Solution Methods</a><a class="docs-footer-nextpage" href="../quadratic_state_space_examples/">Quadratic State Space Examples »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.3.0 on <span class="colophon-date" title="Monday 8 April 2024 01:09">Monday 8 April 2024</span>. Using Julia version 1.10.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+  0.08517384748002621
+  0.07135785076995982
+  0.04317100161435068
+  0.10106197543690171
+  0.0741233383247633
+  0.14491287211656687
+  0.1658242261886731
+  0.11809470574069815
+  0.0032163881613767463</code></pre><p>This &quot;solves&quot; the problem relatively quickly, despite the high-dimensionality. However, from a statistics perspective note that this last optimization process does not do especially well in recovering the pseudotrue if you increase the prior variance on the <code>β</code> parameter. Maximizing the posterior is usually the wrong thing to do in high-dimensions because the mode is not a typical set.</p><h2 id="Caveats-on-Gradients-and-Performance"><a class="docs-heading-anchor" href="#Caveats-on-Gradients-and-Performance">Caveats on Gradients and Performance</a><a id="Caveats-on-Gradients-and-Performance-1"></a><a class="docs-heading-anchor-permalink" href="#Caveats-on-Gradients-and-Performance" title="Permalink"></a></h2><p>A few notes on performance and gradients:</p><ol><li>As this is using reverse-mode AD it will be efficient for fairly large systems as long as the ultimate value of your differentiable program. With a little extra work and unit tests, it could support structured matrices/etc. as well.</li><li>Getting to much higher scales, where the <code>A,B,C,D</code> are so large that matrix-free operators are necessary, is feasible but will require generalizing those to LinearOperators. This would be reasonably easy for joint likelihood and feasible but possible for the Kalman filter.</li><li>At this point, there is no support for forward-mode auto-differentiation. For smaller systems with a kalman filter, this should dominate the alternatives, and efficient forward-mode AD rules for the kalman filter exist (see the supplementary materials in the <a href="https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl">Differentiable State Space Models</a> paper). However, it would be a significant amount of work to add end-to-end support and fulfill standard SciML interfaces, and perhaps waiting for <a href="https://enzyme.mit.edu/julia/">Enzyme</a> or similar AD systems that provide both forward/reverse/mixed mode makes sense.</li><li>Forward-mode AD is likely inappropriate for the joint-likelihood based models, since the dimensionality of the noise is always large.</li><li>The gradient rules are written using <a href="https://github.com/JuliaDiff/ChainRules.jl">ChainRules.jl</a> so in theory they will work with any supporting AD. In practice, though, Zygote is the most tested, and other systems have inconsistent support for Julia at this time.</li></ol></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« DifferenceEquations.jl: Discrete-Time State Space Solution Methods</a><a class="docs-footer-nextpage" href="../quadratic_state_space_examples/">Quadratic State Space Examples »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Wednesday 8 May 2024 05:21">Wednesday 8 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
