@@ -18,6 +18,7 @@ Relative to existing solvers, this package is intended to provide **differentiab
 
 **NOTE**: While the features of this package have unit tests and documentation, the package is in a pre-release state. If you require additional features or flexibility, you will need to contribute them.
 
+
 ## Tutorials and Documentation
 
 For information on using the package,
