@@ -6,6 +6,7 @@ get_concrete_noise(prob, noise, B::Nothing, T) = nothing # if no noise matrix gi
 get_concrete_noise(prob, noise::Nothing, B::Nothing, T) = nothing # if no noise matrix given, do not create noise
 get_concrete_noise(prob, noise::Nothing, B, T) = randn(eltype(B), size(B, 2), T) # default is unit Gaussian
 get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size(B, 2), T) # iid
+get_concrete_noise(prob, noise::UnivariateDistribution, B::Nothing, T) = nothing
 
 # Utility functions to conditionally check size if not-nothing
 maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
