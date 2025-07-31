@@ -204,7 +204,10 @@ end
 kalman_likelihood(A, B, C, D, u0_prior_mean, u0_prior_var, observables)
 # Find the gradient wrt the A, B, C and priors variance.
 gradient(
-    (A, B, C, u0_prior_var) -> kalman_likelihood(
+    (A,
+        B,
+        C,
+        u0_prior_var) -> kalman_likelihood(
         A, B, C, D, u0_prior_mean, u0_prior_var, observables),
     A,
     B,
