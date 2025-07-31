@@ -136,7 +136,9 @@ observables_kalman = readdlm(
 T = 200
 
 @testset "basic test, non-square matrices" begin
-    z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman,
+    z, u,
+    P,
+    loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman,
         D_kalman,
         u0_mean_kalman, u0_var_kalman, [0, T])
     sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
@@ -167,7 +169,9 @@ D_offdiag = [0.01 0.0 0.0 0.0;
              0.0 0.005 0.03 0.0;
              0.0 0.01 0.0 0.04]
 @testset "off-diagonal D" begin
-    z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman,
+    z, u,
+    P,
+    loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman,
         D_offdiag,
         u0_mean_kalman, u0_var_kalman, [0, T])
     sol = solve_kalman(A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
@@ -194,7 +198,9 @@ D_offdiag = [0.01 0.0 0.0 0.0;
 end
 
 @testset "direct rrule" begin
-    z, u, P, loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman,
+    z, u,
+    P,
+    loglik = solve_manual(observables_kalman, A_kalman, B_kalman, C_kalman,
         D_kalman,
         u0_mean_kalman, u0_var_kalman, [0, T])
     problem = LinearStateSpaceProblem(A_kalman, B_kalman, u0_mean_kalman,
@@ -236,8 +242,8 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855,
         u0_var_vech, observables_kalman,
         D_offdiag)
 
-    @test grad_values[1]≈
-    finite_difference_gradient(
+    @test grad_values[1] ≈
+          finite_difference_gradient(
         A -> solve_kalman_cov(A, B_kalman, C_kalman, u0_mean,
             u0_var_vech,
             observables_kalman,
@@ -245,8 +251,8 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855,
         A_kalman) rtol=1e-7
 
     # try this with non-zero mean
-    @test grad_values[4]≈
-    finite_difference_gradient(
+    @test grad_values[4] ≈
+          finite_difference_gradient(
         u0_mean_vec -> solve_kalman_cov(A_kalman, B_kalman, C_kalman,
             u0_mean_vec,
             u0_var_vech,
@@ -254,8 +260,8 @@ u0_var_vech = [1.1193770675024004, -0.1755391543370492, -0.8351442110561855,
             D_offdiag).logpdf,
         u0_mean) rtol=1e-6
 
-    @test grad_values[5]≈
-    finite_difference_gradient(
+    @test grad_values[5] ≈
+          finite_difference_gradient(
         u0_var -> solve_kalman_cov(A_kalman, B_kalman, C_kalman,
             u0_mean,
             u0_var,

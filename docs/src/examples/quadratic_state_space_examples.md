@@ -91,7 +91,14 @@ Which, in turn, can itself be differentiated.
 
 ```@example 2
 gradient(
-    (A_0, A_1, A_2, B, C_0, C_1, C_2, noise) -> joint_likelihood_quad(
+    (A_0,
+        A_1,
+        A_2,
+        B,
+        C_0,
+        C_1,
+        C_2,
+        noise) -> joint_likelihood_quad(
         A_0, A_1, A_2, B, C_0, C_1, C_2, D, u0, noise, observables),
     A_0,
     A_1,

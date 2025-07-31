@@ -115,7 +115,9 @@ noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_n
         A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ)
 
     test_rrule(Zygote.ZygoteRuleConfig(),
-        (A_0_FVGQ, C_1_FVGQ, u0_2_FVGQ) -> joint_likelihood_2(A_0_FVGQ,
+        (A_0_FVGQ,
+            C_1_FVGQ,
+            u0_2_FVGQ) -> joint_likelihood_2(A_0_FVGQ,
             A_1_FVGQ,
             A_2_FVGQ,
             B_2_FVGQ,
