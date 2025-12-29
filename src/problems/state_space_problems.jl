@@ -1,9 +1,5 @@
-abstract type AbstractStateSpaceProblem <: DiffEqBase.DEProblem end
+abstract type AbstractStateSpaceProblem <: DEProblem end
 abstract type AbstractPerturbationProblem <: AbstractStateSpaceProblem end
-
-using DiffEqBase: get_concrete_tspan, get_concrete_u0, get_concrete_p, promote_u0,
-                  promote_tspan,
-                  isconcreteu0
 
 # TODO: Can add in more checks on the algorithm choice
 DiffEqBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothing
@@ -12,7 +8,7 @@ DiffEqBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothin
 # In discrete time, tspan should not have a sensitivity so the concretization is less obvious
 function DiffEqBase.get_concrete_problem(prob::AbstractPerturbationProblem, isadapt;
         kwargs...)
-    p = DiffEqBase.get_concrete_p(prob, kwargs)
+    p = get_concrete_p(prob, kwargs)
     tspan = prob.tspan #get_concrete_tspan(prob, isadapt, kwargs, p)
     u0 = get_concrete_u0(prob, isadapt, tspan[1], kwargs)
     u0_promote = promote_u0(u0, p, tspan[1])
@@ -56,7 +52,7 @@ struct LinearStateSpaceProblem{
             observables = nothing,
             noise = nothing,
             syms = nothing,
-            f = ODEFunction{false}(((u, p, t) -> error("not implemented"));
+            f = ODEFunction{false}((u, p, t) -> error("not implemented");
                 syms = syms),
             kwargs...) where {iip}
         _tspan = promote_tspan(tspan)
@@ -120,7 +116,7 @@ struct QuadraticStateSpaceProblem{uType, uPriorMeanType, uPriorVarType, tType, P
             observables = nothing,
             noise = nothing,
             syms = nothing,
-            f = ODEFunction{false}(((u, p, t) -> error("not implemented"));
+            f = ODEFunction{false}((u, p, t) -> error("not implemented");
                 syms = syms),
             kwargs...) where {iip}
         _tspan = promote_tspan(tspan)
