@@ -1,6 +1,6 @@
 struct StateSpaceSolution{T, N, uType, uType2, DType, tType, randType, P, A, IType, DE,
     PosteriorType,
-    logpdfType, zType} <: SciMLBase.AbstractRODESolution{T, N, uType}
+    logpdfType, zType} <: AbstractRODESolution{T, N, uType}
     u::uType
     u_analytic::uType2
     errors::DType
@@ -23,7 +23,7 @@ function SciMLBase.build_solution(prob::AbstractStateSpaceProblem, alg, t, u; P 
         W = nothing, timeseries_errors = length(u) > 2,
         dense = false,
         dense_errors = dense, calculate_error = true,
-        interp = SciMLBase.ConstantInterpolation(t, u),
+        interp = ConstantInterpolation(t, u),
         retcode = :Default,
         stats = nothing, z = nothing, kwargs...)
     T = eltype(eltype(u))

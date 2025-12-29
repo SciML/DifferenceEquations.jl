@@ -62,7 +62,7 @@ function DiffEqBase.__solve(
 end
 
 # Note: this repeats the primal calculation because so many of the internal buffers are useful for the rrule.  Refactoring could enable directly shared buffers.
-function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::QuadraticStateSpaceProblem,
+function ChainRulesCore.rrule(::typeof(solve), prob::QuadraticStateSpaceProblem,
         alg::DirectIteration, args...; kwargs...)
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.    

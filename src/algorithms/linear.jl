@@ -51,7 +51,7 @@ end
 
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
 #                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(::typeof(DiffEqBase.solve),
+function ChainRulesCore.rrule(::typeof(solve),
         prob::LinearStateSpaceProblem{uType, uPriorMeanType,
             uPriorVarType,
             tType,
@@ -250,7 +250,7 @@ end
 
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
 #                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(::typeof(DiffEqBase.solve), prob::LinearStateSpaceProblem,
+function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
         alg::KalmanFilter, args...; kwargs...)
     # Preallocate values
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)

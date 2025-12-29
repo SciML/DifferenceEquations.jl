@@ -1,5 +1,6 @@
+using DiffEqBase: DEAlgorithm, KeywordArgSilent
 
-abstract type AbstractDifferenceEquationAlgorithm <: DiffEqBase.DEAlgorithm end
+abstract type AbstractDifferenceEquationAlgorithm <: DEAlgorithm end
 struct DirectIteration <: AbstractDifferenceEquationAlgorithm end
 struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 
@@ -36,16 +37,16 @@ function default_alg(prob::LinearStateSpaceProblem{uType, uPriorMeanType, uPrior
 end
 
 # Select default algorithm if not provided
-function DiffEqBase.solve(prob::AbstractStateSpaceProblem; kwargs...)
-    DiffEqBase.solve(prob,
+function CommonSolve.solve(prob::AbstractStateSpaceProblem; kwargs...)
+    CommonSolve.solve(prob,
         default_alg(prob);
-        kwargshandle = DiffEqBase.KeywordArgSilent,
+        kwargshandle = KeywordArgSilent,
         kwargs...)
 end
-function DiffEqBase.solve(prob::AbstractStateSpaceProblem, alg::Nothing, args...; kwargs...)
-    DiffEqBase.solve(prob,
+function CommonSolve.solve(prob::AbstractStateSpaceProblem, alg::Nothing, args...; kwargs...)
+    CommonSolve.solve(prob,
         default_alg(prob),
         args...;
-        kwargshandle = DiffEqBase.KeywordArgSilent,
+        kwargshandle = KeywordArgSilent,
         kwargs...)
 end

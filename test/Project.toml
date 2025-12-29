@@ -7,6 +7,7 @@ DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 DifferenceEquations = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PDMats = "90014a1f-27ba-587c-ab20-58faa44d9150"
@@ -18,3 +19,4 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
 Aqua = "0.8"
+ExplicitImports = "1"
