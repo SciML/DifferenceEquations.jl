@@ -1,15 +1,16 @@
 module DifferenceEquations
 
-using ChainRulesCore
-using Distributions
-using LinearAlgebra
-using CommonSolve
-using UnPack
-using PDMats
-using SciMLBase: @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution
-using DiffEqBase
-using DiffEqBase: __solve
-using SciMLBase: build_solution
+using ChainRulesCore: ChainRulesCore, NoTangent, Tangent, ZeroTangent
+using CommonSolve: CommonSolve, solve
+using DiffEqBase: DiffEqBase
+using Distributions: Distributions, Distribution, MvNormal, UnivariateDistribution,
+                     ZeroMeanDiagNormal, logpdf
+using LinearAlgebra: LinearAlgebra, Cholesky, Diagonal, NoPivot, Symmetric, cholesky!, dot,
+                     ldiv!, lmul!, mul!, rmul!, transpose!
+using PDMats: PDMats, PDMat
+using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, build_solution,
+                 ODEFunction, remake
+using UnPack: UnPack, @unpack
 
 include("utilities.jl")
 include("problems/state_space_problems.jl")

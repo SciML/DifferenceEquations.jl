@@ -1,9 +1,7 @@
 abstract type AbstractStateSpaceProblem <: DiffEqBase.DEProblem end
 abstract type AbstractPerturbationProblem <: AbstractStateSpaceProblem end
 
-using DiffEqBase: get_concrete_tspan, get_concrete_u0, get_concrete_p, promote_u0,
-                  promote_tspan,
-                  isconcreteu0
+using DiffEqBase: get_concrete_u0, promote_u0, isconcreteu0
 
 # TODO: Can add in more checks on the algorithm choice
 DiffEqBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothing
