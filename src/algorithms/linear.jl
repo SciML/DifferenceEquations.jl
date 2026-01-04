@@ -1,16 +1,21 @@
 # See the utilities.jl for all of the "maybe" functions and other utilities.  Those provide ways for the same algorithm to implement various permutations of the model definitions
-# For example, B = nothing, noise = nothing, observables = nothing are all supported 
+# For example, B = nothing, noise = nothing, observables = nothing are all supported
 
 function DiffEqBase.__solve(
-        prob::LinearStateSpaceProblem{uType, uPriorMeanType,
+        prob::LinearStateSpaceProblem{
+            uType, uPriorMeanType,
             uPriorVarType, tType,
             P, NP, F, AType, BType,
-            CType, RType, ObsType, K},
+            CType, RType, ObsType, K,
+        },
         alg::DirectIteration, args...;
-        kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
+        kwargs...
+    ) where {
+        uType, uPriorMeanType, uPriorVarType, tType,
         P, NP, F, AType,
         BType, CType, RType,
-        ObsType, K}
+        ObsType, K,
+    }
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
 
@@ -40,9 +45,11 @@ function DiffEqBase.__solve(
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
 
-    return build_solution(prob, alg, t_values, u; W = noise,
+    return build_solution(
+        prob, alg, t_values, u; W = noise,
         logpdf = ObsType <: Nothing ? nothing : loglik, z,
-        retcode = :Success)
+        retcode = :Success
+    )
 end
 
 # Ideally hook into existing sensitity dispatching
@@ -51,18 +58,24 @@ end
 
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
 #                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(::typeof(solve),
-        prob::LinearStateSpaceProblem{uType, uPriorMeanType,
+function ChainRulesCore.rrule(
+        ::typeof(solve),
+        prob::LinearStateSpaceProblem{
+            uType, uPriorMeanType,
             uPriorVarType,
             tType,
             P, NP, F, AType, BType,
-            CType, RType, ObsType, K},
+            CType, RType, ObsType, K,
+        },
         alg::DirectIteration, args...;
-        kwargs...) where {uType, uPriorMeanType, uPriorVarType, tType,
+        kwargs...
+    ) where {
+        uType, uPriorMeanType, uPriorVarType, tType,
         P, NP, F,
         AType,
         BType, CType, RType,
-        ObsType, K}
+        ObsType, K,
+    }
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     @unpack A, B, C = prob
     # @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
@@ -94,9 +107,11 @@ function ChainRulesCore.rrule(::typeof(solve),
     maybe_add_observation_noise!(z, observables_noise, prob.observables)
     t_values = prob.tspan[1]:prob.tspan[2]
 
-    sol = build_solution(prob, alg, t_values, u; W = noise,
+    sol = build_solution(
+        prob, alg, t_values, u; W = noise,
         logpdf = ObsType <: Nothing ? nothing : loglik, z,
-        retcode = :Success)
+        retcode = :Success
+    )
     function solve_pb(Δsol)
         ΔA = zero(A)
         ΔB = maybe_zero(B)
@@ -109,9 +124,11 @@ function ChainRulesCore.rrule(::typeof(solve),
         observables_noise_cov = prob.observables_noise
 
         @views @inbounds for t in T:-1:2
-            Δz = maybe_zero(z, 1) # zero out in case no logpdf but z observations available 
-            maybe_add_Δ_logpdf!(Δz, Δsol.logpdf, prob.observables, z, t,
-                observables_noise_cov)
+            Δz = maybe_zero(z, 1) # zero out in case no logpdf but z observations available
+            maybe_add_Δ_logpdf!(
+                Δz, Δsol.logpdf, prob.observables, z, t,
+                observables_noise_cov
+            )
             maybe_add_Δ!(Δz, Δsol.z, t)  # only accumulte if z provided
 
             copy!(Δu_temp, Δu)
@@ -124,17 +141,23 @@ function ChainRulesCore.rrule(::typeof(solve),
             maybe_muladd_transpose!(ΔB, Δu_temp, noise, t - 1)
             maybe_muladd!(ΔC, Δz, u[t]')
         end
-        return (NoTangent(),
-            Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
+        return (
+            NoTangent(),
+            Tangent{typeof(prob)}(;
+                A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
                 observables = NoTangent(), # not implemented
-                observables_noise = NoTangent()), NoTangent(),
-            map(_ -> NoTangent(), args)...)
+                observables_noise = NoTangent()
+            ), NoTangent(),
+            map(_ -> NoTangent(), args)...,
+        )
     end
     return sol, solve_pb
 end
 
-function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, args...;
-        kwargs...)
+function DiffEqBase.__solve(
+        prob::LinearStateSpaceProblem, alg::KalmanFilter, args...;
+        kwargs...
+    )
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
 
     # checks on bounds
@@ -155,28 +178,41 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     B_prod = Matrix{eltype(u0_prior_var)}(undef, N, N)
     u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
     P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
-                  for _ in 1:T]
+    innovation = [
+        Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
+            for _ in 1:T
+    ]
     K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(L,
-             Matrix{
-                 eltype(u0_prior_var)
-             }(undef,
-                 L,
-                 L),
-             Cholesky{
-                 eltype(u0_prior_var),
-                 Matrix{
-                     eltype(u0_prior_var)
-                 }}(Matrix{
-                     eltype(u0_prior_var)
-                 }(undef,
-                     L,
-                     L),
-                 'U',
-                 0))
-         for _ in 1:T] # preallocated buffers for cholesky and matrix itself
+    V = [
+        PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
+                L,
+                Matrix{
+                    eltype(u0_prior_var),
+                }(
+                    undef,
+                    L,
+                    L
+                ),
+                Cholesky{
+                    eltype(u0_prior_var),
+                    Matrix{
+                        eltype(u0_prior_var),
+                    },
+                }(
+                    Matrix{
+                        eltype(u0_prior_var),
+                    }(
+                        undef,
+                        L,
+                        L
+                    ),
+                    'U',
+                    0
+                )
+            )
+            for _ in 1:T
+    ] # preallocated buffers for cholesky and matrix itself
 
     R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
     mul!(B_prod, B, B')
@@ -217,7 +253,7 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
             lmul!(0.5, V[t].mat)
 
             copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
-            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
+            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular
             innovation[t] .= prob.observables[:, t - 1] - z[t]
             loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
 
@@ -240,8 +276,10 @@ function DiffEqBase.__solve(prob::LinearStateSpaceProblem, alg::KalmanFilter, ar
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
-        retcode)
+    return build_solution(
+        prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
+        retcode
+    )
 end
 
 # NOTE: when moving to ._concrete_solve_adjoint will need to be careful to ensure the u0 sensitivity
@@ -250,8 +288,10 @@ end
 
 # function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
 #                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
-        alg::KalmanFilter, args...; kwargs...)
+function ChainRulesCore.rrule(
+        ::typeof(solve), prob::LinearStateSpaceProblem,
+        alg::KalmanFilter, args...; kwargs...
+    )
     # Preallocate values
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     # checks on bounds
@@ -272,28 +312,41 @@ function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
     # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
     u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
     P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
-                  for _ in 1:T]
+    innovation = [
+        Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
+            for _ in 1:T
+    ]
     K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(L,
-             Matrix{
-                 eltype(u0_prior_var)
-             }(undef,
-                 L,
-                 L),
-             Cholesky{
-                 eltype(u0_prior_var),
-                 Matrix{
-                     eltype(u0_prior_var)
-                 }}(Matrix{
-                     eltype(u0_prior_var)
-                 }(undef,
-                     L,
-                     L),
-                 'U',
-                 0))
-         for _ in 1:T] # preallocated buffers for cholesky and matrix itself
+    V = [
+        PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
+                L,
+                Matrix{
+                    eltype(u0_prior_var),
+                }(
+                    undef,
+                    L,
+                    L
+                ),
+                Cholesky{
+                    eltype(u0_prior_var),
+                    Matrix{
+                        eltype(u0_prior_var),
+                    },
+                }(
+                    Matrix{
+                        eltype(u0_prior_var),
+                    }(
+                        undef,
+                        L,
+                        L
+                    ),
+                    'U',
+                    0
+                )
+            )
+            for _ in 1:T
+    ] # preallocated buffers for cholesky and matrix itself
 
     R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
     mul!(B_prod, B, B')
@@ -335,7 +388,7 @@ function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
             lmul!(0.5, V[t].mat)
 
             copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
-            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular        
+            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular
             innovation[t] .= prob.observables[:, t - 1] - z[t]
             loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
 
@@ -357,8 +410,10 @@ function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
         loglik = -Inf
     end
     t_values = prob.tspan[1]:prob.tspan[2]
-    sol = build_solution(prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
-        retcode)
+    sol = build_solution(
+        prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
+        retcode
+    )
     function solve_pb(Δsol)
         # Currently only changes in the logpdf are supported in the rrule
         @assert Δsol.u == ZeroTangent()
@@ -369,8 +424,10 @@ function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
         Δlogpdf = Δsol.logpdf
 
         if iszero(Δlogpdf)
-            return (NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
-                map(_ -> NoTangent(), args)...)
+            return (
+                NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
+                map(_ -> NoTangent(), args)...,
+            )
         end
         # Buffers
         ΔP = zero(P[1])
@@ -389,7 +446,7 @@ function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
         # If it was a failure, just return and hope the gradients are ignored!
         if retcode == :Success
             for t in T:-1:2
-                # The inverse is used throughout, including in quadratic forms.  For large systems this might not be stable            
+                # The inverse is used throughout, including in quadratic forms.  For large systems this might not be stable
                 inv_V = Symmetric(inv(V[t].chol)) # use cholesky factorization to invert.  Symmetric
 
                 # Sensitivity accumulation
@@ -447,10 +504,14 @@ function ChainRulesCore.rrule(::typeof(solve), prob::LinearStateSpaceProblem,
                 mul!(Δu, A', Δu_mid)
             end
         end
-        return (NoTangent(),
-            Tangent{typeof(prob)}(; A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
-                u0_prior_mean = Δu, u0_prior_var = ΔP),
-            NoTangent(), map(_ -> NoTangent(), args)...)
+        return (
+            NoTangent(),
+            Tangent{typeof(prob)}(;
+                A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
+                u0_prior_mean = Δu, u0_prior_var = ΔP
+            ),
+            NoTangent(), map(_ -> NoTangent(), args)...,
+        )
     end
     return sol, solve_pb
 end
