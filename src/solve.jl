@@ -9,10 +9,15 @@ struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 default_alg(prob::AbstractStateSpaceProblem) = DirectIteration()
 
 # If a normal prior, normal observational noise, no noise given, and observables provided then can use a kalman filter
-function default_alg(prob::LinearStateSpaceProblem{uType, uPriorMeanType, uPriorVarType,
-        tType, P, NP, F, AType, BType, CType,
-        RType, ObsType,
-        K}) where {uType,
+function default_alg(
+        prob::LinearStateSpaceProblem{
+            uType, uPriorMeanType, uPriorVarType,
+            tType, P, NP, F, AType, BType, CType,
+            RType, ObsType,
+            K,
+        }
+    ) where {
+        uType,
         uPriorMeanType,
         uPriorVarType <:
         AbstractMatrix,
@@ -28,25 +33,30 @@ function default_alg(prob::LinearStateSpaceProblem{uType, uPriorMeanType, uPrior
         RType <:
         Union{
             AbstractVector,
-            AbstractMatrix
+            AbstractMatrix,
         },
         ObsType <:
         AbstractMatrix,
-        K}
-    KalmanFilter()
+        K,
+    }
+    return KalmanFilter()
 end
 
 # Select default algorithm if not provided
 function CommonSolve.solve(prob::AbstractStateSpaceProblem; kwargs...)
-    CommonSolve.solve(prob,
+    return CommonSolve.solve(
+        prob,
         default_alg(prob);
         kwargshandle = KeywordArgSilent,
-        kwargs...)
+        kwargs...
+    )
 end
 function CommonSolve.solve(prob::AbstractStateSpaceProblem, alg::Nothing, args...; kwargs...)
-    CommonSolve.solve(prob,
+    return CommonSolve.solve(
+        prob,
         default_alg(prob),
         args...;
         kwargshandle = KeywordArgSilent,
-        kwargs...)
+        kwargs...
+    )
 end

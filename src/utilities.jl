@@ -12,28 +12,36 @@ maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
 maybe_check_size(m::Nothing, index, val) = true
 
 function maybe_check_size(m1::AbstractArray, index1, m2::AbstractArray, index2)
-    (size(m1, index1) ==
-     size(m2, index2))
+    return (
+        size(m1, index1) ==
+            size(m2, index2)
+    )
 end
 maybe_check_size(m1::Nothing, index1, m2, index2) = true
 maybe_check_size(m1, index1, m2::Nothing, index2) = true
 maybe_check_size(m1::Nothing, index1, m2::Nothing, index2) = true
 
-Base.@propagate_inbounds @inline function maybe_logpdf(observables_noise::Distribution,
+Base.@propagate_inbounds @inline function maybe_logpdf(
+        observables_noise::Distribution,
         observables::AbstractMatrix, t,
-        z::AbstractVector, s)
-    logpdf(observables_noise,
-        view(observables,
+        z::AbstractVector, s
+    )
+    return logpdf(
+        observables_noise,
+        view(
+            observables,
             :,
-            t) -
-        z[s])
+            t
+        ) -
+            z[s]
+    )
 end
 # Don't accumulate likelihoods if no observations or observatino noise
 maybe_logpdf(observables_noise, observable, t, z, s) = 0.0
 
 # If no noise process is given, don't add in noise in simulation
 Base.@propagate_inbounds @inline function maybe_muladd!(x, B, noise, t)
-    mul!(x, B, view(noise, :, t), 1, 1)
+    return mul!(x, B, view(noise, :, t), 1, 1)
 end
 maybe_muladd!(x, B::Nothing, noise, t) = nothing
 
@@ -43,9 +51,11 @@ maybe_muladd!(x, A::Nothing, B) = nothing
 # need transpose versions for gradients
 Base.@propagate_inbounds @inline maybe_muladd_transpose!(x, C, Δz) = mul!(x, C', Δz, 1, 1)
 maybe_muladd_transpose!(x, C::Nothing, Δz) = nothing
-Base.@propagate_inbounds @inline function maybe_muladd_transpose!(ΔB::AbstractMatrix,
+Base.@propagate_inbounds @inline function maybe_muladd_transpose!(
+        ΔB::AbstractMatrix,
         Δu_temp,
-        noise::AbstractMatrix, t)
+        noise::AbstractMatrix, t
+    )
     mul!(ΔB, Δu_temp, view(noise, :, t)', 1, 1)
     return nothing
 end
@@ -56,8 +66,10 @@ maybe_mul!(x::Nothing, t, A, y, s) = nothing
 Base.@propagate_inbounds @inline maybe_mul_transpose!(x, t, A, y, s) = mul!(x[t], A', y[s])
 maybe_mul_transpose!(x::Nothing, t, A, y, s) = nothing
 Base.@propagate_inbounds @inline function maybe_mul_transpose!(Δnoise, t, B, y)
-    mul!(view(Δnoise, :, t),
-        B', y)
+    return mul!(
+        view(Δnoise, :, t),
+        B', y
+    )
 end
 maybe_mul_transpose!(Δnoise::Nothing, t, B, y) = nothing
 
@@ -65,18 +77,20 @@ maybe_mul_transpose!(Δnoise::Nothing, t, B, y) = nothing
 make_observables_noise(observables_noise::Nothing) = nothing
 make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
 function make_observables_noise(observables_noise::AbstractVector)
-    MvNormal(Diagonal(observables_noise))
+    return MvNormal(Diagonal(observables_noise))
 end
 
 # Utilities to get covariance matrix from observation error argument for kalman filter.  e.g. vector is diagonal, etc.
 make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
 function make_observables_covariance_matrix(observables_noise::AbstractVector)
-    Diagonal(observables_noise)
+    return Diagonal(observables_noise)
 end
 
 #Add in observation noise to the output if simulated (i.e, observables not given) and there is observation_noise provided
-function maybe_add_observation_noise!(z, observables_noise::Distribution,
-        observables::Nothing)
+function maybe_add_observation_noise!(
+        z, observables_noise::Distribution,
+        observables::Nothing
+    )
     # add noise to the vector of vectors componentwise
     for z_val in z
         z_val .+= rand(observables_noise)
@@ -92,8 +106,10 @@ Base.@propagate_inbounds @inline function maybe_add_Δ!(Δz, Δsol_z::AbstractVe
 end
 maybe_add_Δ!(Δz, Δsol_z, t) = nothing
 
-Base.@propagate_inbounds @inline function maybe_add_Δ_slice!(Δnoise::AbstractMatrix,
-        ΔW::AbstractMatrix, t)
+Base.@propagate_inbounds @inline function maybe_add_Δ_slice!(
+        Δnoise::AbstractMatrix,
+        ΔW::AbstractMatrix, t
+    )
     Δnoise[:, t] .+= view(ΔW, :, t)
     return nothing
 end
@@ -103,26 +119,29 @@ maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
 # TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
 # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
 # rmul!(Δlogpdf, Δz)
-Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(Δz::AbstractArray{<:Real, 1},
+Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(
+        Δz::AbstractArray{<:Real, 1},
         Δlogpdf::Number,
         observables::AbstractArray{
             <:Real,
-            2},
+            2,
+        },
         z::AbstractArray{T, 1},
         t,
         observables_noise_cov::AbstractArray{
             <:Real,
-            1
-        }) where {
-        T
-}
+            1,
+        }
+    ) where {
+        T,
+    }
     Δz .= Δlogpdf * (view(observables, :, t - 1) - z[t]) ./
-          observables_noise_cov
+        observables_noise_cov
     return nothing
 end
 # Otherwise do nothing
 function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z, t, observables_noise_cov)
-    nothing
+    return nothing
 end
 
 # Only allocate if observation equation

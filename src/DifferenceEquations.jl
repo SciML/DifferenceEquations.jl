@@ -3,14 +3,14 @@ module DifferenceEquations
 using ChainRulesCore: ChainRulesCore, NoTangent, Tangent, ZeroTangent
 using CommonSolve: CommonSolve, solve
 using DiffEqBase: DiffEqBase, DEProblem, get_concrete_u0, get_concrete_p, isconcreteu0,
-                  promote_u0
+    promote_u0
 using Distributions: Distributions, Distribution, MvNormal, UnivariateDistribution,
-                     ZeroMeanDiagNormal, logpdf
+    ZeroMeanDiagNormal, logpdf
 using LinearAlgebra: LinearAlgebra, Cholesky, Diagonal, NoPivot, Symmetric, cholesky!,
-                     dot, ldiv!, lmul!, mul!, rmul!, transpose!
+    dot, ldiv!, lmul!, mul!, rmul!, transpose!
 using PDMats: PDMats, PDMat
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
-                 ODEFunction, remake, ConstantInterpolation, build_solution
+    ODEFunction, remake, ConstantInterpolation, build_solution
 using UnPack: UnPack, @unpack
 
 include("utilities.jl")
