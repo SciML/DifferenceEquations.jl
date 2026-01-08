@@ -297,17 +297,17 @@ Given the observation error, we would not expect the pseudo-true to exactly maxi
 
 ```@example 1
 using Optimization, OptimizationOptimJL
-# Create a function to minimize only of β and use Zygote based gradients
-function kalman_objective(β, p)
-    -kalman_model_likelihood(β, u0_prior_mean, u0_prior_var, observables)
+# Create a function to minimize only of β and use finite difference gradients
+function kalman_objective(β_vec, p)
+    -kalman_model_likelihood(β_vec[1], u0_prior_mean, u0_prior_var, observables)
 end
-kalman_objective(0.95, nothing)
-gradient(β -> kalman_objective(β, nothing), β) # Verifying it can be differentiated
+kalman_objective([0.95], nothing)
+gradient(β_vec -> kalman_objective(β_vec, nothing), [β]) # Verifying it can be differentiated
 
-optf = OptimizationFunction(kalman_objective, Optimization.AutoZygote())
+optf = OptimizationFunction(kalman_objective, Optimization.AutoFiniteDiff())
 β0 = [0.91] # start off of the pseudotrue
 optprob = OptimizationProblem(optf, β0)
-optsol = solve(optprob, LBFGS())  # reverse-mode AD is overkill here
+optsol = solve(optprob, LBFGS())  # finite diff for small problems
 ```
 
 In this way, this package composes with others such as [DifferentiableStateSpaceModels.jl](https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl) which takes a set of structural parameters and an expected difference equation to generate a state-space model.
@@ -337,10 +337,10 @@ x0 = vcat([0.95], noise[1, :])  # starting at the true noise
 joint_model_objective(x0, nothing)
 gradient(x -> joint_model_objective(x, nothing), x0) # Verifying it can be differentiated
 
-# optimize
-optf = OptimizationFunction(joint_model_objective, Optimization.AutoZygote())
+# optimize using finite difference gradients for robustness
+optf = OptimizationFunction(joint_model_objective, Optimization.AutoFiniteDiff())
 optprob = OptimizationProblem(optf, x0)
-optsol = solve(optprob, LBFGS())
+optsol = solve(optprob, LBFGS(); maxiters = 100)
 ```
 
 This "solves" the problem relatively quickly, despite the high-dimensionality. However, from a statistics perspective note that this last optimization process does not do especially well in recovering the pseudotrue if you increase the prior variance on the `β` parameter. Maximizing the posterior is usually the wrong thing to do in high-dimensions because the mode is not a typical set.
