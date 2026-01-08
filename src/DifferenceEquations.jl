@@ -22,8 +22,6 @@ include("algorithms/quadratic.jl")
 include("precompilation.jl")
 
 # Exports
-export MatrixVectorOfArray
-
 export AbstractStateSpaceProblem, LinearStateSpaceProblem, QuadraticStateSpaceProblem
 export StateSpaceSolution, DirectIteration, KalmanFilter
 

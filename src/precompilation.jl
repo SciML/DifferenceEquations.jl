@@ -1,4 +1,4 @@
-using PrecompileTools
+using PrecompileTools: PrecompileTools, @setup_workload, @compile_workload
 using LinearAlgebra: I
 
 @setup_workload begin
