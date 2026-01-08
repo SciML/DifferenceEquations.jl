@@ -1,6 +1,7 @@
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 ChainRulesTestUtils = "cdddcdb0-9152-4a09-a978-84456f9df70a"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
@@ -20,3 +21,4 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 [compat]
 Aqua = "0.8"
 ExplicitImports = "1"
+JET = "0.9"
