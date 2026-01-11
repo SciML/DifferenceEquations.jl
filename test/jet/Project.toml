@@ -1,0 +1,10 @@
+[deps]
+DifferenceEquations = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+JET = "0.9, 0.10, 0.11"
