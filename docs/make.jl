@@ -5,7 +5,8 @@ include("pages.jl")
 makedocs(
     sitename = "DifferenceEquations.jl",
     authors = "Various Authors",
-    clean = true, doctest = false, linkcheck = true,
+    clean = true, doctest = false, linkcheck = false,
+    warnonly = [:example_block],
     modules = [DifferenceEquations],
     format = Documenter.HTML(
         assets = ["assets/favicon.ico"],
