@@ -9,18 +9,22 @@ get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size
 get_concrete_noise(prob, noise::UnivariateDistribution, B::Nothing, T) = nothing # disambiguation: no noise matrix takes precedence
 
 # Utility functions to conditionally check size if not-nothing
-maybe_check_size(m::AbstractMatrix, index, val) = (size(m, index) == val)
-maybe_check_size(m::Nothing, index, val) = true
+maybe_check_size(m::AbstractMatrix, index::Integer, val::Integer) = (size(m, index) == val)
+maybe_check_size(m::AbstractVector, index::Integer, val::Integer) = (index == 1 ? length(m) == val : true)
+maybe_check_size(m::Nothing, index::Integer, val::Integer) = true
 
-function maybe_check_size(m1::AbstractArray, index1, m2::AbstractArray, index2)
+function maybe_check_size(
+        m1::AbstractArray, index1::Integer,
+        m2::AbstractArray, index2::Integer
+    )
     return (
         size(m1, index1) ==
             size(m2, index2)
     )
 end
-maybe_check_size(m1::Nothing, index1, m2, index2) = true
-maybe_check_size(m1, index1, m2::Nothing, index2) = true
-maybe_check_size(m1::Nothing, index1, m2::Nothing, index2) = true
+maybe_check_size(m1::Nothing, index1::Integer, m2, index2::Integer) = true
+maybe_check_size(m1, index1::Integer, m2::Nothing, index2::Integer) = true
+maybe_check_size(m1::Nothing, index1::Integer, m2::Nothing, index2::Integer) = true
 
 Base.@propagate_inbounds @inline function maybe_logpdf(
         observables_noise::Distribution,
