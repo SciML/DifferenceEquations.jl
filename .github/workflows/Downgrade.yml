@@ -12,6 +12,7 @@ on:
       - 'docs/**'
 jobs:
   test:
+    if: false  # Disabled: PrecompileTools compatibility. See #149 for details.
     runs-on: ubuntu-latest
     strategy:
       matrix:

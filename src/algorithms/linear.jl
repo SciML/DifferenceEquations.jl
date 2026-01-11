@@ -186,27 +186,9 @@ function DiffEqBase.__solve(
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
     V = [
         PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
-                L,
-                Matrix{
-                    eltype(u0_prior_var),
-                }(
-                    undef,
-                    L,
-                    L
-                ),
-                Cholesky{
-                    eltype(u0_prior_var),
-                    Matrix{
-                        eltype(u0_prior_var),
-                    },
-                }(
-                    Matrix{
-                        eltype(u0_prior_var),
-                    }(
-                        undef,
-                        L,
-                        L
-                    ),
+                Matrix{eltype(u0_prior_var)}(undef, L, L),
+                Cholesky{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
+                    Matrix{eltype(u0_prior_var)}(undef, L, L),
                     'U',
                     0
                 )
@@ -320,27 +302,9 @@ function ChainRulesCore.rrule(
     CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
     V = [
         PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
-                L,
-                Matrix{
-                    eltype(u0_prior_var),
-                }(
-                    undef,
-                    L,
-                    L
-                ),
-                Cholesky{
-                    eltype(u0_prior_var),
-                    Matrix{
-                        eltype(u0_prior_var),
-                    },
-                }(
-                    Matrix{
-                        eltype(u0_prior_var),
-                    }(
-                        undef,
-                        L,
-                        L
-                    ),
+                Matrix{eltype(u0_prior_var)}(undef, L, L),
+                Cholesky{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
+                    Matrix{eltype(u0_prior_var)}(undef, L, L),
                     'U',
                     0
                 )
