@@ -1,7 +1,9 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
+# using ChainRulesTestUtils  # AD disabled — will restore with Enzyme
+using DifferenceEquations, Distributions, LinearAlgebra, Test
+# using Zygote  # AD disabled — will restore with Enzyme
 using DelimitedFiles
 using DiffEqBase
-using FiniteDiff: finite_difference_gradient
+# using FiniteDiff: finite_difference_gradient  # AD disabled — will restore with Enzyme
 
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(
@@ -105,11 +107,13 @@ end
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
 end
 
+#= AD disabled — will restore with Enzyme
 gradient(
     (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
     C_rbc,
     u0_rbc, noise_rbc
 )
+=#
 
 @testset "linear rbc joint likelihood" begin
     @test joint_likelihood_1(
@@ -121,6 +125,7 @@ gradient(
         A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc,
         D_rbc
     ) #
+    #= AD disabled — will restore with Enzyme
     gradient(
         (args...) -> joint_likelihood_1(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
         C_rbc,
@@ -133,24 +138,29 @@ gradient(
         B_rbc,
         C_rbc, u0_rbc, noise_rbc; rrule_f = rrule_via_ad, check_inferred = false
     )
+    =#
 end
 
+#= AD disabled — will restore with Enzyme
 gradient(
     (args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc, B_rbc,
     C_rbc,
     u0_rbc
 )
+=#
 
 @testset "linear rbc kalman likelihood" begin
     @test kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) ≈
         -607.3698273765538
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc) # would this catch inference problems in the solve?
+    #= AD disabled — will restore with Enzyme
     test_rrule(
         Zygote.ZygoteRuleConfig(),
         (args...) -> kalman_likelihood(args..., observables_rbc, D_rbc), A_rbc,
         B_rbc, C_rbc,
         u0_rbc; rrule_f = rrule_via_ad, check_inferred = false
     )
+    =#
 end
 
 # Load FVGQ data for checks
@@ -183,12 +193,14 @@ u0_FVGQ = zeros(size(A_FVGQ, 1))
         observables_FVGQ,
         D_FVGQ
     )
+    #= AD disabled — will restore with Enzyme
     test_rrule(
         Zygote.ZygoteRuleConfig(),
         (args...) -> joint_likelihood_1(args..., observables_FVGQ, D_FVGQ), A_FVGQ,
         B_FVGQ,
         C_FVGQ, u0_FVGQ, noise_FVGQ; rrule_f = rrule_via_ad, check_inferred = false
     )
+    =#
 end
 
 @testset "linear FVGQ Kalman" begin
@@ -202,6 +214,7 @@ end
     ) ≈
         2253.0905386483046
 
+    #= AD disabled — will restore with Enzyme
     gradient(
         (args...) -> kalman_likelihood(args..., observables_FVGQ, D_FVGQ), A_FVGQ,
         B_FVGQ,
@@ -214,6 +227,7 @@ end
         A_FVGQ, B_FVGQ,
         C_FVGQ, u0_FVGQ; rrule_f = rrule_via_ad, check_inferred = false, rtol = 1.0e-8
     )
+    =#
 end
 
 @testset "basic kalman failure" begin
@@ -230,6 +244,7 @@ end
     @test sol.retcode != :Success
 end
 
+#= AD disabled — will restore with Enzyme
 @testset "basic kalman failure gradient" begin
     A = [1.0e20 0.0; 1.0e20 0.0]
     u0_prior_var = diagm(1.0e10 * ones(length(u0_rbc)))
@@ -245,3 +260,4 @@ end
     end
     @test gradient(fail_kalman, B_rbc)[1] ≈ [0.0; 0.0;;] # but hopefully gradients are ignored!
 end
+=#

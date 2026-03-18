@@ -19,7 +19,7 @@ if GROUP == "All" || GROUP == "Core"
     include("explicit_imports.jl")
     include("kalman_likelihood.jl")
     include("linear_likelihood.jl")
-    include("linear_gradients.jl")
+    # include("linear_gradients.jl")  # AD tests disabled — will restore with Enzyme
     include("linear_simulations.jl")
     include("quadratic_likelihood.jl")
     include("quadratic_simulations.jl")

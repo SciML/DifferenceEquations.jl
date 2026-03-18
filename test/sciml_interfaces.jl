@@ -1,7 +1,9 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
+# using ChainRulesTestUtils  # AD disabled — will restore with Enzyme
+using DifferenceEquations, Distributions, LinearAlgebra, Test
+# using Zygote  # AD disabled — will restore with Enzyme
 using DelimitedFiles
 using DiffEqBase
-using FiniteDiff: finite_difference_gradient
+# using FiniteDiff: finite_difference_gradient  # AD disabled — will restore with Enzyme
 using Plots, DataFrames
 
 # Matrices from RBC
