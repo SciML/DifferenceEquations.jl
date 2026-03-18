@@ -53,6 +53,7 @@ maybe_muladd!(x, B::Nothing, noise, t) = nothing
 Base.@propagate_inbounds @inline maybe_muladd!(x, A, B) = mul!(x, A, B, 1, 1)
 maybe_muladd!(x, A::Nothing, B) = nothing
 
+#= AD-only helpers — disabled, will restore with Enzyme
 # need transpose versions for gradients
 Base.@propagate_inbounds @inline maybe_muladd_transpose!(x, C, Δz) = mul!(x, C', Δz, 1, 1)
 maybe_muladd_transpose!(x, C::Nothing, Δz) = nothing
@@ -65,8 +66,10 @@ Base.@propagate_inbounds @inline function maybe_muladd_transpose!(
     return nothing
 end
 maybe_muladd_transpose!(ΔB, Δu_temp, noise, t) = nothing
+=#
 Base.@propagate_inbounds @inline maybe_mul!(x, t, A, y, s) = mul!(x[t], A, y[s])
 maybe_mul!(x::Nothing, t, A, y, s) = nothing
+#= AD-only helpers — disabled, will restore with Enzyme
 # Need transpose versions for rrule
 Base.@propagate_inbounds @inline maybe_mul_transpose!(x, t, A, y, s) = mul!(x[t], A', y[s])
 maybe_mul_transpose!(x::Nothing, t, A, y, s) = nothing
@@ -77,6 +80,7 @@ Base.@propagate_inbounds @inline function maybe_mul_transpose!(Δnoise, t, B, y)
     )
 end
 maybe_mul_transpose!(Δnoise::Nothing, t, B, y) = nothing
+=#
 
 # Utilities to get distribution for logpdf from observation error argument
 make_observables_noise(observables_noise::Nothing) = nothing
@@ -104,6 +108,7 @@ function maybe_add_observation_noise!(
 end
 maybe_add_observation_noise!(z, observables_noise, observables) = nothing  #otherwise do nothing
 
+#= AD-only helpers — disabled, will restore with Enzyme
 #Maybe add observation noise, if observables and their adjoints given
 Base.@propagate_inbounds @inline function maybe_add_Δ!(Δz, Δsol_z::AbstractVector, t)
     Δz .+= Δsol_z[t]
@@ -148,16 +153,19 @@ end
 function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z, t, observables_noise_cov)
     return nothing
 end
+=#
 
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
 
+#= AD-only helpers — disabled, will restore with Enzyme
 # Maybe zero
 maybe_zero(A::AbstractArray) = zero(A)
 maybe_zero(A::Nothing) = nothing
 maybe_zero(A::AbstractArray, i::Int64) = zero(A[i])
 maybe_zero(A::Nothing, i) = nothing
+=#
 
 # old quad and adjoint replaced by inplace accumulation versions.
 # function quad(A::AbstractArray{<:Number,3}, x)
@@ -184,6 +192,7 @@ function quad_muladd!(y, A, x)
     return y
 end
 
+#= AD-only helper — disabled, will restore with Enzyme
 # inplace version with accumulation and using the cache of A[i] + A[i]', etc.
 function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     tmp = x * x'  # could add in a temp here
@@ -193,3 +202,4 @@ function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
     end
     return nothing
 end
+=#

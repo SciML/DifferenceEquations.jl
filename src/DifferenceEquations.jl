@@ -1,13 +1,15 @@
 module DifferenceEquations
 
-using ChainRulesCore: ChainRulesCore, NoTangent, Tangent, ZeroTangent
+# using ChainRulesCore: ChainRulesCore, NoTangent, Tangent, ZeroTangent  # AD disabled — will restore with Enzyme
 using CommonSolve: CommonSolve, solve
 using DiffEqBase: DiffEqBase, DEProblem, get_concrete_u0, get_concrete_p, isconcreteu0,
     promote_u0
 using Distributions: Distributions, Distribution, MvNormal, UnivariateDistribution,
-    ZeroMeanDiagNormal, logpdf
-using LinearAlgebra: LinearAlgebra, Cholesky, Diagonal, NoPivot, Symmetric, cholesky!,
-    dot, ldiv!, lmul!, mul!, rmul!, transpose!
+    logpdf
+    # ZeroMeanDiagNormal  # AD disabled — only used in rrule assertions
+using LinearAlgebra: LinearAlgebra, Cholesky, Diagonal, NoPivot, cholesky!,
+    dot, ldiv!, lmul!, mul!, transpose!
+    # Symmetric, rmul!  # AD disabled — only used in rrule pullbacks
 using PDMats: PDMats, PDMat
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
     ODEFunction, remake, ConstantInterpolation, build_solution

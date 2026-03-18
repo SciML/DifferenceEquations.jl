@@ -67,6 +67,7 @@ function DiffEqBase.__solve(
     )
 end
 
+#= AD rrule for QuadraticStateSpaceProblem DirectIteration — disabled, will restore with Enzyme
 # Note: this repeats the primal calculation because so many of the internal buffers are useful for the rrule.  Refactoring could enable directly shared buffers.
 function ChainRulesCore.rrule(
         ::typeof(solve), prob::QuadraticStateSpaceProblem,
@@ -204,3 +205,4 @@ function ChainRulesCore.rrule(
     end
     return sol, solve_pb
 end
+=# # end AD rrule for QuadraticStateSpaceProblem

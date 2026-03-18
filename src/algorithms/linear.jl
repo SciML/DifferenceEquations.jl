@@ -52,6 +52,7 @@ function DiffEqBase.__solve(
     )
 end
 
+#= AD rrule for DirectIteration — disabled, will restore with Enzyme
 # Ideally hook into existing sensitity dispatching
 # Trouble with Zygote.  The problem isn't the _concrete_solve_adjoint but rather something in the
 # adjoint of the basic solve and `solve_up`.  Probably promotion on the prob
@@ -153,6 +154,7 @@ function ChainRulesCore.rrule(
     end
     return sol, solve_pb
 end
+=# # end AD rrule for DirectIteration
 
 function DiffEqBase.__solve(
         prob::LinearStateSpaceProblem, alg::KalmanFilter, args...;
@@ -264,6 +266,7 @@ function DiffEqBase.__solve(
     )
 end
 
+#= AD rrule for KalmanFilter — disabled, will restore with Enzyme
 # NOTE: when moving to ._concrete_solve_adjoint will need to be careful to ensure the u0 sensitivity
 # takes into account any promotion in the `remake_model` side.  We want u0 to be the prior and have the
 # sensitivity of it as a distribution, not a draw from it which might happen in the remake(...)
@@ -479,3 +482,4 @@ function ChainRulesCore.rrule(
     end
     return sol, solve_pb
 end
+=# # end AD rrule for KalmanFilter

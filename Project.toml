@@ -4,7 +4,6 @@ version = "1.0.0"
 authors = ["various contributors"]
 
 [deps]
-ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 CommonSolve = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -16,14 +15,13 @@ SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
-ChainRulesCore = "1.24"
 CommonSolve = "0.2"
 DiffEqBase = "6.145"
 Distributions = "0.25"
 LinearAlgebra = "1"
 PDMats = "0.11"
 PrecompileTools = "1"
-RecursiveArrayTools = "2.34"
+RecursiveArrayTools = "2.34, 3, 4"
 SciMLBase = "1.90, 2"
 UnPack = "1"
-julia = "1.8"
+julia = "1.10"

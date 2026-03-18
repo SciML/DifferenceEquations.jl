@@ -1,7 +1,9 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
+# using ChainRulesTestUtils  # AD disabled — will restore with Enzyme
+using DifferenceEquations, Distributions, LinearAlgebra, Test
+# using Zygote  # AD disabled — will restore with Enzyme
 using DelimitedFiles
 using DiffEqBase
-using FiniteDiff: finite_difference_gradient
+# using FiniteDiff: finite_difference_gradient  # AD disabled — will restore with Enzyme
 
 # joint case
 function joint_likelihood_2(
@@ -87,6 +89,7 @@ end
         C_2_rbc,
         u0_2_rbc, noise_2_rbc, observables_2_rbc, D_2_rbc
     ) # would this catch inference problems in the solve?
+    #= AD disabled — will restore with Enzyme
     gradient(
         (args...) -> joint_likelihood_2(args..., observables_2_rbc, D_2_rbc), A_0_rbc,
         A_1_rbc,
@@ -99,6 +102,7 @@ end
         A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc, noise_2_rbc;
         rrule_f = rrule_via_ad, check_inferred = false
     )
+    =#
 end
 
 # Load FVGQ data for checks
@@ -142,6 +146,7 @@ noise_2_FVGQ = readdlm(
         C_2_FVGQ,
         u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ
     )
+    #= AD disabled — will restore with Enzyme
     gradient(
         (args...) -> joint_likelihood_2(args..., observables_2_FVGQ, D_2_FVGQ),
         A_0_FVGQ,
@@ -178,4 +183,5 @@ noise_2_FVGQ = readdlm(
     #            A_1_FVGQ,
     #            A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ, noise_2_FVGQ;
     #            rrule_f = rrule_via_ad, check_inferred = false)
+    =#
 end

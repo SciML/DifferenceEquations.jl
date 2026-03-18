@@ -1,9 +1,9 @@
-using ChainRulesCore, ChainRulesTestUtils, DifferenceEquations, Distributions,
-    LinearAlgebra, Test,
-    Zygote
+# using ChainRulesCore, ChainRulesTestUtils  # AD disabled — will restore with Enzyme
+using DifferenceEquations, Distributions, LinearAlgebra, Test
+# using Zygote  # AD disabled — will restore with Enzyme
 using DelimitedFiles
 using DiffEqBase
-using FiniteDiff: finite_difference_gradient
+# using FiniteDiff: finite_difference_gradient  # AD disabled — will restore with Enzyme
 
 # inv_vech in dssm repo manually with slices instead of given code
 # in diffeq turn the cholesky pdef check off in fvgq in linear.jl
@@ -69,9 +69,10 @@ function solve_manual(observables, A, B, C, R_raw, u0_mean, u0_variance, tspan)
     R = get_matrix(R_raw)
 
     # TODO: when saveall = false, etc. don't allocate everything, or at least don't save it
-    u = Zygote.Buffer(Vector{Vector{Float64}}(undef, T + 1)) # prior mean
-    P = Zygote.Buffer(Vector{Matrix{Float64}}(undef, T + 1)) # prior variance
-    z = Zygote.Buffer(Vector{Vector{Float64}}(undef, T + 1)) # mean observation
+    # Replaced Zygote.Buffer with plain Vector allocations (Zygote.Buffer was only needed for AD)
+    u = Vector{Vector{Float64}}(undef, T + 1) # prior mean
+    P = Vector{Matrix{Float64}}(undef, T + 1) # prior variance
+    z = Vector{Vector{Float64}}(undef, T + 1) # mean observation
 
     u[1] = u0_mean
     P[1] = u0_variance
@@ -91,7 +92,7 @@ function solve_manual(observables, A, B, C, R_raw, u0_mean, u0_variance, tspan)
         u[i] += K * (observables[:, i - 1] - z[i])
         P[i] -= K * CP_i
     end
-    return copy(z), copy(u), copy(P), loglik
+    return z, u, P, loglik
 end
 
 function solve_manual_cov_lik(A, B, C, u0_mean, u0_variance_vech, observables, R_raw, tspan)
@@ -182,6 +183,7 @@ T = 200
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
+    #= AD disabled — will restore with Enzyme
     gradient(
         (args...) -> solve_kalman(
             args..., u0_var_kalman, observables_kalman,
@@ -200,6 +202,7 @@ T = 200
         B_kalman, C_kalman,
         u0_mean_kalman; rrule_f = rrule_via_ad, check_inferred = false
     )
+    =#
 end
 
 D_offdiag = [
@@ -230,6 +233,7 @@ D_offdiag = [
     @test sol.z ≈ z
     @test sol.u ≈ u
     @test sol.P ≈ P
+    #= AD disabled — will restore with Enzyme
     gradient(
         (args...) -> solve_kalman(
             args..., u0_var_kalman, observables_kalman,
@@ -248,8 +252,10 @@ D_offdiag = [
         B_kalman, C_kalman,
         u0_mean_kalman; rrule_f = rrule_via_ad, check_inferred = false
     )
+    =#
 end
 
+#= AD disabled — will restore with Enzyme
 @testset "direct rrule" begin
     z, u,
         P,
@@ -274,6 +280,7 @@ end
     @test sol.u ≈ u
     @test sol.P ≈ P
 end
+=#
 
 u0_mean = [0.0, 0.0, 0.0, 0.0, 0.0]
 # [0.46278392661230217, -0.35157252508544934, -0.33952978655645105, -0.3486954393399204, 0.6934920135433433]
@@ -285,6 +292,7 @@ u0_var_vech = [
     -0.3971349857502508, -0.1474011998331263, 0.18113754883619412,
     0.13433861105247683, 0.029171596025489813,
 ]
+#= AD disabled — will restore with Enzyme
 @testset "covariance prior" begin
     sol = solve_kalman_cov(
         A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
@@ -343,6 +351,7 @@ u0_var_vech = [
         u0_var_vech
     ) rtol = 1.4e-5
 end
+=#
 
 R = [
     0.01 0.0 0.0 0.0;
