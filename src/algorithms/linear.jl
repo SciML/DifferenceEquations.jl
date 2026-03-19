@@ -1,485 +1,261 @@
-# See the utilities.jl for all of the "maybe" functions and other utilities.  Those provide ways for the same algorithm to implement various permutations of the model definitions
-# For example, B = nothing, noise = nothing, observables = nothing are all supported
+# =============================================================================
+# Model interface for DirectIteration dispatch
+# Each problem type defines these methods to plug into the generic solver loop.
+# =============================================================================
 
-function DiffEqBase.__solve(
-        prob::LinearStateSpaceProblem{
-            uType, uPriorMeanType,
-            uPriorVarType, tType,
-            P, NP, F, AType, BType,
-            CType, RType, ObsType, K,
-        },
-        alg::DirectIteration, args...;
-        kwargs...
-    ) where {
-        uType, uPriorMeanType, uPriorVarType, tType,
-        P, NP, F, AType,
-        BType, CType, RType,
-        ObsType, K,
-    }
-    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    @unpack A, B, C = prob
+# --- Noise matrix extraction ---
+_noise_matrix(prob::LinearStateSpaceProblem) = prob.B
 
-    # checks on bounds
-    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
-    observables_noise = make_observables_noise(prob.observables_noise)
+# --- Cache noise access ---
+_cache_noise(cache) = cache.noise
 
-    @assert maybe_check_size(noise, 1, prob.B, 2)
-    @assert maybe_check_size(noise, 2, T - 1)
-    @assert maybe_check_size(prob.observables, 2, T - 1)
+# --- Model-specific initialization (e.g., quadratic u_f) ---
+_init_model_state!!(::LinearStateSpaceProblem, cache) = nothing
 
-    # Initialize
-    u = [zero(prob.u0) for _ in 1:T]
-    u[1] .= prob.u0
+# --- Observation flag (does this problem have an observation equation?) ---
+_has_observations(cache) = !isnothing(cache.z)
 
-    z = allocate_z(prob, C, prob.u0, T)
-    maybe_mul!(z, 1, C, u, 1)  # update the first of z if it isn't nothing
+# =============================================================================
+# Linear state-space callbacks
+# =============================================================================
 
-    loglik = 0.0
-    @inbounds for t in 2:T
-        mul!(u[t], A, u[t - 1])
-        maybe_muladd!(u[t], B, noise, t - 1) # was:  mul!(u[t], B, view(noise, :, t - 1), 1, 1)
+"""
+    _transition!!(x_next, x, w, prob::LinearStateSpaceProblem, cache, t)
 
-        maybe_mul!(z, t, C, u, t)  # does mul!(z[t], C, u[t]) if C is not nothing
-        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
-    end
-    maybe_add_observation_noise!(z, observables_noise, prob.observables)
-    t_values = prob.tspan[1]:prob.tspan[2]
-
-    return build_solution(
-        prob, alg, t_values, u; W = noise,
-        logpdf = ObsType <: Nothing ? nothing : loglik, z,
-        retcode = :Success
-    )
+Linear state transition: `x_next = A * x + B * w`
+"""
+@inline function _transition!!(x_next, x, w, prob::LinearStateSpaceProblem, cache, t)
+    x_next = mul!!(x_next, prob.A, x)
+    x_next = muladd!!(x_next, prob.B, w)
+    return x_next
 end
 
-#= AD rrule for DirectIteration — disabled, will restore with Enzyme
-# Ideally hook into existing sensitity dispatching
-# Trouble with Zygote.  The problem isn't the _concrete_solve_adjoint but rather something in the
-# adjoint of the basic solve and `solve_up`.  Probably promotion on the prob
+"""
+    _observation!!(y, x, prob::LinearStateSpaceProblem, cache, t)
 
-# function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::DirectIteration,
-#                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(
-        ::typeof(solve),
-        prob::LinearStateSpaceProblem{
-            uType, uPriorMeanType,
-            uPriorVarType,
-            tType,
-            P, NP, F, AType, BType,
-            CType, RType, ObsType, K,
-        },
-        alg::DirectIteration, args...;
-        kwargs...
-    ) where {
-        uType, uPriorMeanType, uPriorVarType, tType,
-        P, NP, F,
-        AType,
-        BType, CType, RType,
-        ObsType, K,
-    }
+Linear observation: `y = C * x`
+"""
+@inline function _observation!!(y, x, prob::LinearStateSpaceProblem, cache, t)
+    y = mul!!(y, prob.C, x)
+    return y
+end
+
+# =============================================================================
+# Generic DirectIteration solver — single loop for all problem types
+# =============================================================================
+
+function _solve_with_cache!(
+        prob::AbstractStateSpaceProblem, alg::DirectIteration, cache; kwargs...
+    )
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    @unpack A, B, C = prob
-    # @assert !isnothing(prob.noise) || isnothing(prob.B)  # need to have concrete noise or no noise for this simple method
 
-    # checks on bounds
-    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
+    # Get concrete noise and copy into cache
+    B = _noise_matrix(prob)
+    noise_concrete = get_concrete_noise(prob, prob.noise, B, T - 1)
     observables_noise = make_observables_noise(prob.observables_noise)
-    @assert observables_noise isa Union{ZeroMeanDiagNormal, Nothing}  # can extend to more general in rrule later
 
-    @assert maybe_check_size(noise, 1, prob.B, 2)
-    @assert maybe_check_size(noise, 2, T - 1)
+    # Validate dimensions
+    if !isnothing(noise_concrete)
+        @assert length(noise_concrete) == T - 1
+        @assert length(noise_concrete[1]) == size(B, 2)
+    end
     @assert maybe_check_size(prob.observables, 2, T - 1)
 
-    # Initialize
-    u = [zero(prob.u0) for _ in 1:T]
-    u[1] .= prob.u0
+    (; u, z) = cache
+    noise = _cache_noise(cache)
 
-    z = allocate_z(prob, C, prob.u0, T)
-    maybe_mul!(z, 1, C, u, 1)  # update the first of z if it isn't nothing
-
-    loglik = 0.0
-    @inbounds for t in 2:T
-        mul!(u[t], A, u[t - 1])
-        maybe_muladd!(u[t], B, noise, t - 1) # was:  mul!(u[t], B, view(noise, :, t - 1), 1, 1)
-
-        maybe_mul!(z, t, C, u, t)  # does mul!(z[t], C, u[t]) if C is not nothing
-        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
+    # Copy noise into cache buffers
+    if !isnothing(noise) && !isnothing(noise_concrete)
+        copy_noise_to_cache!(noise, noise_concrete)
     end
-    maybe_add_observation_noise!(z, observables_noise, prob.observables)
-    t_values = prob.tspan[1]:prob.tspan[2]
 
-    sol = build_solution(
-        prob, alg, t_values, u; W = noise,
-        logpdf = ObsType <: Nothing ? nothing : loglik, z,
-        retcode = :Success
-    )
-    function solve_pb(Δsol)
-        ΔA = zero(A)
-        ΔB = maybe_zero(B)
-        ΔC = maybe_zero(C)
-        Δnoise = maybe_zero(noise)
-        Δu = zero(u[1])
-        Δu_temp = zero(u[1])
+    # Initialize state
+    u[1] = assign!!(u[1], prob.u0)
+    _init_model_state!!(prob, cache)
 
-        # Assert checked above about being diagonal and Normal
-        observables_noise_cov = prob.observables_noise
+    # Initial observation
+    if _has_observations(cache)
+        z[1] = _observation!!(z[1], u[1], prob, cache, 1)
+    end
 
-        @views @inbounds for t in T:-1:2
-            Δz = maybe_zero(z, 1) # zero out in case no logpdf but z observations available
-            maybe_add_Δ_logpdf!(
-                Δz, Δsol.logpdf, prob.observables, z, t,
-                observables_noise_cov
-            )
-            maybe_add_Δ!(Δz, Δsol.z, t)  # only accumulte if z provided
+    loglik = zero(eltype(prob.u0))
+    @inbounds for t in 2:T
+        w_t = isnothing(noise) ? nothing : noise[t - 1]
+        u[t] = _transition!!(u[t], u[t - 1], w_t, prob, cache, t)
 
-            copy!(Δu_temp, Δu)
-            maybe_muladd_transpose!(Δu_temp, C, Δz) # mul!(Δu_temp, C', Δz, 1, 1)
-            maybe_add_Δ!(Δu_temp, Δsol.u, t)  # only accumulate if not NoTangent and if observables provided
-            mul!(Δu, A', Δu_temp)
-            maybe_mul_transpose!(Δnoise, t - 1, B, Δu_temp)
-            maybe_add_Δ_slice!(Δnoise, Δsol.W, t - 1)
-            mul!(ΔA, Δu_temp, u[t - 1]', 1, 1)
-            maybe_muladd_transpose!(ΔB, Δu_temp, noise, t - 1)
-            maybe_muladd!(ΔC, Δz, u[t]')
+        if _has_observations(cache)
+            z[t] = _observation!!(z[t], u[t], prob, cache, t)
         end
-        return (
-            NoTangent(),
-            Tangent{typeof(prob)}(;
-                A = ΔA, B = ΔB, C = ΔC, u0 = Δu, noise = Δnoise,
-                observables = NoTangent(), # not implemented
-                observables_noise = NoTangent()
-            ), NoTangent(),
-            map(_ -> NoTangent(), args)...,
-        )
+        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
     end
-    return sol, solve_pb
+
+    maybe_add_observation_noise!(z, observables_noise, prob.observables)
+    t_values = prob.tspan[1]:prob.tspan[2]
+
+    ObsType = typeof(prob.observables)
+    return build_solution(
+        prob, alg, t_values, u; W = noise_concrete,
+        logpdf = ObsType <: Nothing ? nothing : loglik, z,
+        retcode = :Success
+    )
 end
-=# # end AD rrule for DirectIteration
+
+# Single __solve route for all problem types with DirectIteration
+function DiffEqBase.__solve(
+        prob::AbstractStateSpaceProblem, alg::DirectIteration, args...;
+        kwargs...
+    )
+    ws = CommonSolve.init(prob, alg; kwargs...)
+    return CommonSolve.solve!(ws; kwargs...)
+end
+
+# =============================================================================
+# KalmanFilter solver — specific to LinearStateSpaceProblem
+# =============================================================================
+
+function _solve_with_cache!(
+        prob::LinearStateSpaceProblem, alg::KalmanFilter, cache;
+        perturb_diagonal = 0.0, kwargs...
+    )
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+
+    @assert size(prob.observables, 2) == T - 1
+
+    (; A, B, C, u0_prior_mean, u0_prior_var) = prob
+
+    R = make_observables_covariance_matrix(prob.observables_noise)
+
+    # Zero cache for Enzyme AD compatibility
+    zero_kalman_cache!!(cache)
+
+    (; u, P, z, B_prod) = cache
+
+    # Compute B*B' once
+    B_prod = mul!!(B_prod, B, transpose(B))
+
+    # Initialize
+    u[1] = copyto!!(u[1], u0_prior_mean)
+    P[1] = copyto!!(P[1], u0_prior_var)
+    z[1] = mul!!(z[1], C, u[1])
+
+    loglik = zero(eltype(u0_prior_var))
+    is_mutable = ismutable(u[1])
+    T_obs = T - 1
+
+    retcode = :Failure
+    try
+        @inbounds for t in 1:T_obs
+            # Get cache buffers for this timestep
+            μp = cache.mu_pred[t]
+            Σp = cache.sigma_pred[t]
+            AΣ = cache.A_sigma[t]
+            ΣGt = cache.sigma_Gt[t]
+            ν = cache.innovation[t]
+            S = cache.innovation_cov[t]
+            S_chol_buf = cache.S_chol[t]
+            ν_solved = cache.innovation_solved[t]
+            rhs = cache.gain_rhs[t]
+            K_t = cache.gain[t]
+            KG = cache.gainG[t]
+            KGS = cache.KgSigma[t]
+            μu = cache.mu_update[t]
+
+            # Current state
+            μt = u[t]
+            Σt = P[t]
+
+            # Predict mean: μp = A * μt
+            μp = mul!!(μp, A, μt)
+
+            # Predict covariance: Σp = A * Σt * A' + B * B'
+            AΣ = mul!!(AΣ, A, Σt)
+            Σp = mul!!(Σp, AΣ, transpose(A))
+            if is_mutable
+                @inbounds for i in eachindex(Σp)
+                    Σp[i] += B_prod[i]
+                end
+            else
+                Σp = Σp + B_prod
+            end
+
+            # Predicted observation: z[t+1] = C * μp
+            z[t + 1] = mul!!(z[t + 1], C, μp)
+
+            # Innovation: ν = observables[t] - z[t+1]
+            obs_t = get_observable(prob.observables, t)
+            ν = copyto!!(ν, obs_t)
+            ν = mul!!(ν, C, μp, -1.0, 1.0)
+
+            # Innovation covariance: S = C * Σp * C' + R
+            ΣGt = mul!!(ΣGt, Σp, transpose(C))
+            S = mul!!(S, C, ΣGt)
+            if is_mutable
+                @inbounds for i in eachindex(S)
+                    S[i] += R[i]
+                end
+            else
+                S = S + R
+            end
+
+            # Symmetrize and Cholesky
+            S_chol_buf = symmetrize_upper!!(S_chol_buf, S, perturb_diagonal)
+            F = cholesky!!(S_chol_buf, :U)
+
+            # Kalman gain: K = Σp * C' * S^{-1}
+            rhs = transpose!!(rhs, ΣGt)
+            rhs = ldiv!!(F, rhs)
+            K_t = transpose!!(K_t, rhs)
+
+            # Update mean: u[t+1] = μp + K * ν
+            μu = mul!!(μu, K_t, ν)
+            if is_mutable
+                @inbounds for i in eachindex(μp)
+                    u[t + 1][i] = μp[i] + μu[i]
+                end
+            else
+                cache.mu_pred[t] = μp
+                cache.mu_update[t] = μu
+                u[t + 1] = μp + μu
+            end
+
+            # Update covariance: P[t+1] = Σp - K * C * Σp
+            KG = mul!!(KG, K_t, C)
+            KGS = mul!!(KGS, KG, Σp)
+            if is_mutable
+                @inbounds for i in eachindex(Σp)
+                    P[t + 1][i] = Σp[i] - KGS[i]
+                end
+            else
+                cache.sigma_pred[t] = Σp
+                cache.KgSigma[t] = KGS
+                P[t + 1] = Σp - KGS
+            end
+
+            # Log-likelihood contribution (allocation-free)
+            ν_solved = ldiv!!(ν_solved, F, ν)
+            cache.innovation[t] = ν
+            cache.innovation_solved[t] = ν_solved
+            logdetS = logdet_chol(F)
+            M_obs = length(ν)
+            quad = dot(ν_solved, ν)
+            loglik -= 0.5 * (M_obs * log(2π) + logdetS + quad)
+        end
+        retcode = :Success
+    catch e
+        loglik = convert(typeof(loglik), -Inf)
+    end
+
+    t_values = prob.tspan[1]:prob.tspan[2]
+    return build_solution(
+        prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
+        retcode
+    )
+end
 
 function DiffEqBase.__solve(
         prob::LinearStateSpaceProblem, alg::KalmanFilter, args...;
         kwargs...
     )
-    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-
-    # checks on bounds
-    @assert size(prob.observables, 2) == T - 1
-
-    @unpack A, B, C, u0_prior_mean, u0_prior_var = prob
-    N = length(u0_prior_mean)
-    L = size(C, 1)
-
-    # TODO: move to internal algorithm cache
-    # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
-    u = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
-    P = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
-    z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
-
-    # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
-    # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
-    B_prod = Matrix{eltype(u0_prior_var)}(undef, N, N)
-    u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
-    P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [
-        Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
-            for _ in 1:T
-    ]
-    K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [
-        PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
-                Matrix{eltype(u0_prior_var)}(undef, L, L),
-                Cholesky{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
-                    Matrix{eltype(u0_prior_var)}(undef, L, L),
-                    'U',
-                    0
-                )
-            )
-            for _ in 1:T
-    ] # preallocated buffers for cholesky and matrix itself
-
-    R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
-    mul!(B_prod, B, B')
-
-    # Gaussian Prior
-    u[1] .= u0_prior_mean
-    P[1] .= u0_prior_var
-    z[1] .= C * u[1]
-
-    loglik = 0.0
-
-    # temp buffers.  Could be moved into algorithm settings
-    temp_N_N = Matrix{eltype(u0_prior_var)}(undef, N, N)
-    temp_L_L = Matrix{eltype(u0_prior_var)}(undef, L, L)
-    temp_L_N = Matrix{eltype(u0_prior_var)}(undef, L, N)
-
-    retcode = :Failure
-    try
-        @inbounds for t in 2:T
-            # Kalman iteration
-            mul!(u_mid[t], A, u[t - 1]) # u[t] = A u[t-1]
-            mul!(z[t], C, u_mid[t]) # z[t] = C u[t]
-
-            # P[t] = A * P[t - 1] * A' + B * B'
-            mul!(temp_N_N, P[t - 1], A')
-            mul!(P_mid[t], A, temp_N_N)
-            P_mid[t] .+= B_prod
-
-            mul!(CP[t], C, P_mid[t]) # CP[t] = C * P[t]
-
-            # V[t] = CP[t] * C' + R
-            mul!(V[t].mat, CP[t], C')
-            V[t].mat .+= R
-
-            # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-            transpose!(temp_L_L, V[t].mat)
-            V[t].mat .+= temp_L_L
-            lmul!(0.5, V[t].mat)
-
-            copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
-            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular
-            innovation[t] .= prob.observables[:, t - 1] - z[t]
-            loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
-
-            # K[t] .= CP[t]' / V[t]  # Kalman gain
-            # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
-            ldiv!(temp_L_N, V[t].chol, CP[t])
-            transpose!(K[t], temp_L_N)
-
-            #u[t] += K[t] * innovation[t]
-            copy!(u[t], u_mid[t])
-            mul!(u[t], K[t], innovation[t], 1, 1)
-
-            #P[t] -= K[t] * CP[t]
-            copy!(P[t], P_mid[t])
-            mul!(P[t], K[t], CP[t], -1, 1)
-        end
-        retcode = :Success
-    catch e
-        loglik = -Inf
-    end
-
-    t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(
-        prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
-        retcode
-    )
+    ws = CommonSolve.init(prob, alg; kwargs...)
+    return CommonSolve.solve!(ws; kwargs...)
 end
-
-#= AD rrule for KalmanFilter — disabled, will restore with Enzyme
-# NOTE: when moving to ._concrete_solve_adjoint will need to be careful to ensure the u0 sensitivity
-# takes into account any promotion in the `remake_model` side.  We want u0 to be the prior and have the
-# sensitivity of it as a distribution, not a draw from it which might happen in the remake(...)
-
-# function DiffEqBase._concrete_solve_adjoint(prob::LinearStateSpaceProblem, alg::KalmanFilter,
-#                                             sensealg, u0, p, args...; kwargs...)
-function ChainRulesCore.rrule(
-        ::typeof(solve), prob::LinearStateSpaceProblem,
-        alg::KalmanFilter, args...; kwargs...
-    )
-    # Preallocate values
-    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    # checks on bounds
-    @assert size(prob.observables, 2) == T - 1
-
-    @unpack A, B, C, u0_prior_mean, u0_prior_var = prob
-    N = length(u0_prior_mean)
-    L = size(C, 1)
-
-    # TODO: move to internal algorithm cache
-    # This method of preallocation won't work with staticarrays.  Note that we can't use eltype(mean(u0)) since it may be special case of FillArrays.zeros
-    B_prod = Matrix{eltype(u0_prior_var)}(undef, N, N)
-    u = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # Mean of Kalman filter inferred latent states
-    P = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # Posterior variance of Kalman filter inferred latent states
-    z = [Vector{eltype(prob.observables)}(undef, size(prob.observables, 1)) for _ in 1:T] # Mean of observables, generated from mean of latent states
-
-    # TODO: these intermediates should be of size T-1 instead as the first was skipped.  Left in for checks on timing
-    # Maintaining allocations for these intermediates is necessary for the rrule, but not for forward only.  Code could be refactored along those lines with solid unit tests.
-    u_mid = [Vector{eltype(u0_prior_var)}(undef, N) for _ in 1:T] # intermediate in u calculation
-    P_mid = [Matrix{eltype(u0_prior_var)}(undef, N, N) for _ in 1:T] # intermediate in P calculation
-    innovation = [
-        Vector{eltype(prob.observables)}(undef, size(prob.observables, 1))
-            for _ in 1:T
-    ]
-    K = [Matrix{eltype(u0_prior_var)}(undef, N, L) for _ in 1:T] # Gain
-    CP = [Matrix{eltype(u0_prior_var)}(undef, L, N) for _ in 1:T] # C * P[t]
-    V = [
-        PDMat{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
-                Matrix{eltype(u0_prior_var)}(undef, L, L),
-                Cholesky{eltype(u0_prior_var), Matrix{eltype(u0_prior_var)}}(
-                    Matrix{eltype(u0_prior_var)}(undef, L, L),
-                    'U',
-                    0
-                )
-            )
-            for _ in 1:T
-    ] # preallocated buffers for cholesky and matrix itself
-
-    R = make_observables_covariance_matrix(prob.observables_noise)  # Support diagonal or matrix covariance matrices.
-    mul!(B_prod, B, B')
-
-    u[1] .= u0_prior_mean
-    P[1] .= u0_prior_var
-    z[1] .= C * u[1]
-
-    loglik = 0.0
-
-    # temp buffers.  Could be moved into algorithm settings
-    temp_N_N = Matrix{eltype(u0_prior_var)}(undef, N, N)
-    temp_L_L = Matrix{eltype(u0_prior_var)}(undef, L, L)
-    temp_L_N = Matrix{eltype(u0_prior_var)}(undef, L, N)
-    temp_N_L = Matrix{eltype(u0_prior_var)}(undef, N, L)
-    temp_M = Vector{eltype(u0_prior_var)}(undef, L)
-    temp_N = Vector{eltype(u0_prior_var)}(undef, N)
-    retcode = :Failure
-    try
-        @inbounds for t in 2:T
-            # Kalman iteration
-            mul!(u_mid[t], A, u[t - 1]) # u[t] = A u[t-1]
-            mul!(z[t], C, u_mid[t]) # z[t] = C u[t]
-
-            # P[t] = A * P[t - 1] * A' + B * B'
-            mul!(temp_N_N, P[t - 1], A')
-            mul!(P_mid[t], A, temp_N_N)
-            P_mid[t] .+= B_prod
-
-            mul!(CP[t], C, P_mid[t]) # CP[t] = C * P[t]
-
-            # V[t] = CP[t] * C' + R
-            mul!(V[t].mat, CP[t], C')
-            V[t].mat .+= R
-
-            # V_t .= (V_t + V_t') / 2 # classic hack to deal with stability of not being quite symmetric
-            transpose!(temp_L_L, V[t].mat)
-            V[t].mat .+= temp_L_L
-            lmul!(0.5, V[t].mat)
-
-            copy!(V[t].chol.factors, V[t].mat) # copy over to the factors for the cholesky and do in place
-            cholesky!(V[t].chol.factors, NoPivot(); check = false) # inplace uses V_t with cholesky.  Now V[t]'s chol is upper-triangular
-            innovation[t] .= prob.observables[:, t - 1] - z[t]
-            loglik += logpdf(MvNormal(V[t]), innovation[t])  # no allocations since V[t] is a PDMat
-
-            # K[t] .= CP[t]' / V[t]  # Kalman gain
-            # Can rewrite as K[t]' = V[t] \ CP[t] since V[t] is symmetric
-            ldiv!(temp_L_N, V[t].chol, CP[t])
-            transpose!(K[t], temp_L_N)
-
-            #u[t] += K[t] * innovation[t]
-            copy!(u[t], u_mid[t])
-            mul!(u[t], K[t], innovation[t], 1, 1)
-
-            #P[t] -= K[t] * CP[t]
-            copy!(P[t], P_mid[t])
-            mul!(P[t], K[t], CP[t], -1, 1)
-        end
-        retcode = :Success
-    catch e
-        loglik = -Inf
-    end
-    t_values = prob.tspan[1]:prob.tspan[2]
-    sol = build_solution(
-        prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
-        retcode
-    )
-    function solve_pb(Δsol)
-        # Currently only changes in the logpdf are supported in the rrule
-        @assert Δsol.u == ZeroTangent()
-        @assert Δsol.W == ZeroTangent()
-        @assert Δsol.P == ZeroTangent()
-        @assert Δsol.z == ZeroTangent()
-
-        Δlogpdf = Δsol.logpdf
-
-        if iszero(Δlogpdf)
-            return (
-                NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
-                map(_ -> NoTangent(), args)...,
-            )
-        end
-        # Buffers
-        ΔP = zero(P[1])
-        Δu = zero(u[1])
-        ΔA = zero(A)
-        ΔB = zero(B)
-        ΔC = zero(C)
-        ΔK = zero(K[1])
-        ΔP_mid = zero(ΔP)
-        ΔP_mid_sum = zero(ΔP)
-        ΔCP = zero(CP[1])
-        Δu_mid = zero(u_mid[1])
-        Δz = zero(z[1])
-        ΔV = zero(V[1].mat)
-
-        # If it was a failure, just return and hope the gradients are ignored!
-        if retcode == :Success
-            for t in T:-1:2
-                # The inverse is used throughout, including in quadratic forms.  For large systems this might not be stable
-                inv_V = Symmetric(inv(V[t].chol)) # use cholesky factorization to invert.  Symmetric
-
-                # Sensitivity accumulation
-                copy!(ΔP_mid, ΔP)
-                mul!(ΔK, ΔP, CP[t]', -1, 0) # i.e. ΔK = -ΔP * CP[t]'
-                mul!(ΔCP, K[t]', ΔP, -1, 0) # i.e. ΔCP = - K[t]' * ΔP
-                copy!(Δu_mid, Δu)
-                mul!(ΔK, Δu, innovation[t]', 1, 1) # ΔK += Δu * innovation[t]'
-                mul!(Δz, K[t]', Δu, -1, 0)  # i.e, Δz = -K[t]'* Δu
-                mul!(ΔCP, inv_V, ΔK', 1, 1) # ΔCP += inv_V * ΔK'
-
-                # ΔV .= -inv_V * CP[t] * ΔK * inv_V
-                mul!(temp_L_N, inv_V, CP[t])
-                mul!(temp_N_L, ΔK, inv_V)
-                mul!(ΔV, temp_L_N, temp_N_L, -1, 0)
-
-                mul!(ΔC, ΔCP, P_mid[t]', 1, 1) # ΔC += ΔCP * P_mid[t]'
-                mul!(ΔP_mid, C', ΔCP, 1, 1) # ΔP_mid += C' * ΔCP
-                mul!(Δz, inv_V, innovation[t], Δlogpdf, 1) # Δz += Δlogpdf * inv_V * innovation[t] # Σ^-1 * (z_obs - z)
-
-                #ΔV -= Δlogpdf * 0.5 * (inv_V - inv_V * innovation[t] * innovation[t]' * inv_V) # -0.5 * (Σ^-1 - Σ^-1(z_obs - z)(z_obx - z)'Σ^-1)
-                mul!(temp_M, inv_V, innovation[t])
-                mul!(temp_L_L, temp_M, temp_M')
-                temp_L_L .-= inv_V
-                rmul!(temp_L_L, Δlogpdf * 0.5)
-                ΔV += temp_L_L
-
-                #ΔC += ΔV * C * P_mid[t]' + ΔV' * C * P_mid[t]
-                mul!(temp_L_N, C, P_mid[t])
-                transpose!(temp_L_L, ΔV)
-                temp_L_L .+= ΔV
-                mul!(ΔC, temp_L_L, temp_L_N, 1, 1)
-
-                # ΔP_mid += C' * ΔV * C
-                mul!(temp_L_N, ΔV, C)
-                mul!(ΔP_mid, C', temp_L_N, 1, 1)
-
-                mul!(ΔC, Δz, u_mid[t]', 1, 1) # ΔC += Δz * u_mid[t]'
-                mul!(Δu_mid, C', Δz, 1, 1) # Δu_mid += C' * Δz
-
-                # Calculates (ΔP_mid + ΔP_mid')
-                transpose!(ΔP_mid_sum, ΔP_mid)
-                ΔP_mid_sum .+= ΔP_mid
-
-                # ΔA += (ΔP_mid + ΔP_mid') * A * P[t - 1]
-                mul!(temp_N_N, A, P[t - 1])
-                mul!(ΔA, ΔP_mid_sum, temp_N_N, 1, 1)
-
-                # ΔP .= A' * ΔP_mid * A # pass into next period
-                mul!(temp_N_N, ΔP_mid, A)
-                mul!(ΔP, A', temp_N_N)
-
-                mul!(ΔB, ΔP_mid_sum, B, 1, 1) # ΔB += ΔP_mid_sum * B
-                mul!(ΔA, Δu_mid, u[t - 1]', 1, 1) # ΔA += Δu_mid * u[t - 1]'
-                mul!(Δu, A', Δu_mid)
-            end
-        end
-        return (
-            NoTangent(),
-            Tangent{typeof(prob)}(;
-                A = ΔA, B = ΔB, C = ΔC, u0 = ZeroTangent(), # u0 not used in kalman filter
-                u0_prior_mean = Δu, u0_prior_var = ΔP
-            ),
-            NoTangent(), map(_ -> NoTangent(), args)...,
-        )
-    end
-    return sol, solve_pb
-end
-=# # end AD rrule for KalmanFilter

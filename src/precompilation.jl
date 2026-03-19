@@ -2,9 +2,6 @@ using PrecompileTools: PrecompileTools, @setup_workload, @compile_workload
 using LinearAlgebra: I
 
 @setup_workload begin
-    # Minimal setup data for precompilation workload
-    # Use simple 2x2 system that's typical for state-space models
-
     @compile_workload begin
         # Common matrices for state-space models (2x2 system)
         A = [0.9 0.1; 0.0 0.8]
@@ -14,7 +11,7 @@ using LinearAlgebra: I
         u0 = [0.0, 0.0]
         T = 10
 
-        # === LinearStateSpaceProblem with DirectIteration (most common) ===
+        # === LinearStateSpaceProblem with DirectIteration ===
         # Simulation without observations
         prob_sim = LinearStateSpaceProblem(A, B, u0, (0, T))
         sol_sim = solve(prob_sim)
@@ -27,9 +24,11 @@ using LinearAlgebra: I
         prob_noise = LinearStateSpaceProblem(A, B, u0, (0, T); C = C, observables_noise = D)
         sol_noise = solve(prob_noise)
 
+        # === init/solve! API ===
+        ws = CommonSolve.init(prob_obs, DirectIteration())
+        sol_ws = CommonSolve.solve!(ws)
+
         # === LinearStateSpaceProblem with KalmanFilter ===
-        # Generate fake observables for Kalman filter
-        # For tspan = (0, T), we get T+1 time points, so need T observables
         observables = randn(2, T)
         u0_prior_mean = zeros(2)
         u0_prior_var = Matrix{Float64}(I, 2, 2)
@@ -41,25 +40,49 @@ using LinearAlgebra: I
         )
         sol_kalman = solve(prob_kalman)
 
+        # Kalman init/solve!
+        ws_k = CommonSolve.init(prob_kalman, KalmanFilter())
+        sol_k = CommonSolve.solve!(ws_k)
+
         # === LinearStateSpaceProblem with no noise matrix ===
         prob_no_noise = LinearStateSpaceProblem(A, nothing, u0, (0, T); C = C)
         sol_no_noise = solve(prob_no_noise)
 
-        # === QuadraticStateSpaceProblem with DirectIteration ===
-        # Use proper dimensions: B has 1 column, so noise needs 1 row
-        # For tspan = (0, T), we get T+1 time points, so need T noise samples
-        A_0 = zeros(2)
-        A_1 = A
-        A_2 = zeros(2, 2, 2)
-        C_0 = zeros(2)
-        C_1 = C
-        C_2 = zeros(2, 2, 2)
-        noise_quad = randn(1, T)
-
-        prob_quad = QuadraticStateSpaceProblem(
-            A_0, A_1, A_2, B, u0, (0, T);
-            C_0 = C_0, C_1 = C_1, C_2 = C_2, noise = noise_quad
+        # === GenericStateSpaceProblem with DirectIteration ===
+        gen_f!! = (x_next, x, w, p, t) -> begin
+            mul!(x_next, A, x)
+            mul!(x_next, B, w, 1.0, 1.0)
+            return x_next
+        end
+        gen_g!! = (y, x, p, t) -> begin
+            mul!(y, C, x)
+            return y
+        end
+        prob_gen = GenericStateSpaceProblem(
+            gen_f!!, gen_g!!, u0, (0, T);
+            n_shocks = 1, n_obs = 2
         )
-        sol_quad = solve(prob_quad)
+        sol_gen = solve(prob_gen)
+
+        # Generic init/solve!
+        ws_gen = CommonSolve.init(prob_gen, DirectIteration())
+        sol_gen_ws = CommonSolve.solve!(ws_gen)
+
+        # Generic without observations
+        prob_gen_no_obs = GenericStateSpaceProblem(
+            gen_f!!, nothing, u0, (0, T);
+            n_shocks = 1, n_obs = 0
+        )
+        sol_gen_no_obs = solve(prob_gen_no_obs)
+
+        # === StaticArrays workload ===
+        A_s = SMatrix{2, 2}(0.9, 0.0, 0.1, 0.8)
+        B_s = SMatrix{2, 1}(0.0, 0.1)
+        C_s = SMatrix{2, 2}(1.0, 0.0, 0.0, 1.0)
+        u0_s = SVector{2}(0.0, 0.0)
+        noise_s = [SVector{1}(randn()) for _ in 1:T]
+
+        prob_s = LinearStateSpaceProblem(A_s, B_s, u0_s, (0, T); C = C_s, noise = noise_s)
+        sol_s = solve(prob_s)
     end
 end
