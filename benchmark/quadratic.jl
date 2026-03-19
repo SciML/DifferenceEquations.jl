@@ -7,7 +7,7 @@ function make_problem_2(
         kwargs...
     )
     prob = QuadraticStateSpaceProblem(
-        A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0,
+        A_0, A_1, A_2, B, u0, (0, length(observables)); C_0,
         C_1,
         C_2, observables_noise = D,
         noise,
@@ -21,7 +21,7 @@ function joint_likelihood_2(
         kwargs...
     )
     prob = QuadraticStateSpaceProblem(
-        A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0,
+        A_0, A_1, A_2, B, u0, (0, length(observables)); C_0,
         C_1,
         C_2, observables_noise = D,
         noise,
@@ -35,7 +35,7 @@ function simulate_model_no_noise_2(
         kwargs...
     )
     prob = QuadraticStateSpaceProblem(
-        A_0, A_1, A_2, B, u0, (0, size(observables, 2)); C_0,
+        A_0, A_1, A_2, B, u0, (0, length(observables)); C_0,
         C_1,
         C_2, observables_noise = D,
         observables, kwargs...
@@ -75,21 +75,11 @@ const C_2_rbc = cat(
 const D_2_rbc = [0.1, 0.1]
 const u0_2_rbc = zeros(2)
 
-const observables_2_rbc = readdlm(
-    joinpath(
-        pkgdir(DifferenceEquations),
-        "test/data/RBC_observables.csv"
-    ), ','
-)' |>
-    collect
-const noise_2_rbc = readdlm(
-    joinpath(
-        pkgdir(DifferenceEquations),
-        "test/data/RBC_noise.csv"
-    ),
-    ','
-)' |> collect
-const T_2_rbc = size(observables_2_rbc, 2)
+const observables_2_rbc = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ','))]
+const noise_2_rbc = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ','))]
+const T_2_rbc = length(observables_2_rbc)
 # Matrices from FVGQ
 # Load FVGQ data for checks
 A_0_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A_0.csv"), ',')
@@ -115,22 +105,12 @@ const C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0
 # D_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "FVGQ_D.csv"); header = false)))
 D_2_FVGQ = ones(6) * 1.0e-3
 u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
-const observables_2_FVGQ = readdlm(
-    joinpath(
-        pkgdir(DifferenceEquations),
-        "test/data/FVGQ20_observables.csv"
-    ), ','
-)' |>
-    collect
+const observables_2_FVGQ = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_observables.csv"), ','))]
 
-const noise_2_FVGQ = readdlm(
-    joinpath(
-        pkgdir(DifferenceEquations),
-        "test/data/FVGQ20_noise.csv"
-    ),
-    ','
-)' |> collect
-const T_2_FVGQ = size(observables_2_FVGQ, 2)
+const noise_2_FVGQ = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ','))]
+const T_2_FVGQ = length(observables_2_FVGQ)
 
 # RBC sized specific tests
 # Verifying code prior to benchmark

@@ -77,19 +77,19 @@ const D_rbc = abs2.([0.1, 0.1])
 const u0_rbc = zeros(2)
 const u0_prior_var_rbc = diagm(ones(length(u0_rbc)))
 
-const observables_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ',')' |> collect
-const noise_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |> collect
-const T_rbc = size(observables_rbc, 2)
+const observables_rbc = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ','))]
+const noise_rbc = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ','))]
+const T_rbc = length(observables_rbc)
 
 const A_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A.csv"), ',')
 const B_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_B.csv"), ',')
 const C_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C.csv"), ',')
 const D_FVGQ = abs2.(ones(6) * 1.0e-3)
-const observables_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_observables.csv"), ',')' |> collect
-const noise_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ',')' |> collect
+const observables_FVGQ = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_observables.csv"), ','))]
+const noise_FVGQ = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ','))]
 const u0_FVGQ = zeros(size(A_FVGQ, 1))
 const u0_prior_var_FVGQ = diagm(ones(length(u0_FVGQ)))
-const T_FVGQ = size(observables_FVGQ, 2)
+const T_FVGQ = length(observables_FVGQ)
 
 # =============================================================================
 # Quadratic model data
@@ -106,8 +106,8 @@ const C_2_rbc = cat([-0.00018554166974717046 0.0025652363153049716; 0.0 0.0],
     [0.002565236315304951 0.3132705036896446; 0.0 0.0]; dims = 3)
 const D_2_rbc = abs2.([0.1, 0.1])
 const u0_2_rbc = zeros(2)
-const observables_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ',')' |> collect
-const noise_2_rbc = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ',')' |> collect
+const observables_2_rbc = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ','))]
+const noise_2_rbc = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ','))]
 
 A_0_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A_0.csv"), ',')
 const A_0_FVGQ = vec(A_0_raw)
@@ -122,8 +122,8 @@ C_2_raw = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C_2.cs
 const C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ))
 const D_2_FVGQ = ones(6) * 1.0e-3
 const u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
-const observables_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_observables.csv"), ',')' |> collect
-const noise_2_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ',')' |> collect
+const observables_2_FVGQ = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_observables.csv"), ','))]
+const noise_2_FVGQ = [collect(row) for row in eachrow(readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ','))]
 
 # =============================================================================
 # Static data — same values wrapped in SMatrix/SVector
@@ -133,7 +133,7 @@ const A_s = SMatrix{2, 2}(A_rbc)
 const B_s = SMatrix{2, 1}(B_rbc)
 const C_s = SMatrix{2, 2}(C_rbc)
 const u0_s = SVector{2}(u0_rbc)
-const nse_s = [SVector{1}(noise_rbc[:, t]) for t in 1:size(noise_rbc, 2)]
+const nse_s = [SVector{1}(noise_rbc[t]) for t in 1:length(noise_rbc)]
 const p_m = (; A = A_rbc, B = B_rbc, C = C_rbc)
 const p_s = (; A = A_s, B = B_s, C = C_s)
 
@@ -181,7 +181,7 @@ const ws_lin_fvgq_sim = init(
 const f_quad_rbc!!, g_quad_rbc!! = make_quadratic_callbacks(
     A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc)
 const ws_quad_rbc = init(
-    StateSpaceProblem(f_quad_rbc!!, g_quad_rbc!!, u0_2_rbc, (0, size(observables_2_rbc, 2));
+    StateSpaceProblem(f_quad_rbc!!, g_quad_rbc!!, u0_2_rbc, (0, length(observables_2_rbc));
         n_shocks = 1, n_obs = 2, observables_noise = D_2_rbc,
         noise = noise_2_rbc, observables = observables_2_rbc),
     DirectIteration())
@@ -190,7 +190,7 @@ const ws_quad_rbc = init(
 const f_quad_fvgq!!, g_quad_fvgq!! = make_quadratic_callbacks(
     A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ)
 const ws_quad_fvgq = init(
-    StateSpaceProblem(f_quad_fvgq!!, g_quad_fvgq!!, u0_2_FVGQ, (0, size(observables_2_FVGQ, 2));
+    StateSpaceProblem(f_quad_fvgq!!, g_quad_fvgq!!, u0_2_FVGQ, (0, length(observables_2_FVGQ));
         n_shocks = size(B_2_FVGQ, 2), n_obs = length(C_0_FVGQ),
         observables_noise = D_2_FVGQ, noise = noise_2_FVGQ, observables = observables_2_FVGQ),
     DirectIteration())
@@ -320,7 +320,7 @@ display(@benchmark solve!($ws_lin_fvgq_sim))
 
 println()
 println("=" ^ 70)
-println("QUADRATIC (Generic) MODEL — RBC (2×2, T=$(size(observables_2_rbc, 2)))")
+println("QUADRATIC (Generic) MODEL — RBC (2×2, T=$(length(observables_2_rbc)))")
 println("=" ^ 70)
 
 print("  DirectIteration:  ")
@@ -328,7 +328,7 @@ display(@benchmark solve!($ws_quad_rbc))
 
 println()
 println("=" ^ 70)
-println("QUADRATIC (Generic) MODEL — FVGQ ($(size(A_1_FVGQ,1))×$(size(A_1_FVGQ,2)), T=$(size(observables_2_FVGQ, 2)))")
+println("QUADRATIC (Generic) MODEL — FVGQ ($(size(A_1_FVGQ,1))×$(size(A_1_FVGQ,2)), T=$(length(observables_2_FVGQ)))")
 println("=" ^ 70)
 
 print("  DirectIteration:  ")

@@ -53,11 +53,10 @@ const y_kf, x_true_kf = generate_observations(A_kf, B_kf, C_kf, H_kf, mu_0_kf, S
 # Helper: create a LinearStateSpaceProblem for cache allocation
 function make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
     T_obs = length(y)
-    obs_matrix = hcat(y...)
     return LinearStateSpaceProblem(
         A, B, zeros(size(A, 1)), (0, T_obs); C,
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
-        observables_noise = R, observables = obs_matrix,
+        observables_noise = R, observables = y,
         noise = nothing
     )
 end

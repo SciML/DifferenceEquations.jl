@@ -2,36 +2,22 @@
 # (e.g., no observables, no observation equation, etc.)
 
 # =============================================================================
-# Noise handling — returns vector of vectors
+# Noise handling — vector of vectors only
 # =============================================================================
 
 # Pass-through: already a vector of vectors
 get_concrete_noise(prob, noise::AbstractVector{<:AbstractVector}, B, T) = noise
 
-# Matrix noise: convert to vector of vectors
-function get_concrete_noise(prob, noise::AbstractMatrix, B, T)
-    return [noise[:, t] for t in 1:size(noise, 2)]
-end
-
 # No noise matrix: no noise regardless of noise argument
 get_concrete_noise(prob, noise, B::Nothing, T) = nothing
 get_concrete_noise(prob, noise::Nothing, B::Nothing, T) = nothing
-# Disambiguations: B=nothing takes precedence
+# Disambiguation: B=nothing takes precedence
 get_concrete_noise(prob, noise::AbstractVector{<:AbstractVector}, B::Nothing, T) = nothing
-get_concrete_noise(prob, noise::AbstractMatrix, B::Nothing, T) = nothing
 
 # Generate random noise as vector of vectors
 function get_concrete_noise(prob, noise::Nothing, B, T)
     return [randn(eltype(B), size(B, 2)) for _ in 1:T]
 end
-
-# iid noise from distribution as vector of vectors
-function get_concrete_noise(prob, noise::UnivariateDistribution, B, T)
-    return [rand(noise, size(B, 2)) for _ in 1:T]
-end
-
-# Disambiguation: no noise matrix takes precedence over distribution
-get_concrete_noise(prob, noise::UnivariateDistribution, B::Nothing, T) = nothing
 
 # =============================================================================
 # Copy noise into cache buffers
@@ -52,30 +38,21 @@ copy_noise_to_cache!(cache_noise, ::Nothing) = nothing
 copy_noise_to_cache!(::Nothing, ::Nothing) = nothing
 
 # =============================================================================
-# Observables handling — support both matrix and vec-of-vecs
+# Observables handling — vector of vectors only
 # =============================================================================
-
-"""
-    get_observable(observables::AbstractMatrix, t)
-
-Get observation at time t from matrix-format observables.
-"""
-Base.@propagate_inbounds @inline get_observable(observables::AbstractMatrix, t) =
-    view(observables, :, t)
 
 """
     get_observable(observables::AbstractVector{<:AbstractVector}, t)
 
 Get observation at time t from vector-of-vectors observables.
 """
-Base.@propagate_inbounds @inline get_observable(observables::AbstractVector{<:AbstractVector}, t) =
-    observables[t]
+Base.@propagate_inbounds @inline get_observable(
+    observables::AbstractVector{<:AbstractVector}, t) = observables[t]
 
 # =============================================================================
 # Conditional size checking
 # =============================================================================
 
-maybe_check_size(m::AbstractMatrix, index::Integer, val::Integer) = (size(m, index) == val)
 maybe_check_size(m::AbstractVector, index::Integer, val::Integer) = (index == 1 ? length(m) == val : true)
 maybe_check_size(m::Nothing, index::Integer, val::Integer) = true
 
@@ -100,64 +77,36 @@ function maybe_check_size(m::AbstractVector{<:AbstractVector}, index::Integer, v
 end
 
 # =============================================================================
-# Conditional log-likelihood computation
+# Observation noise covariance
 # =============================================================================
 
-"""
-    maybe_logpdf(observables_noise, observables, t, z, s)
-
-Compute log-likelihood contribution if observations and noise are provided.
-Supports both matrix and vector-of-vectors observables formats.
-"""
-Base.@propagate_inbounds @inline function maybe_logpdf(
-        observables_noise::Distribution,
-        observables::AbstractMatrix, t,
-        z::AbstractVector, s
-    )
-    return logpdf(observables_noise, view(observables, :, t) - z[s])
-end
-
-Base.@propagate_inbounds @inline function maybe_logpdf(
-        observables_noise::Distribution,
-        observables::AbstractVector{<:AbstractVector}, t,
-        z::AbstractVector, s
-    )
-    return logpdf(observables_noise, observables[t] - z[s])
-end
-
-# Don't accumulate likelihoods if no observations or observation noise
-maybe_logpdf(observables_noise, observable, t, z, s) = 0.0
-
-# =============================================================================
-# Observation noise distribution construction
-# =============================================================================
-
-make_observables_noise(observables_noise::Nothing) = nothing
-make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
-function make_observables_noise(observables_noise::AbstractVector)
-    return MvNormal(Diagonal(observables_noise))
-end
-
-# Covariance matrix for Kalman filter
+# Covariance matrix for Kalman filter and loglik computation
 make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
 function make_observables_covariance_matrix(observables_noise::AbstractVector)
     return Diagonal(observables_noise)
 end
 
 # =============================================================================
-# Observation noise simulation
+# Observation noise simulation (for DirectIteration without observables)
 # =============================================================================
 
-function maybe_add_observation_noise!(
-        z, observables_noise::Distribution,
-        observables::Nothing
-    )
+"""
+    maybe_add_observation_noise!(z, R, observables)
+
+Add observation noise to simulated observations when `observables` is `nothing` (simulation mode).
+Uses Cholesky factorization of covariance matrix R. No-op when observables are provided.
+"""
+function maybe_add_observation_noise!(z, R, observables::Nothing)
+    F = cholesky(Symmetric(R))
+    M = size(R, 1)
     for z_val in z
-        z_val .+= rand(observables_noise)
+        z_val .+= F.L * randn(M)
     end
     return nothing
 end
-maybe_add_observation_noise!(z, observables_noise, observables) = nothing
+maybe_add_observation_noise!(z, R, observables) = nothing
+maybe_add_observation_noise!(z, R::Nothing, observables) = nothing
+maybe_add_observation_noise!(z, R::Nothing, observables::Nothing) = nothing
 
 # =============================================================================
 # Legacy helpers (kept for backward compatibility during transition)

@@ -10,7 +10,7 @@ using DiffEqBase
 
 function solve_kalman(A, B, C, u0_prior_mean, u0_prior_var, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(
-        A, B, u0_prior_mean, (0, size(observables, 2)); C,
+        A, B, u0_prior_mean, (0, length(observables)); C,
         observables_noise = D,
         u0_prior_mean, u0_prior_var,
         noise = nothing, observables, kwargs...
@@ -48,7 +48,7 @@ function solve_kalman_cov(A, B, C, u0_mean, u0_variance_vech, observables, D; kw
     u0_variance = u0_variance_cholesky * u0_variance_cholesky'
     problem = LinearStateSpaceProblem(
         A, B, zeros(length(u0_mean)),
-        (0, size(observables, 2)); C,
+        (0, length(observables)); C,
         observables_noise = D,
         u0_prior_mean = u0_mean, u0_prior_var = u0_variance,
         noise = nothing, observables, kwargs...
@@ -62,7 +62,7 @@ function solve_manual(observables, A, B, C, R_raw, u0_mean, u0_variance, tspan)
     # hardcoded right now for tspan = (0, T) for T+1 points
     T = tspan[2]
     @assert tspan[1] == 0
-    @assert size(observables)[2] == T # i.e. we do not calculate the likelihood of the initial condition
+    @assert length(observables) == T # i.e. we do not calculate the likelihood of the initial condition
 
     # Gaussian Prior
     B_prod = B * B'
@@ -87,9 +87,9 @@ function solve_manual(observables, A, B, C, R_raw, u0_mean, u0_variance, tspan)
         CP_i = C * P[i]
         V_temp = CP_i * C' + R
         V = Symmetric((V_temp + V_temp') / 2)
-        loglik += logpdf(MvNormal(z[i], V), observables[:, i - 1])
+        loglik += logpdf(MvNormal(z[i], V), observables[i - 1])
         K = CP_i' / V  # gain
-        u[i] += K * (observables[:, i - 1] - z[i])
+        u[i] += K * (observables[i - 1] - z[i])
         P[i] -= K * CP_i
     end
     return z, u, P, loglik
@@ -99,7 +99,7 @@ function solve_manual_cov_lik(A, B, C, u0_mean, u0_variance_vech, observables, R
     # hardcoded right now for tspan = (0, T) for T+1 points
     T = tspan[2]
     @assert tspan[1] == 0
-    @assert size(observables)[2] == T # i.e. we do not calculate the likelihood of the initial condition
+    @assert length(observables) == T # i.e. we do not calculate the likelihood of the initial condition
 
     # Gaussian Prior
     # u0 prior taken from params
@@ -121,9 +121,9 @@ function solve_manual_cov_lik(A, B, C, u0_mean, u0_variance_vech, observables, R
         CP_i = C * P
         V_temp = CP_i * C' + R
         V = (V_temp + V_temp') / 2
-        loglik += logpdf(MvNormal(z, V), observables[:, i - 1])
+        loglik += logpdf(MvNormal(z, V), observables[i - 1])
         K = CP_i' / V  # gain
-        u += K * (observables[:, i - 1] - z)
+        u += K * (observables[i - 1] - z)
         P -= K * CP_i
     end
     return loglik
@@ -153,12 +153,13 @@ D_kalman = abs2.(ones(4) * 0.1)
 u0_mean_kalman = zeros(5)
 u0_var_kalman = diagm(ones(length(u0_mean_kalman)))
 
-observables_kalman = readdlm(
+observables_kalman_matrix = readdlm(
     joinpath(
         pkgdir(DifferenceEquations),
         "test/data/Kalman_observables.csv"
     ), ','
 )' |> collect
+observables_kalman = [observables_kalman_matrix[:, t] for t in 1:size(observables_kalman_matrix, 2)]
 T = 200
 
 @testset "basic test, non-square matrices" begin
@@ -266,7 +267,7 @@ end
     )
     problem = LinearStateSpaceProblem(
         A_kalman, B_kalman, u0_mean_kalman,
-        (0, size(observables_kalman, 2));
+        (0, length(observables_kalman));
         C = C_kalman, observables_noise = D_kalman,
         u0_prior_mean = u0_mean_kalman,
         u0_prior_var = u0_var_kalman,

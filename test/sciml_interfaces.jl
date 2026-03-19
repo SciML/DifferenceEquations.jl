@@ -16,26 +16,26 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(
+observables_rbc_matrix = readdlm(
     joinpath(
         pkgdir(DifferenceEquations),
         "test/data/RBC_observables.csv"
     ),
     ','
 )' |> collect
-noise_rbc = readdlm(
+noise_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
     ','
 )' |>
     collect
 # Data and Noise
 T = 5
-observables_rbc = observables_rbc[:, 1:T]
-noise_rbc = noise_rbc[:, 1:T]
+observables_rbc = [observables_rbc_matrix[:, t] for t in 1:T]
+noise_rbc = [noise_rbc_matrix[:, t] for t in 1:T]
 
 @testset "Plotting given noise" begin
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
@@ -49,7 +49,7 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc,
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
-        (0, size(observables_rbc, 2)); C = C_rbc,
+        (0, length(observables_rbc)); C = C_rbc,
         observables_noise = D_rbc, noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
@@ -66,7 +66,7 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc,
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
-        (0, size(observables_rbc, 2)); C = C_rbc,
+        (0, length(observables_rbc)); C = C_rbc,
         observables_noise = D_rbc, noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
@@ -78,7 +78,7 @@ end
 
 @testset "Symbolic indexing — state and obs (Linear)" begin
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, noise = noise_rbc,
         observables = observables_rbc,
@@ -99,7 +99,7 @@ end
     @test_throws Exception sol[:nonexistent]
 
     # Direct u access works
-    @test length(sol.u) == size(observables_rbc, 2) + 1
+    @test length(sol.u) == length(observables_rbc) + 1
 
     # DataFrame still works
     df = DataFrame(sol)
@@ -108,15 +108,15 @@ end
 
 @testset "No syms — backward compat (Linear)" begin
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2))
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc))
     )
     sol = solve(prob)
-    @test length(sol.u) == size(observables_rbc, 2) + 1
+    @test length(sol.u) == length(observables_rbc) + 1
 end
 
 @testset "Plotting simulating noise" begin
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, observables = observables_rbc,
         syms = (:a, :b)
@@ -128,7 +128,7 @@ end
 @testset "Ensemble simulation and plotting, simulating noise" begin
     # fixed initial condition, random noise
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, observables = observables_rbc,
         syms = (:a, :b)

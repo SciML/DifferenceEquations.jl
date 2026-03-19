@@ -15,17 +15,18 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(
+observables_rbc_matrix = readdlm(
     joinpath(
         pkgdir(DifferenceEquations),
         "test/data/RBC_observables.csv"
     ),
     ','
 )' |> collect
+observables_rbc = [observables_rbc_matrix[:, t] for t in 1:size(observables_rbc_matrix, 2)]
 # Data and Noise
 @testset "basic inference, simulated noise" begin
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, observables = observables_rbc,
         syms = [:a, :b]
