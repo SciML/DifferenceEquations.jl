@@ -58,7 +58,6 @@ end
 function _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
     # Get concrete noise and copy into cache
     noise_concrete = get_concrete_noise(prob, prob.noise, B, T - 1)
-    observables_noise = make_observables_noise(prob.observables_noise)
 
     # Validate dimensions
     if !isnothing(noise_concrete)
@@ -84,6 +83,16 @@ function _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
         z[1] = _observation!!(z[1], u[1], prob, cache, 1)
     end
 
+    # Pre-compute Cholesky-based loglik constants if observables provided
+    has_obs = !isnothing(prob.observables) && !isnothing(prob.observables_noise)
+    if has_obs
+        R_cov = make_observables_covariance_matrix(prob.observables_noise)
+        F_obs = cholesky(Symmetric(R_cov))
+        logdetR = logdet(F_obs)
+        M_obs = size(R_cov, 1)
+        log_const = M_obs * log(2π) + logdetR
+    end
+
     loglik = zero(eltype(prob.u0))
     @inbounds for t in 2:T
         w_t = isnothing(noise) ? nothing : noise[t - 1]
@@ -92,10 +101,22 @@ function _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
         if _has_observations(cache)
             z[t] = _observation!!(z[t], u[t], prob, cache, t)
         end
-        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
+
+        # Log-likelihood contribution (Cholesky-based, no MvNormal)
+        if has_obs
+            obs_t = get_observable(prob.observables, t - 1)
+            innovation = obs_t - z[t]
+            innovation_solved = F_obs \ innovation
+            loglik -= 0.5 * (log_const + dot(innovation, innovation_solved))
+        end
     end
 
-    maybe_add_observation_noise!(z, observables_noise, prob.observables)
+    # Add observation noise for simulation (when no observables provided)
+    if !isnothing(prob.observables_noise)
+        R_sim = make_observables_covariance_matrix(prob.observables_noise)
+        maybe_add_observation_noise!(z, R_sim, prob.observables)
+    end
+
     t_values = prob.tspan[1]:prob.tspan[2]
 
     ObsType = typeof(prob.observables)
@@ -341,7 +362,7 @@ function _solve_with_cache!(
         perturb_diagonal = 0.0, kwargs...
     )
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    @assert size(prob.observables, 2) == T - 1
+    @assert length(prob.observables) == T - 1
 
     (; A, B, C, u0_prior_mean, u0_prior_var) = prob
     R = make_observables_covariance_matrix(prob.observables_noise)

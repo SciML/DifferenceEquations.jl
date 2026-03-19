@@ -6,7 +6,6 @@ authors = ["various contributors"]
 [deps]
 CommonSolve = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
@@ -17,7 +16,6 @@ SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 [compat]
 CommonSolve = "0.2"
 DiffEqBase = "6"
-Distributions = "0.25"
 LinearAlgebra = "1"
 PrecompileTools = "1"
 RecursiveArrayTools = "3, 4"

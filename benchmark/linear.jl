@@ -5,7 +5,7 @@ using DelimitedFiles, Distributions, Zygote, LinearAlgebra
 # for benchmarking construction itself
 function make_problem_1(A, B, C, u0, noise, observables, D; kwargs...)
     prob = LinearStateSpaceProblem(
-        A, B, u0, (0, size(observables, 2)); C,
+        A, B, u0, (0, length(observables)); C,
         observables_noise = D,
         noise, observables, kwargs...
     )
@@ -13,7 +13,7 @@ function make_problem_1(A, B, C, u0, noise, observables, D; kwargs...)
 end
 function make_problem_kalman(A, B, C, u0_prior_var, observables, D; kwargs...)
     prob = LinearStateSpaceProblem(
-        A, B, zeros(size(A, 1)), (0, size(observables, 2)); C,
+        A, B, zeros(size(A, 1)), (0, length(observables)); C,
         u0_prior_var, u0_prior_mean = zeros(size(A, 1)),
         observables_noise = D, noise = nothing, observables,
         kwargs...
@@ -24,7 +24,7 @@ end
 # for benchmarking likelihoods
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     prob = LinearStateSpaceProblem(
-        A, B, u0, (0, size(observables, 2)); C,
+        A, B, u0, (0, length(observables)); C,
         observables_noise = D,
         noise, observables, kwargs...
     )
@@ -32,7 +32,7 @@ function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
 end
 function kalman_likelihood(A, B, C, u0_prior_var, observables, D; kwargs...)
     prob = LinearStateSpaceProblem(
-        A, B, zeros(size(A, 1)), (0, size(observables, 2)); C,
+        A, B, zeros(size(A, 1)), (0, length(observables)); C,
         u0_prior_var, u0_prior_mean = zeros(size(A, 1)),
         observables_noise = D, noise = nothing, observables,
         kwargs...
@@ -42,7 +42,7 @@ end
 
 function simulate_model_no_noise_1(A, B, C, u0, observables, D; kwargs...)
     prob = LinearStateSpaceProblem(
-        A, B, u0, (0, size(observables, 2)); C,
+        A, B, u0, (0, length(observables)); C,
         observables_noise = D,
         observables, kwargs...
     )
@@ -67,18 +67,11 @@ const D_rbc = abs2.([0.1, 0.1])
 const u0_rbc = zeros(2)
 const u0_prior_var_rbc = diagm(ones(length(u0_rbc)))
 
-const observables_rbc = readdlm(
-    joinpath(
-        pkgdir(DifferenceEquations),
-        "test/data/RBC_observables.csv"
-    ), ','
-)' |> collect
-const noise_rbc = readdlm(
-    joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
-    ','
-)' |>
-    collect
-const T_rbc = size(observables_rbc, 2)
+const observables_rbc = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ','))]
+const noise_rbc = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ','))]
+const T_rbc = length(observables_rbc)
 # Matrices from FVGQ
 # Load FVGQ data for checks
 const A_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_A.csv"), ',')
@@ -86,24 +79,14 @@ const B_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_B
 const C_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C.csv"), ',')
 const D_FVGQ = abs2.(ones(6) * 1.0e-3)
 
-const observables_FVGQ = readdlm(
-    joinpath(
-        pkgdir(DifferenceEquations),
-        "test/data/FVGQ20_observables.csv"
-    ), ','
-)' |>
-    collect
+const observables_FVGQ = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_observables.csv"), ','))]
 
-const noise_FVGQ = readdlm(
-    joinpath(
-        pkgdir(DifferenceEquations),
-        "test/data/FVGQ20_noise.csv"
-    ),
-    ','
-)' |> collect
+const noise_FVGQ = [collect(row) for row in eachrow(readdlm(
+    joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ','))]
 const u0_FVGQ = zeros(size(A_FVGQ, 1))
 const u0_prior_var_FVGQ = diagm(ones(length(u0_FVGQ)))
-const T_FVGQ = size(observables_FVGQ, 2)
+const T_FVGQ = length(observables_FVGQ)
 # executing gradients once to avoid compilation time in benchmarking
 
 make_problem_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc, observables_rbc, D_rbc)

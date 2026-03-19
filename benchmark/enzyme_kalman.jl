@@ -45,7 +45,7 @@ function make_kalman_problem(p; seed = 42)
     # Allocate cache via LinearStateSpaceProblem
     prob = LinearStateSpaceProblem(A, B, zeros(N), (0, T); C,
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
-        observables_noise = R, observables = hcat(y...), noise = nothing)
+        observables_noise = R, observables = y, noise = nothing)
     cache = alloc_kalman_cache(prob, T + 1)
 
     # Shadow copies for AD
@@ -89,7 +89,7 @@ function make_kalman_problem_static(p; seed = 42)
     # Allocate cache via LinearStateSpaceProblem
     prob = LinearStateSpaceProblem(A, B, SVector{N}(zeros(N)), (0, T); C,
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
-        observables_noise = Matrix(R), observables = hcat([Vector(yi) for yi in y]...),
+        observables_noise = Matrix(R), observables = y,
         noise = nothing)
     cache = alloc_kalman_cache(prob, T + 1)
 

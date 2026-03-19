@@ -36,7 +36,7 @@ function default_alg(
             AbstractMatrix,
         },
         ObsType <:
-        AbstractMatrix,
+        AbstractVector,
         K,
     }
     return KalmanFilter()

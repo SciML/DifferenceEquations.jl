@@ -67,12 +67,14 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(
+observables_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ','
 )' |> collect
-noise_rbc = readdlm(
+observables_rbc = [observables_rbc_matrix[:, t] for t in 1:size(observables_rbc_matrix, 2)]
+noise_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ','
 )' |> collect
+noise_rbc = [noise_rbc_matrix[:, t] for t in 1:size(noise_rbc_matrix, 2)]
 
 # =============================================================================
 # Tests: Linear callbacks match LinearStateSpaceProblem
@@ -108,8 +110,8 @@ end
 
 @testset "Generic linear matches — with explicit noise and observables" begin
     T = 5
-    obs = observables_rbc[:, 1:T]
-    nse = noise_rbc[:, 1:T]
+    obs = observables_rbc[1:T]
+    nse = noise_rbc[1:T]
 
     sol_linear = solve(LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
@@ -264,16 +266,17 @@ C_2_rbc = cat(
 D_2_rbc = abs2.([0.1, 0.1])
 u0_2_rbc = zeros(2)
 
-observables_2_rbc = readdlm(
+observables_2_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ','
 )' |> collect
+observables_2_rbc = [observables_2_rbc_matrix[:, t] for t in 1:size(observables_2_rbc_matrix, 2)]
 
 @testset "Quadratic RBC basic inference, simulated noise" begin
     f!!, g!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc
     )
     prob = StateSpaceProblem(
-        f!!, g!!, u0_2_rbc, (0, size(observables_2_rbc, 2));
+        f!!, g!!, u0_2_rbc, (0, length(observables_2_rbc));
         n_shocks = 1, n_obs = 2,
         observables_noise = D_2_rbc, observables = observables_2_rbc
     )
@@ -338,7 +341,7 @@ function quadratic_joint_likelihood(
     )
     f!!, g!! = make_quadratic_callbacks(A_0, A_1, A_2, B, C_0, C_1, C_2, u0)
     problem = StateSpaceProblem(
-        f!!, g!!, u0, (0, size(observables, 2));
+        f!!, g!!, u0, (0, length(observables));
         n_shocks = size(B, 2), n_obs = length(C_0),
         observables_noise = D, noise = noise, observables = observables,
         kwargs...
@@ -346,19 +349,20 @@ function quadratic_joint_likelihood(
     return solve(problem).logpdf
 end
 
-noise_2_rbc = readdlm(
+noise_2_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ','
 )' |> collect
+noise_2_rbc = [noise_2_rbc_matrix[:, t] for t in 1:size(noise_2_rbc_matrix, 2)]
 T_rbc = 5
-observables_2_rbc_short = observables_2_rbc[:, 1:T_rbc]
-noise_2_rbc_short = noise_2_rbc[:, 1:T_rbc]
+observables_2_rbc_short = observables_2_rbc[1:T_rbc]
+noise_2_rbc_short = noise_2_rbc[1:T_rbc]
 
 @testset "Quadratic RBC basic inference with known noise" begin
     f!!, g!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc
     )
     prob = StateSpaceProblem(
-        f!!, g!!, u0_2_rbc, (0, size(observables_2_rbc_short, 2));
+        f!!, g!!, u0_2_rbc, (0, length(observables_2_rbc_short));
         n_shocks = 1, n_obs = 2,
         observables_noise = D_2_rbc, noise = noise_2_rbc_short,
         observables = observables_2_rbc_short
@@ -389,12 +393,14 @@ C_2_FVGQ = reshape(C_2_raw, length(C_0_FVGQ), length(A_0_FVGQ), length(A_0_FVGQ)
 D_2_FVGQ = ones(6) * 1.0e-3
 u0_2_FVGQ = zeros(size(A_1_FVGQ, 1))
 
-observables_2_FVGQ = readdlm(
+observables_2_FVGQ_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_observables.csv"), ','
 )' |> collect
-noise_2_FVGQ = readdlm(
+observables_2_FVGQ = [observables_2_FVGQ_matrix[:, t] for t in 1:size(observables_2_FVGQ_matrix, 2)]
+noise_2_FVGQ_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"), ','
 )' |> collect
+noise_2_FVGQ = [noise_2_FVGQ_matrix[:, t] for t in 1:size(noise_2_FVGQ_matrix, 2)]
 
 @testset "Quadratic FVGQ joint likelihood" begin
     @test quadratic_joint_likelihood(
@@ -517,8 +523,8 @@ end
 
 @testset "Generic init/solve! matches solve" begin
     T = 5
-    obs = observables_rbc[:, 1:T]
-    nse = noise_rbc[:, 1:T]
+    obs = observables_rbc[1:T]
+    nse = noise_rbc[1:T]
 
     linear_f!! = (x_next, x, w, p, t) -> begin
         mul!(x_next, p.A, x)
@@ -548,8 +554,8 @@ end
 
 @testset "Generic repeated solve! gives consistent results" begin
     T = 5
-    obs = observables_rbc[:, 1:T]
-    nse = noise_rbc[:, 1:T]
+    obs = observables_rbc[1:T]
+    nse = noise_rbc[1:T]
 
     linear_f!! = (x_next, x, w, p, t) -> begin
         mul!(x_next, p.A, x)

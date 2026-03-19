@@ -7,7 +7,7 @@ using DiffEqBase
 
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(
-        A, B, u0, (0, size(observables, 2)); C,
+        A, B, u0, (0, length(observables)); C,
         observables_noise = D,
         noise, observables, kwargs...
     )
@@ -17,7 +17,7 @@ end
 # CRTU has problems with generating random MvNormal, so just testing diagonals
 function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(
-        A, B, u0, (0, size(observables, 2)); C,
+        A, B, u0, (0, length(observables)); C,
         observables_noise = D,
         u0_prior_mean = u0,
         u0_prior_var = diagm(ones(length(u0))),
@@ -36,32 +36,32 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(
+observables_rbc_matrix = readdlm(
     joinpath(
         pkgdir(DifferenceEquations),
         "test/data/RBC_observables.csv"
     ),
     ','
 )' |> collect
-noise_rbc = readdlm(
+noise_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"),
     ','
 )' |>
     collect
 # Data and Noise
 T = 5
-observables_rbc = observables_rbc[:, 1:T]
-noise_rbc = noise_rbc[:, 1:T]
+observables_rbc = [observables_rbc_matrix[:, t] for t in 1:T]
+noise_rbc = [noise_rbc_matrix[:, t] for t in 1:T]
 
 @testset "basic inference" begin
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, noise = noise_rbc,
         observables = observables_rbc
     )
     @inferred LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc, observables_noise = D_rbc,
         noise = noise_rbc,
         observables = observables_rbc
@@ -82,14 +82,14 @@ end
 
 @testset "basic kalman inference" begin
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, observables = observables_rbc,
         u0_prior_mean = u0_rbc,
         u0_prior_var = diagm(ones(length(u0_rbc)))
     )
     @inferred LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc,
         observables = observables_rbc,
@@ -169,18 +169,20 @@ B_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_B.csv")
 C_FVGQ = readdlm(joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_C.csv"), ',')
 D_FVGQ = ones(6) * 1.0e-3
 
-observables_FVGQ = readdlm(
+observables_FVGQ_matrix = readdlm(
     joinpath(
         pkgdir(DifferenceEquations),
         "test/data/FVGQ20_observables.csv"
     ), ','
 )' |> collect
+observables_FVGQ = [observables_FVGQ_matrix[:, t] for t in 1:size(observables_FVGQ_matrix, 2)]
 
-noise_FVGQ = readdlm(
+noise_FVGQ_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/FVGQ20_noise.csv"),
     ','
 )' |>
     collect
+noise_FVGQ = [noise_FVGQ_matrix[:, t] for t in 1:size(noise_FVGQ_matrix, 2)]
 u0_FVGQ = zeros(size(A_FVGQ, 1))
 
 @testset "linear FVGQ joint likelihood" begin
@@ -234,7 +236,7 @@ end
     A = [1.0e20 0.0; 1.0e20 0.0]
     u0_prior_var = diagm(1.0e10 * ones(length(u0_rbc)))
     prob = LinearStateSpaceProblem(
-        A, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        A, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
         observables_noise = D_rbc, observables = observables_rbc,
         u0_prior_mean = u0_rbc, u0_prior_var
@@ -250,7 +252,7 @@ end
     u0_prior_var = diagm(1.0e10 * ones(length(u0_rbc)))
     function fail_kalman(B_rbc)
         prob = LinearStateSpaceProblem(
-            A, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+            A, B_rbc, u0_rbc, (0, length(observables_rbc));
             C = C_rbc,
             observables_noise = D_rbc,
             observables = observables_rbc,

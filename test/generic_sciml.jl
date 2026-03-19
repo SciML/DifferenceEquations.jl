@@ -11,15 +11,15 @@ C_rbc = [0.09579643002426148 0.6746869652592109; 1.0 0.0]
 D_rbc = abs2.([0.1, 0.1])
 u0_rbc = zeros(2)
 
-observables_rbc = readdlm(
+observables_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_observables.csv"), ','
 )' |> collect
-noise_rbc = readdlm(
+noise_rbc_matrix = readdlm(
     joinpath(pkgdir(DifferenceEquations), "test/data/RBC_noise.csv"), ','
 )' |> collect
 T = 5
-observables_rbc = observables_rbc[:, 1:T]
-noise_rbc = noise_rbc[:, 1:T]
+observables_rbc = [observables_rbc_matrix[:, t] for t in 1:T]
+noise_rbc = [noise_rbc_matrix[:, t] for t in 1:T]
 
 # Callbacks
 linear_f!! = (x_next, x, w, p, t) -> begin

@@ -29,12 +29,12 @@ using LinearAlgebra: I
         sol_ws = CommonSolve.solve!(ws)
 
         # === LinearStateSpaceProblem with KalmanFilter ===
-        observables = randn(2, T)
+        observables = [randn(2) for _ in 1:T]
         u0_prior_mean = zeros(2)
         u0_prior_var = Matrix{Float64}(I, 2, 2)
 
         prob_kalman = LinearStateSpaceProblem(
-            A, B, u0, (0, size(observables, 2));
+            A, B, u0, (0, length(observables));
             C = C, observables_noise = D, observables = observables,
             u0_prior_mean = u0_prior_mean, u0_prior_var = u0_prior_var
         )
