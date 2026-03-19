@@ -1,5 +1,5 @@
-using DifferenceEquations, BenchmarkTools
-using Test, LinearAlgebra, Random
+using DifferenceEquations, BenchmarkTools, Enzyme
+using LinearAlgebra, Random, StaticArrays
 
 # Check if MKL or not
 julia_mkl = @static if VERSION < v"1.7"
@@ -13,14 +13,16 @@ if !julia_mkl
     BLAS.set_num_threads(openblas_threads)
 end
 
-println("Running Testsuite with Threads.nthreads = $(Threads.nthreads()) MKL = $julia_mkl, and BLAS.num_threads = $(BLAS.get_num_threads()) \n")
+println("Threads.nthreads = $(Threads.nthreads()), MKL = $julia_mkl, " *
+        "BLAS.num_threads = $(BLAS.get_num_threads())\n")
 
-# Benchmark groups
-BenchmarkTools.DEFAULT_PARAMETERS.seconds = 15.0 # 10 seconds per benchmark by default.
+BenchmarkTools.DEFAULT_PARAMETERS.seconds = 15.0
 BenchmarkTools.DEFAULT_PARAMETERS.evals = 3
 
 const SUITE = BenchmarkGroup()
-SUITE["linear"] = include(pkgdir(DifferenceEquations) * "/benchmark/linear.jl")
-SUITE["quadratic"] = include(pkgdir(DifferenceEquations) * "/benchmark/quadratic.jl")
+SUITE["enzyme_kalman"] = include(
+    joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_kalman.jl"))
+SUITE["enzyme_direct_iteration"] = include(
+    joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_direct_iteration.jl"))
 
 # results = run(SUITE; verbose = true)

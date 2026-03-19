@@ -1,5 +1,5 @@
 # Cache allocation functions for preallocated workspace buffers
-# Following differentiable_economics patterns: named-tuple caches, vector-of-vectors storage
+# Named-tuple caches, vector-of-vectors storage
 
 # =============================================================================
 # Linear DirectIteration cache
@@ -26,6 +26,50 @@ end
 
 _alloc_noise(B, T) = [Vector{eltype(B)}(undef, size(B, 2)) for _ in 1:(T - 1)]
 _alloc_noise(::Nothing, T) = nothing
+
+"""
+    alloc_direct_loglik_cache(u0, A, B, C, H, T)
+
+Allocate cache for DirectIteration with log-likelihood computation (Enzyme AD path).
+Extends the basic DI cache with R = H*H' and Cholesky workspace.
+
+# Arguments
+- `H`: Observation noise input matrix (M×L), used as prototype for R buffers
+"""
+function alloc_direct_loglik_cache(u0, A, B, C, H, T)
+    M = size(C, 1)
+    T_obs = T - 1
+    return (;
+        u = [alloc_like(u0) for _ in 1:T],
+        z = [alloc_like(u0, M) for _ in 1:T_obs],
+        # Loglik workspace: R = H*H' computed at runtime, then Cholesky factored
+        R = alloc_like(H, M, M),
+        R_chol = alloc_like(H, M, M),
+        innovation = [alloc_like(u0, M) for _ in 1:T_obs],
+        innovation_solved = [alloc_like(u0, M) for _ in 1:T_obs]
+    )
+end
+
+"""
+    zero_direct_loglik_cache!!(cache)
+
+Zero all buffers in a DirectIteration loglik cache for Enzyme AD compatibility.
+"""
+function zero_direct_loglik_cache!!(cache)
+    @inbounds for t in eachindex(cache.u)
+        cache.u[t] = fill_zero!!(cache.u[t])
+    end
+    @inbounds for t in eachindex(cache.z)
+        cache.z[t] = fill_zero!!(cache.z[t])
+    end
+    fill_zero!!(cache.R)
+    fill_zero!!(cache.R_chol)
+    @inbounds for t in eachindex(cache.innovation)
+        cache.innovation[t] = fill_zero!!(cache.innovation[t])
+        cache.innovation_solved[t] = fill_zero!!(cache.innovation_solved[t])
+    end
+    return cache
+end
 
 """
     zero_direct_cache!!(cache)
@@ -56,8 +100,7 @@ end
 """
     alloc_kalman_cache(prob::LinearStateSpaceProblem, T)
 
-Allocate cache for Kalman filter. Follows differentiable_economics/src/kalman.jl
-`alloc_kalman_cache` exactly, with all workspace arrays as vectors of vectors/matrices.
+Allocate cache for Kalman filter with all workspace arrays as vectors of vectors/matrices.
 """
 function alloc_kalman_cache(prob::LinearStateSpaceProblem, T)
     (; A, B, C, u0_prior_mean, u0_prior_var) = prob

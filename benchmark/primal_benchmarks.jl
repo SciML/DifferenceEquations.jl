@@ -216,8 +216,7 @@ const ws_lin_static = init(
     DirectIteration())
 
 # =============================================================================
-# Cross-package comparable problems (matching differentiable_economics dimensions)
-# Uses same data generation as differentiable_economics benchmark/lss.jl
+# Scalable benchmark problems at various dimensions
 # =============================================================================
 
 function make_bench_data(; N, M, K, T, seed = 42)
@@ -242,7 +241,7 @@ function make_bench_data_static(; N, M, K, T, seed = 42)
     return (; A, C, G, x_0, w)
 end
 
-# Callbacks using differentiable_economics field names (A, C, G)
+# Callbacks using (A, C, G) field names for generic SSM
 @inline function f_de!!(x_p, x, w, p, t)
     x_p = mul!!(x_p, p.A, x)
     return muladd!!(x_p, p.C, w)
@@ -354,8 +353,7 @@ display(@benchmark solve!($ws_gen_static))
 
 println()
 println("=" ^ 70)
-println("CROSS-PACKAGE — differentiable_economics dimensions")
-println("  (compare with: julia --project=<de_path> <de_path>/benchmark/lss.jl)")
+println("SCALABLE — generic SSM at various dimensions")
 println("=" ^ 70)
 
 print("  small mutable (N=5, M=2, T=10):    ")
