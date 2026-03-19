@@ -161,30 +161,25 @@ end
 # Raw benchmarks (include cache zeroing in the call)
 # =============================================================================
 
-function raw_kalman_mutable!(A, B, C, mu_0, Sigma_0, R, y, cache)
-    zero_kalman_cache!!(cache)
-    return _kalman_loglik!(A, B, C, mu_0, Sigma_0, R, y, cache; perturb_diagonal = 1e-8)
-end
-
-function raw_kalman_static!(A, B, C, mu_0, Sigma_0, R, y, cache)
+function raw_kalman!(A, B, C, mu_0, Sigma_0, R, y, cache)
     zero_kalman_cache!!(cache)
     return _kalman_loglik!(A, B, C, mu_0, Sigma_0, R, y, cache; perturb_diagonal = 1e-8)
 end
 
 # Warmup
-raw_kalman_mutable!(kf_s.A, kf_s.B, kf_s.C, kf_s.mu_0, kf_s.Sigma_0, kf_s.R, kf_s.y, kf_s.cache)
-raw_kalman_static!(kf_ss.A, kf_ss.B, kf_ss.C, kf_ss.mu_0, kf_ss.Sigma_0, kf_ss.R, kf_ss.y, kf_ss.cache)
-raw_kalman_mutable!(kf_l.A, kf_l.B, kf_l.C, kf_l.mu_0, kf_l.Sigma_0, kf_l.R, kf_l.y, kf_l.cache)
+raw_kalman!(kf_s.A, kf_s.B, kf_s.C, kf_s.mu_0, kf_s.Sigma_0, kf_s.R, kf_s.y, kf_s.cache)
+raw_kalman!(kf_ss.A, kf_ss.B, kf_ss.C, kf_ss.mu_0, kf_ss.Sigma_0, kf_ss.R, kf_ss.y, kf_ss.cache)
+raw_kalman!(kf_l.A, kf_l.B, kf_l.C, kf_l.mu_0, kf_l.Sigma_0, kf_l.R, kf_l.y, kf_l.cache)
 
-KALMAN_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_kalman_mutable!(
+KALMAN_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_kalman!(
     $(kf_s.A), $(kf_s.B), $(kf_s.C), $(kf_s.mu_0), $(kf_s.Sigma_0),
     $(kf_s.R), $(kf_s.y), $(kf_s.cache))
 
-KALMAN_ENZYME["raw"]["small_static"] = @benchmarkable raw_kalman_static!(
+KALMAN_ENZYME["raw"]["small_static"] = @benchmarkable raw_kalman!(
     $(kf_ss.A), $(kf_ss.B), $(kf_ss.C), $(kf_ss.mu_0), $(kf_ss.Sigma_0),
     $(kf_ss.R), $(kf_ss.y), $(kf_ss.cache))
 
-KALMAN_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_kalman_mutable!(
+KALMAN_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_kalman!(
     $(kf_l.A), $(kf_l.B), $(kf_l.C), $(kf_l.mu_0), $(kf_l.Sigma_0),
     $(kf_l.R), $(kf_l.y), $(kf_l.cache))
 
