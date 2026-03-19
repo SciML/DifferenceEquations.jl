@@ -404,7 +404,7 @@ noise_2_FVGQ = readdlm(
 end
 
 # =============================================================================
-# Tests: StaticArrays with !! pattern (matching differentiable_economics)
+# Tests: StaticArrays with !! pattern
 # =============================================================================
 
 using StaticArrays

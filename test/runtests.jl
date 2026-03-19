@@ -27,6 +27,11 @@ if GROUP == "All" || GROUP == "Core"
     include("sciml_interfaces.jl")
 end
 
+if GROUP == "All" || GROUP == "Enzyme"
+    include("enzyme_kalman.jl")
+    include("enzyme_direct_iteration.jl")
+end
+
 if GROUP == "JET"
     activate_jet_env()
     include("jet/jet_tests.jl")

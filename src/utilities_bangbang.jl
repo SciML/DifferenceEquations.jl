@@ -1,6 +1,5 @@
 # Utility functions for generic array operations
 # These work with both mutable arrays (Vector) and immutable arrays (SVector)
-# Copied from differentiable_economics/src/utilities.jl
 
 """
     mul!!(Y, A, B)

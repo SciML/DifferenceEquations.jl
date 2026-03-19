@@ -116,24 +116,110 @@ function DiffEqBase.__solve(
 end
 
 # =============================================================================
+# Enzyme AD-compatible DirectIteration loglik (standalone, no prob struct)
+# =============================================================================
+
+"""
+    _direct_iteration_loglik!(A, B, C, u0, noise, observables, H, cache;
+                              perturb_diagonal = 0.0)
+
+Linear DirectIteration simulation with log-likelihood (Enzyme AD-compatible hot path).
+Computes R = H*H' via `muladd!!`, factors it once, then uses Cholesky-based loglik
+per timestep. Returns scalar log-likelihood.
+
+# Arguments
+- `A`: State transition matrix
+- `B`: Noise input matrix (state noise)
+- `C`: Observation matrix
+- `u0`: Initial state
+- `noise`: Concrete noise vectors (vector-of-vectors)
+- `observables`: Observations (vector-of-vectors or matrix)
+- `H`: Observation noise input matrix (M×L), R = H*H' computed internally
+- `cache`: DirectIteration loglik cache from `alloc_direct_loglik_cache`
+- `perturb_diagonal`: Diagonal perturbation for numerical stability
+"""
+function _direct_iteration_loglik!(A, B, C, u0, noise, observables, H, cache;
+        perturb_diagonal = 0.0)
+    (; u, z) = cache
+
+    # Extract cache arrays once (avoids repeated named tuple field access in loop)
+    R = cache.R
+    R_chol_buf = cache.R_chol
+    innovation_buf = cache.innovation
+    innovation_solved_buf = cache.innovation_solved
+
+    # Compute R = H*H' and Cholesky factorize (once, outside loop)
+    R = mul!!(R, H, transpose(H))
+    R_chol_buf = symmetrize_upper!!(R_chol_buf, R, perturb_diagonal)
+    F = cholesky!!(R_chol_buf, :U)
+
+    # Precompute constant term
+    M_obs = size(C, 1)
+    logdetR = logdet_chol(F)
+    log_const = M_obs * log(2π) + logdetR
+
+    # Initialize state
+    u[1] = copyto!!(u[1], u0)
+
+    T = length(noise)
+    loglik = zero(eltype(u0))
+
+    @inbounds for t in 1:T
+        # Linear transition: x_{t+1} = A * x_t + B * w_t
+        u[t + 1] = mul!!(u[t + 1], A, u[t])
+        u[t + 1] = muladd!!(u[t + 1], B, noise[t])
+
+        # Predicted observation: z = C * x
+        z[t] = mul!!(z[t], C, u[t])
+
+        # Innovation: ν = obs_t - z_t
+        ν = innovation_buf[t]
+        ν = copyto!!(ν, observables[t])
+        if ismutable(ν)
+            @inbounds for i in eachindex(ν)
+                ν[i] -= z[t][i]
+            end
+        else
+            ν = ν - z[t]
+        end
+        innovation_buf[t] = ν
+
+        # Quadratic form: ν' * R⁻¹ * ν
+        ν_solved = innovation_solved_buf[t]
+        ν_solved = ldiv!!(ν_solved, F, ν)
+        innovation_solved_buf[t] = ν_solved
+        quad = dot(ν, ν_solved)
+
+        loglik -= 0.5 * (log_const + quad)
+    end
+
+    return loglik
+end
+
+# =============================================================================
 # KalmanFilter solver — specific to LinearStateSpaceProblem
 # =============================================================================
 
-function _solve_with_cache!(
-        prob::LinearStateSpaceProblem, alg::KalmanFilter, cache;
-        perturb_diagonal = 0.0, kwargs...
-    )
-    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+"""
+    _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, cache;
+                    perturb_diagonal = 0.0)
 
-    @assert size(prob.observables, 2) == T - 1
+Kalman filter log-likelihood on individual arrays (Enzyme AD-compatible hot path).
+Returns only the scalar log-likelihood. No exceptions, no solution construction.
 
-    (; A, B, C, u0_prior_mean, u0_prior_var) = prob
-
-    R = make_observables_covariance_matrix(prob.observables_noise)
-
-    # Zero cache for Enzyme AD compatibility
-    zero_kalman_cache!!(cache)
-
+# Arguments
+- `A`: State transition matrix
+- `B`: State noise input matrix
+- `C`: Observation matrix
+- `u0_prior_mean`: Prior mean
+- `u0_prior_var`: Prior covariance
+- `R`: Observation noise covariance (precomputed)
+- `observables`: Observations (vector-of-vectors or matrix)
+- `cache`: Kalman cache from `alloc_kalman_cache`
+- `perturb_diagonal`: Diagonal perturbation for numerical stability
+"""
+function _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, cache;
+        perturb_diagonal = 0.0)
     (; u, P, z, B_prod) = cache
 
     # Compute B*B' once
@@ -146,115 +232,133 @@ function _solve_with_cache!(
 
     loglik = zero(eltype(u0_prior_var))
     is_mutable = ismutable(u[1])
-    T_obs = T - 1
+    T_obs = length(cache.mu_pred)
 
-    retcode = :Failure
-    try
-        @inbounds for t in 1:T_obs
-            # Get cache buffers for this timestep
-            μp = cache.mu_pred[t]
-            Σp = cache.sigma_pred[t]
-            AΣ = cache.A_sigma[t]
-            ΣGt = cache.sigma_Gt[t]
-            ν = cache.innovation[t]
-            S = cache.innovation_cov[t]
-            S_chol_buf = cache.S_chol[t]
-            ν_solved = cache.innovation_solved[t]
-            rhs = cache.gain_rhs[t]
-            K_t = cache.gain[t]
-            KG = cache.gainG[t]
-            KGS = cache.KgSigma[t]
-            μu = cache.mu_update[t]
+    @inbounds for t in 1:T_obs
+        # Get cache buffers for this timestep
+        μp = cache.mu_pred[t]
+        Σp = cache.sigma_pred[t]
+        AΣ = cache.A_sigma[t]
+        ΣGt = cache.sigma_Gt[t]
+        ν = cache.innovation[t]
+        S = cache.innovation_cov[t]
+        S_chol_buf = cache.S_chol[t]
+        ν_solved = cache.innovation_solved[t]
+        rhs = cache.gain_rhs[t]
+        K_t = cache.gain[t]
+        KG = cache.gainG[t]
+        KGS = cache.KgSigma[t]
+        μu = cache.mu_update[t]
 
-            # Current state
-            μt = u[t]
-            Σt = P[t]
+        # Current state
+        μt = u[t]
+        Σt = P[t]
 
-            # Predict mean: μp = A * μt
-            μp = mul!!(μp, A, μt)
+        # Predict mean: μp = A * μt
+        μp = mul!!(μp, A, μt)
 
-            # Predict covariance: Σp = A * Σt * A' + B * B'
-            AΣ = mul!!(AΣ, A, Σt)
-            Σp = mul!!(Σp, AΣ, transpose(A))
-            if is_mutable
-                @inbounds for i in eachindex(Σp)
-                    Σp[i] += B_prod[i]
-                end
-            else
-                Σp = Σp + B_prod
+        # Predict covariance: Σp = A * Σt * A' + B * B'
+        AΣ = mul!!(AΣ, A, Σt)
+        Σp = mul!!(Σp, AΣ, transpose(A))
+        if is_mutable
+            @inbounds for i in eachindex(Σp)
+                Σp[i] += B_prod[i]
             end
-
-            # Predicted observation: z[t+1] = C * μp
-            z[t + 1] = mul!!(z[t + 1], C, μp)
-
-            # Innovation: ν = observables[t] - z[t+1]
-            obs_t = get_observable(prob.observables, t)
-            ν = copyto!!(ν, obs_t)
-            ν = mul!!(ν, C, μp, -1.0, 1.0)
-
-            # Innovation covariance: S = C * Σp * C' + R
-            ΣGt = mul!!(ΣGt, Σp, transpose(C))
-            S = mul!!(S, C, ΣGt)
-            if is_mutable
-                @inbounds for i in eachindex(S)
-                    S[i] += R[i]
-                end
-            else
-                S = S + R
-            end
-
-            # Symmetrize and Cholesky
-            S_chol_buf = symmetrize_upper!!(S_chol_buf, S, perturb_diagonal)
-            F = cholesky!!(S_chol_buf, :U)
-
-            # Kalman gain: K = Σp * C' * S^{-1}
-            rhs = transpose!!(rhs, ΣGt)
-            rhs = ldiv!!(F, rhs)
-            K_t = transpose!!(K_t, rhs)
-
-            # Update mean: u[t+1] = μp + K * ν
-            μu = mul!!(μu, K_t, ν)
-            if is_mutable
-                @inbounds for i in eachindex(μp)
-                    u[t + 1][i] = μp[i] + μu[i]
-                end
-            else
-                cache.mu_pred[t] = μp
-                cache.mu_update[t] = μu
-                u[t + 1] = μp + μu
-            end
-
-            # Update covariance: P[t+1] = Σp - K * C * Σp
-            KG = mul!!(KG, K_t, C)
-            KGS = mul!!(KGS, KG, Σp)
-            if is_mutable
-                @inbounds for i in eachindex(Σp)
-                    P[t + 1][i] = Σp[i] - KGS[i]
-                end
-            else
-                cache.sigma_pred[t] = Σp
-                cache.KgSigma[t] = KGS
-                P[t + 1] = Σp - KGS
-            end
-
-            # Log-likelihood contribution (allocation-free)
-            ν_solved = ldiv!!(ν_solved, F, ν)
-            cache.innovation[t] = ν
-            cache.innovation_solved[t] = ν_solved
-            logdetS = logdet_chol(F)
-            M_obs = length(ν)
-            quad = dot(ν_solved, ν)
-            loglik -= 0.5 * (M_obs * log(2π) + logdetS + quad)
+        else
+            Σp = Σp + B_prod
         end
+
+        # Predicted observation: z[t+1] = C * μp
+        z[t + 1] = mul!!(z[t + 1], C, μp)
+
+        # Innovation: ν = observables[t] - z[t+1]
+        obs_t = get_observable(observables, t)
+        ν = copyto!!(ν, obs_t)
+        ν = mul!!(ν, C, μp, -1.0, 1.0)
+
+        # Innovation covariance: S = C * Σp * C' + R
+        ΣGt = mul!!(ΣGt, Σp, transpose(C))
+        S = mul!!(S, C, ΣGt)
+        if is_mutable
+            @inbounds for i in eachindex(S)
+                S[i] += R[i]
+            end
+        else
+            S = S + R
+        end
+
+        # Symmetrize and Cholesky
+        S_chol_buf = symmetrize_upper!!(S_chol_buf, S, perturb_diagonal)
+        F = cholesky!!(S_chol_buf, :U)
+
+        # Kalman gain: K = Σp * C' * S^{-1}
+        rhs = transpose!!(rhs, ΣGt)
+        rhs = ldiv!!(F, rhs)
+        K_t = transpose!!(K_t, rhs)
+
+        # Update mean: u[t+1] = μp + K * ν
+        μu = mul!!(μu, K_t, ν)
+        if is_mutable
+            @inbounds for i in eachindex(μp)
+                u[t + 1][i] = μp[i] + μu[i]
+            end
+        else
+            cache.mu_pred[t] = μp
+            cache.mu_update[t] = μu
+            u[t + 1] = μp + μu
+        end
+
+        # Update covariance: P[t+1] = Σp - K * C * Σp
+        KG = mul!!(KG, K_t, C)
+        KGS = mul!!(KGS, KG, Σp)
+        if is_mutable
+            @inbounds for i in eachindex(Σp)
+                P[t + 1][i] = Σp[i] - KGS[i]
+            end
+        else
+            cache.sigma_pred[t] = Σp
+            cache.KgSigma[t] = KGS
+            P[t + 1] = Σp - KGS
+        end
+
+        # Log-likelihood contribution (allocation-free)
+        ν_solved = ldiv!!(ν_solved, F, ν)
+        cache.innovation[t] = ν
+        cache.innovation_solved[t] = ν_solved
+        logdetS = logdet_chol(F)
+        M_obs = length(ν)
+        quad = dot(ν_solved, ν)
+        loglik -= 0.5 * (M_obs * log(2π) + logdetS + quad)
+    end
+
+    return loglik
+end
+
+function _solve_with_cache!(
+        prob::LinearStateSpaceProblem, alg::KalmanFilter, cache;
+        perturb_diagonal = 0.0, kwargs...
+    )
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+    @assert size(prob.observables, 2) == T - 1
+
+    (; A, B, C, u0_prior_mean, u0_prior_var) = prob
+    R = make_observables_covariance_matrix(prob.observables_noise)
+
+    # Error handling kept in the SciML wrapper (not in the Enzyme hot path)
+    retcode = :Failure
+    loglik = convert(eltype(u0_prior_var), -Inf)
+    try
+        loglik = _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R,
+            prob.observables, cache; perturb_diagonal)
         retcode = :Success
-    catch e
-        loglik = convert(typeof(loglik), -Inf)
+    catch
+        loglik = convert(eltype(u0_prior_var), -Inf)
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(
-        prob, alg, t_values, u; P, W = nothing, logpdf = loglik, z,
-        retcode
+        prob, alg, t_values, cache.u; P = cache.P, W = nothing, logpdf = loglik,
+        z = cache.z, retcode
     )
 end
 
