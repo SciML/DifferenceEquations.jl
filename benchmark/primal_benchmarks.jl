@@ -5,7 +5,7 @@
 # Usage: julia --project=benchmark benchmark/primal_benchmarks.jl
 
 using DifferenceEquations, BenchmarkTools
-using DelimitedFiles, Distributions, LinearAlgebra, StaticArrays
+using DelimitedFiles, Distributions, LinearAlgebra, Random, StaticArrays
 using DifferenceEquations: mul!!, muladd!!, init, solve!
 
 # Check if MKL or not
@@ -216,13 +216,74 @@ const ws_lin_static = init(
     DirectIteration())
 
 # =============================================================================
+# Cross-package comparable problems (matching differentiable_economics dimensions)
+# Uses same data generation as differentiable_economics benchmark/lss.jl
+# =============================================================================
+
+function make_bench_data(; N, M, K, T, seed = 42)
+    Random.seed!(seed)
+    A_raw = randn(N, N)
+    A = 0.5 * A_raw / maximum(abs.(eigvals(A_raw)))
+    C = 0.1 * randn(N, K)  # noise matrix (C in diff_econ notation)
+    G = randn(M, N)         # observation matrix (G in diff_econ notation)
+    x_0 = randn(N)
+    w = [rand(K) for _ in 1:T]
+    return (; A, C, G, x_0, w)
+end
+
+function make_bench_data_static(; N, M, K, T, seed = 42)
+    Random.seed!(seed)
+    A_raw = randn(N, N)
+    A = SMatrix{N, N}(0.5 * A_raw / maximum(abs.(eigvals(A_raw))))
+    C = SMatrix{N, K}(0.1 * randn(N, K))
+    G = SMatrix{M, N}(randn(M, N))
+    x_0 = SVector{N}(randn(N))
+    w = [SVector{K}(rand(K)) for _ in 1:T]
+    return (; A, C, G, x_0, w)
+end
+
+# Callbacks using differentiable_economics field names (A, C, G)
+@inline function f_de!!(x_p, x, w, p, t)
+    x_p = mul!!(x_p, p.A, x)
+    return muladd!!(x_p, p.C, w)
+end
+@inline function g_de!!(y, x, p, t)
+    return mul!!(y, p.G, x)
+end
+
+# Small (N=5, M=2, K=2, T=10) — mutable
+const de_sm = make_bench_data(N = 5, M = 2, K = 2, T = 10)
+const ws_de_sm = init(
+    GenericStateSpaceProblem(f_de!!, g_de!!, de_sm.x_0, (0, 10),
+        (; A = de_sm.A, C = de_sm.C, G = de_sm.G);
+        n_shocks = 2, n_obs = 2, noise = de_sm.w),
+    DirectIteration())
+
+# Small (N=5, M=2, K=2, T=10) — static
+const de_sm_s = make_bench_data_static(N = 5, M = 2, K = 2, T = 10)
+const ws_de_sm_s = init(
+    GenericStateSpaceProblem(f_de!!, g_de!!, de_sm_s.x_0, (0, 10),
+        (; A = de_sm_s.A, C = de_sm_s.C, G = de_sm_s.G);
+        n_shocks = 2, n_obs = 2, noise = de_sm_s.w),
+    DirectIteration())
+
+# Large (N=30, M=10, K=10, T=100) — mutable
+const de_lg = make_bench_data(N = 30, M = 10, K = 10, T = 100)
+const ws_de_lg = init(
+    GenericStateSpaceProblem(f_de!!, g_de!!, de_lg.x_0, (0, 100),
+        (; A = de_lg.A, C = de_lg.C, G = de_lg.G);
+        n_shocks = 10, n_obs = 10, noise = de_lg.w),
+    DirectIteration())
+
+# =============================================================================
 # Warmup all solve! paths
 # =============================================================================
 
 for ws in (ws_lin_rbc_di, ws_lin_rbc_kf, ws_lin_rbc_sim,
         ws_lin_fvgq_di, ws_lin_fvgq_kf, ws_lin_fvgq_sim,
         ws_quad_rbc, ws_quad_fvgq,
-        ws_gen_mut, ws_gen_static, ws_lin_static)
+        ws_gen_mut, ws_gen_static, ws_lin_static,
+        ws_de_sm, ws_de_sm_s, ws_de_lg)
     solve!(ws)
     solve!(ws)
 end
@@ -290,6 +351,21 @@ display(@benchmark solve!($ws_gen_mut))
 
 print("  GenericSSP static:   ")
 display(@benchmark solve!($ws_gen_static))
+
+println()
+println("=" ^ 70)
+println("CROSS-PACKAGE — differentiable_economics dimensions")
+println("  (compare with: julia --project=<de_path> <de_path>/benchmark/lss.jl)")
+println("=" ^ 70)
+
+print("  small mutable (N=5, M=2, T=10):    ")
+display(@benchmark solve!($ws_de_sm))
+
+print("  small static  (N=5, M=2, T=10):    ")
+display(@benchmark solve!($ws_de_sm_s))
+
+print("  large mutable (N=30, M=10, T=100):  ")
+display(@benchmark solve!($ws_de_lg))
 
 println()
 println("Done.")
