@@ -404,29 +404,77 @@ noise_2_FVGQ = readdlm(
 end
 
 # =============================================================================
-# Tests: StaticArrays
+# Tests: StaticArrays with !! pattern (matching differentiable_economics)
 # =============================================================================
 
 using StaticArrays
+using DifferenceEquations: mul!!, muladd!!
 
-@testset "Generic StaticArrays DirectIteration" begin
+# Single set of callbacks that work for BOTH mutable and static arrays
+@inline function f_lss!!(x_p, x, w, p, t)
+    x_p = mul!!(x_p, p.A, x)
+    return muladd!!(x_p, p.B, w)
+end
+
+@inline function g_lss!!(y, x, p, t)
+    return mul!!(y, p.C, x)
+end
+
+@testset "Generic !! callbacks — mutable vs static consistency" begin
+    A_m = [0.9 0.1; 0.0 0.8]
+    B_m = reshape([0.0; 0.1], 2, 1)
+    C_m = [1.0 0.0; 0.0 1.0]
+    u0_m = [0.5, 0.3]
+    noise_vals = [randn(1) for _ in 1:9]
+
+    # Mutable version
+    p_m = (; A = A_m, B = B_m, C = C_m)
+    prob_m = GenericStateSpaceProblem(
+        f_lss!!, g_lss!!, u0_m, (0, 9), p_m;
+        n_shocks = 1, n_obs = 2, noise = noise_vals
+    )
+    sol_m = solve(prob_m)
+
+    # Static version — same callbacks, same data, just wrapped in SMatrix/SVector
+    A_s = SMatrix{2, 2}(A_m)
+    B_s = SMatrix{2, 1}(B_m)
+    C_s = SMatrix{2, 2}(C_m)
+    u0_s = SVector{2}(u0_m)
+    noise_s = [SVector{1}(n) for n in noise_vals]
+
+    p_s = (; A = A_s, B = B_s, C = C_s)
+    prob_s = GenericStateSpaceProblem(
+        f_lss!!, g_lss!!, u0_s, (0, 9), p_s;
+        n_shocks = 1, n_obs = 2, noise = noise_s
+    )
+    sol_s = solve(prob_s)
+
+    # Results must match exactly
+    for t in eachindex(sol_m.u)
+        @test Vector(sol_s.u[t]) ≈ sol_m.u[t]
+    end
+    for t in eachindex(sol_m.z)
+        @test Vector(sol_s.z[t]) ≈ sol_m.z[t]
+    end
+
+    # Verify static types are preserved
+    @test eltype(sol_s.u) <: SVector{2, Float64}
+    @test eltype(sol_s.z) <: SVector{2, Float64}
+end
+
+@testset "Generic !! callbacks — static matches LinearStateSpaceProblem" begin
     A = @SMatrix [0.9 0.1; 0.0 0.8]
     B = @SMatrix [0.0; 0.1;;]
     C = @SMatrix [1.0 0.0; 0.0 1.0]
     u0 = @SVector [0.5, 0.3]
     noise = [SVector{1, Float64}(randn()) for _ in 1:9]
 
-    # Linear SSP for reference
     prob_linear = LinearStateSpaceProblem(A, B, u0, (0, 9); C = C, noise = noise)
     sol_linear = solve(prob_linear)
 
-    # Generic with immutable callbacks
-    f!! = (x_next, x, w, p, t) -> p.A * x + p.B * w
-    g!! = (y, x, p, t) -> p.C * x
     p = (; A = A, B = B, C = C)
-
     prob_generic = GenericStateSpaceProblem(
-        f!!, g!!, u0, (0, 9), p;
+        f_lss!!, g_lss!!, u0, (0, 9), p;
         n_shocks = 1, n_obs = 2, noise = noise
     )
     sol_generic = solve(prob_generic)
@@ -439,7 +487,7 @@ using StaticArrays
     end
 end
 
-@testset "Generic StaticArrays no noise" begin
+@testset "Generic !! callbacks — static no noise" begin
     A = @SMatrix [0.9 0.1; 0.0 0.8]
     C = @SMatrix [1.0 0.0; 0.0 1.0]
     u0 = @SVector [1.0, 0.5]
@@ -447,12 +495,10 @@ end
     prob_linear = LinearStateSpaceProblem(A, nothing, u0, (0, 5); C = C)
     sol_linear = solve(prob_linear)
 
-    f!! = (x_next, x, w, p, t) -> p.A * x
-    g!! = (y, x, p, t) -> p.C * x
-    p = (; A = A, C = C)
-
+    # f_lss!! handles w=nothing via muladd!!(x_p, B, nothing) → x_p
+    p = (; A = A, B = nothing, C = C)
     prob_generic = GenericStateSpaceProblem(
-        f!!, g!!, u0, (0, 5), p;
+        f_lss!!, g_lss!!, u0, (0, 5), p;
         n_shocks = 0, n_obs = 2
     )
     sol_generic = solve(prob_generic)

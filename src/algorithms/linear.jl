@@ -44,13 +44,19 @@ end
 # Generic DirectIteration solver — single loop for all problem types
 # =============================================================================
 
+# Function barrier: _noise_matrix may return a union type for GenericStateSpaceProblem
+# (n_shocks is a runtime Int). Splitting here lets Julia specialize the hot loop
+# on the concrete B type.
 function _solve_with_cache!(
         prob::AbstractStateSpaceProblem, alg::DirectIteration, cache; kwargs...
     )
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-
-    # Get concrete noise and copy into cache
     B = _noise_matrix(prob)
+    return _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
+end
+
+function _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
+    # Get concrete noise and copy into cache
     noise_concrete = get_concrete_noise(prob, prob.noise, B, T - 1)
     observables_noise = make_observables_noise(prob.observables_noise)
 
