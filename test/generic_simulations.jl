@@ -94,7 +94,7 @@ noise_rbc = readdlm(
     p = (; A = A_rbc, B = B_rbc, C = C_rbc)
 
     Random.seed!(1234)
-    sol_generic = solve(GenericStateSpaceProblem(
+    sol_generic = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, 5), p;
         n_shocks = 1, n_obs = 2
     ))
@@ -127,7 +127,7 @@ end
     end
     p = (; A = A_rbc, B = B_rbc, C = C_rbc)
 
-    sol_generic = solve(GenericStateSpaceProblem(
+    sol_generic = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
         observables_noise = D_rbc, noise = nse, observables = obs
@@ -151,7 +151,7 @@ end
     end
     p = (; A = A_rbc, B = B_rbc)
 
-    sol = solve(GenericStateSpaceProblem(
+    sol = solve(StateSpaceProblem(
         linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
         n_shocks = 1, n_obs = 0
     ))
@@ -165,7 +165,7 @@ end
     ))
     # Must use same seed → same random noise
     Random.seed!(1234)
-    sol_generic = solve(GenericStateSpaceProblem(
+    sol_generic = solve(StateSpaceProblem(
         linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
         n_shocks = 1, n_obs = 0
     ))
@@ -187,7 +187,7 @@ end
     end
     p = (; A = A_rbc, C = C_rbc)
 
-    sol = solve(GenericStateSpaceProblem(
+    sol = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, [1.0, 0.5], (0, 5), p;
         n_shocks = 0, n_obs = 2
     ))
@@ -224,18 +224,18 @@ end
     end
     p = (; A = A_rbc, B = B_no_noise, C = C_rbc)
 
-    sol_no_noise = solve(GenericStateSpaceProblem(
+    sol_no_noise = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0, (0, T), p;
         n_shocks = 1, n_obs = 2
     ))
 
-    sol_obs_noise = solve(GenericStateSpaceProblem(
+    sol_obs_noise = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0, (0, T), p;
         n_shocks = 1, n_obs = 2, observables_noise = D_rbc
     ))
 
     # Tiny observation noise → nearly deterministic
-    sol_tiny = solve(GenericStateSpaceProblem(
+    sol_tiny = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0, (0, T), p;
         n_shocks = 1, n_obs = 2, observables_noise = [1.0e-16, 1.0e-16]
     ))
@@ -272,7 +272,7 @@ observables_2_rbc = readdlm(
     f!!, g!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc
     )
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         f!!, g!!, u0_2_rbc, (0, size(observables_2_rbc, 2));
         n_shocks = 1, n_obs = 2,
         observables_noise = D_2_rbc, observables = observables_2_rbc
@@ -286,7 +286,7 @@ end
     f!!, g!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc
     )
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         f!!, g!!, u0_2_rbc, (0, T);
         n_shocks = 1, n_obs = 2
     )
@@ -304,7 +304,7 @@ end
     f_nn!!, g_nn!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, C_0_rbc, C_1_rbc, C_2_rbc, u0
     )
-    sol_no_noise = solve(GenericStateSpaceProblem(
+    sol_no_noise = solve(StateSpaceProblem(
         f_nn!!, g_nn!!, u0, (0, T);
         n_shocks = 1, n_obs = 2
     ))
@@ -312,7 +312,7 @@ end
     f_on!!, g_on!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, C_0_rbc, C_1_rbc, C_2_rbc, u0
     )
-    sol_obs_noise = solve(GenericStateSpaceProblem(
+    sol_obs_noise = solve(StateSpaceProblem(
         f_on!!, g_on!!, u0, (0, T);
         n_shocks = 1, n_obs = 2, observables_noise = D_2_rbc
     ))
@@ -320,7 +320,7 @@ end
     f_ti!!, g_ti!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, C_0_rbc, C_1_rbc, C_2_rbc, u0
     )
-    sol_tiny = solve(GenericStateSpaceProblem(
+    sol_tiny = solve(StateSpaceProblem(
         f_ti!!, g_ti!!, u0, (0, T);
         n_shocks = 1, n_obs = 2, observables_noise = [1.0e-16, 1.0e-16]
     ))
@@ -337,7 +337,7 @@ function quadratic_joint_likelihood(
         kwargs...
     )
     f!!, g!! = make_quadratic_callbacks(A_0, A_1, A_2, B, C_0, C_1, C_2, u0)
-    problem = GenericStateSpaceProblem(
+    problem = StateSpaceProblem(
         f!!, g!!, u0, (0, size(observables, 2));
         n_shocks = size(B, 2), n_obs = length(C_0),
         observables_noise = D, noise = noise, observables = observables,
@@ -357,7 +357,7 @@ noise_2_rbc_short = noise_2_rbc[:, 1:T_rbc]
     f!!, g!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc
     )
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         f!!, g!!, u0_2_rbc, (0, size(observables_2_rbc_short, 2));
         n_shocks = 1, n_obs = 2,
         observables_noise = D_2_rbc, noise = noise_2_rbc_short,
@@ -429,7 +429,7 @@ end
 
     # Mutable version
     p_m = (; A = A_m, B = B_m, C = C_m)
-    prob_m = GenericStateSpaceProblem(
+    prob_m = StateSpaceProblem(
         f_lss!!, g_lss!!, u0_m, (0, 9), p_m;
         n_shocks = 1, n_obs = 2, noise = noise_vals
     )
@@ -443,7 +443,7 @@ end
     noise_s = [SVector{1}(n) for n in noise_vals]
 
     p_s = (; A = A_s, B = B_s, C = C_s)
-    prob_s = GenericStateSpaceProblem(
+    prob_s = StateSpaceProblem(
         f_lss!!, g_lss!!, u0_s, (0, 9), p_s;
         n_shocks = 1, n_obs = 2, noise = noise_s
     )
@@ -473,7 +473,7 @@ end
     sol_linear = solve(prob_linear)
 
     p = (; A = A, B = B, C = C)
-    prob_generic = GenericStateSpaceProblem(
+    prob_generic = StateSpaceProblem(
         f_lss!!, g_lss!!, u0, (0, 9), p;
         n_shocks = 1, n_obs = 2, noise = noise
     )
@@ -497,7 +497,7 @@ end
 
     # f_lss!! handles w=nothing via muladd!!(x_p, B, nothing) → x_p
     p = (; A = A, B = nothing, C = C)
-    prob_generic = GenericStateSpaceProblem(
+    prob_generic = StateSpaceProblem(
         f_lss!!, g_lss!!, u0, (0, 5), p;
         n_shocks = 0, n_obs = 2
     )
@@ -531,7 +531,7 @@ end
     end
     p = (; A = A_rbc, B = B_rbc, C = C_rbc)
 
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
         observables_noise = D_rbc, noise = nse, observables = obs
@@ -562,7 +562,7 @@ end
     end
     p = (; A = A_rbc, B = B_rbc, C = C_rbc)
 
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
         observables_noise = D_rbc, noise = nse, observables = obs

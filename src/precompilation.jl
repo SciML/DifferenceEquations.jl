@@ -48,7 +48,7 @@ using LinearAlgebra: I
         prob_no_noise = LinearStateSpaceProblem(A, nothing, u0, (0, T); C = C)
         sol_no_noise = solve(prob_no_noise)
 
-        # === GenericStateSpaceProblem with DirectIteration ===
+        # === StateSpaceProblem with DirectIteration ===
         gen_f!! = (x_next, x, w, p, t) -> begin
             mul!(x_next, A, x)
             mul!(x_next, B, w, 1.0, 1.0)
@@ -58,18 +58,21 @@ using LinearAlgebra: I
             mul!(y, C, x)
             return y
         end
-        prob_gen = GenericStateSpaceProblem(
+        prob_gen = StateSpaceProblem(
             gen_f!!, gen_g!!, u0, (0, T);
-            n_shocks = 1, n_obs = 2
+            n_shocks = 1, n_obs = 2,
+            syms = (:x1, :x2), obs_syms = (:y1, :y2)
         )
         sol_gen = solve(prob_gen)
+        sol_gen[:x1]   # precompile state indexing
+        sol_gen[:y1]   # precompile obs indexing
 
         # Generic init/solve!
         ws_gen = CommonSolve.init(prob_gen, DirectIteration())
         sol_gen_ws = CommonSolve.solve!(ws_gen)
 
         # Generic without observations
-        prob_gen_no_obs = GenericStateSpaceProblem(
+        prob_gen_no_obs = StateSpaceProblem(
             gen_f!!, nothing, u0, (0, T);
             n_shocks = 1, n_obs = 0
         )

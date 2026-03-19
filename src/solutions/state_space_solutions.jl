@@ -54,6 +54,28 @@ end
 # _interpolate(sol::StateSpaceSolution, t::Number, idxs::Nothing) = sol.u[Integer(round(t))]
 # _interpolate(sol::StateSpaceSolution, t::Integer, idxs) = sol.u[t][idxs]
 
+"""Return observation symbols from the problem, or nothing."""
+obs_syms(sol::StateSpaceSolution) = sol.prob.obs_syms
+
+Base.@propagate_inbounds function Base.getindex(sol::StateSpaceSolution, sym::Symbol)
+    # Check observation symbols first
+    _obs_syms = sol.prob.obs_syms
+    if _obs_syms !== nothing
+        idx = findfirst(==(sym), _obs_syms)
+        if idx !== nothing
+            sol.z === nothing &&
+                error("Observation symbol $sym found but no observations in solution")
+            return [sol.z[t][idx] for t in eachindex(sol.z)]
+        end
+    end
+    # Check state symbols via the ODEFunction's SymbolCache
+    state_idx = variable_index(sol.prob.f.sys, sym)
+    if state_idx !== nothing
+        return [sol.u[t][state_idx] for t in eachindex(sol.u)]
+    end
+    throw(ArgumentError("Symbol $sym not found in state or observation symbols"))
+end
+
 # For recipes
 SciMLBase.getindepsym(sol::StateSpaceSolution) = :t
 SciMLBase.getindepsym_defaultt(sol::StateSpaceSolution) = :t

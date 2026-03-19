@@ -181,7 +181,7 @@ const ws_lin_fvgq_sim = init(
 const f_quad_rbc!!, g_quad_rbc!! = make_quadratic_callbacks(
     A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc)
 const ws_quad_rbc = init(
-    GenericStateSpaceProblem(f_quad_rbc!!, g_quad_rbc!!, u0_2_rbc, (0, size(observables_2_rbc, 2));
+    StateSpaceProblem(f_quad_rbc!!, g_quad_rbc!!, u0_2_rbc, (0, size(observables_2_rbc, 2));
         n_shocks = 1, n_obs = 2, observables_noise = D_2_rbc,
         noise = noise_2_rbc, observables = observables_2_rbc),
     DirectIteration())
@@ -190,21 +190,21 @@ const ws_quad_rbc = init(
 const f_quad_fvgq!!, g_quad_fvgq!! = make_quadratic_callbacks(
     A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ, u0_2_FVGQ)
 const ws_quad_fvgq = init(
-    GenericStateSpaceProblem(f_quad_fvgq!!, g_quad_fvgq!!, u0_2_FVGQ, (0, size(observables_2_FVGQ, 2));
+    StateSpaceProblem(f_quad_fvgq!!, g_quad_fvgq!!, u0_2_FVGQ, (0, size(observables_2_FVGQ, 2));
         n_shocks = size(B_2_FVGQ, 2), n_obs = length(C_0_FVGQ),
         observables_noise = D_2_FVGQ, noise = noise_2_FVGQ, observables = observables_2_FVGQ),
     DirectIteration())
 
 # Generic Linear — mutable (!! callbacks)
 const ws_gen_mut = init(
-    GenericStateSpaceProblem(f_lss!!, g_lss!!, u0_rbc, (0, T_rbc), p_m;
+    StateSpaceProblem(f_lss!!, g_lss!!, u0_rbc, (0, T_rbc), p_m;
         n_shocks = 1, n_obs = 2, observables_noise = D_rbc,
         noise = noise_rbc, observables = observables_rbc),
     DirectIteration())
 
 # Generic Linear — static (!! callbacks, same functions)
 const ws_gen_static = init(
-    GenericStateSpaceProblem(f_lss!!, g_lss!!, u0_s, (0, T_rbc), p_s;
+    StateSpaceProblem(f_lss!!, g_lss!!, u0_s, (0, T_rbc), p_s;
         n_shocks = 1, n_obs = 2, observables_noise = D_rbc,
         noise = nse_s, observables = observables_rbc),
     DirectIteration())
@@ -254,7 +254,7 @@ end
 # Small (N=5, M=2, K=2, T=10) — mutable
 const de_sm = make_bench_data(N = 5, M = 2, K = 2, T = 10)
 const ws_de_sm = init(
-    GenericStateSpaceProblem(f_de!!, g_de!!, de_sm.x_0, (0, 10),
+    StateSpaceProblem(f_de!!, g_de!!, de_sm.x_0, (0, 10),
         (; A = de_sm.A, C = de_sm.C, G = de_sm.G);
         n_shocks = 2, n_obs = 2, noise = de_sm.w),
     DirectIteration())
@@ -262,7 +262,7 @@ const ws_de_sm = init(
 # Small (N=5, M=2, K=2, T=10) — static
 const de_sm_s = make_bench_data_static(N = 5, M = 2, K = 2, T = 10)
 const ws_de_sm_s = init(
-    GenericStateSpaceProblem(f_de!!, g_de!!, de_sm_s.x_0, (0, 10),
+    StateSpaceProblem(f_de!!, g_de!!, de_sm_s.x_0, (0, 10),
         (; A = de_sm_s.A, C = de_sm_s.C, G = de_sm_s.G);
         n_shocks = 2, n_obs = 2, noise = de_sm_s.w),
     DirectIteration())
@@ -270,7 +270,7 @@ const ws_de_sm_s = init(
 # Large (N=30, M=10, K=10, T=100) — mutable
 const de_lg = make_bench_data(N = 30, M = 10, K = 10, T = 100)
 const ws_de_lg = init(
-    GenericStateSpaceProblem(f_de!!, g_de!!, de_lg.x_0, (0, 100),
+    StateSpaceProblem(f_de!!, g_de!!, de_lg.x_0, (0, 100),
         (; A = de_lg.A, C = de_lg.C, G = de_lg.G);
         n_shocks = 10, n_obs = 10, noise = de_lg.w),
     DirectIteration())

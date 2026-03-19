@@ -30,7 +30,7 @@ SciMLBase.isinplace(prob::AbstractStateSpaceProblem) = false  # necessary for th
 struct LinearStateSpaceProblem{
         uType, uPriorMeanType, uPriorVarType, tType, P, NP, F, AType,
         BType, CType,
-        RType, ObsType, K,
+        RType, ObsType, OS, K,
     } <:
     AbstractStateSpaceProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
@@ -45,6 +45,7 @@ struct LinearStateSpaceProblem{
     tspan::tType
     p::P
     noise::NP
+    obs_syms::OS
     kwargs::K
     @add_kwonly function LinearStateSpaceProblem{iip}(
             A, B, u0, tspan, p = NullParameters();
@@ -54,12 +55,16 @@ struct LinearStateSpaceProblem{
             observables = nothing,
             noise = nothing,
             syms = nothing,
-            f = ODEFunction{false}(
-                (u, p, t) -> error("not implemented");
-                syms = syms
-            ),
+            obs_syms = nothing,
+            f = nothing,
             kwargs...
         ) where {iip}
+        if f === nothing
+            f = ODEFunction{false}(
+                (u, p, t) -> error("not implemented");
+                sys = SymbolCache(syms)
+            )
+        end
         _tspan = promote_tspan(tspan)
         # _observables = promote_vv(observables)
         _observables = observables
@@ -72,13 +77,13 @@ struct LinearStateSpaceProblem{
             typeof(p),
             typeof(noise), typeof(f),
             typeof(A), typeof(B), typeof(C), typeof(observables_noise),
-            typeof(_observables),
+            typeof(_observables), typeof(obs_syms),
             typeof(kwargs),
         }(
             f, A, B, C, observables_noise, _observables, u0,
             u0_prior_mean,
             u0_prior_var,
-            _tspan, p, noise, kwargs
+            _tspan, p, noise, obs_syms, kwargs
         )
     end
 end
@@ -87,9 +92,9 @@ function LinearStateSpaceProblem(args...; kwargs...)
     return LinearStateSpaceProblem{false}(args...; kwargs...)
 end
 
-struct GenericStateSpaceProblem{
+struct StateSpaceProblem{
         uType, tType, P, NP, TF, GF, F,
-        RType, ObsType, K,
+        RType, ObsType, OS, K,
     } <: AbstractStateSpaceProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     transition::TF     # f!!(x_next, x, w, p, t) -> x_next
@@ -102,8 +107,9 @@ struct GenericStateSpaceProblem{
     noise::NP
     n_shocks::Int
     n_obs::Int         # 0 if no observation equation
+    obs_syms::OS
     kwargs::K
-    @add_kwonly function GenericStateSpaceProblem{iip}(
+    @add_kwonly function StateSpaceProblem{iip}(
             transition, observation, u0, tspan, p = NullParameters();
             n_shocks,
             n_obs = 0,
@@ -111,12 +117,16 @@ struct GenericStateSpaceProblem{
             observables = nothing,
             noise = nothing,
             syms = nothing,
-            f = ODEFunction{false}(
-                (u, p, t) -> error("not implemented");
-                syms = syms
-            ),
+            obs_syms = nothing,
+            f = nothing,
             kwargs...
         ) where {iip}
+        if f === nothing
+            f = ODEFunction{false}(
+                (u, p, t) -> error("not implemented");
+                sys = SymbolCache(syms)
+            )
+        end
         _tspan = promote_tspan(tspan)
         _observables = observables
 
@@ -126,15 +136,15 @@ struct GenericStateSpaceProblem{
         return new{
             typeof(u0), typeof(_tspan), typeof(p), typeof(noise),
             typeof(transition), typeof(observation), typeof(f),
-            typeof(observables_noise), typeof(_observables),
+            typeof(observables_noise), typeof(_observables), typeof(obs_syms),
             typeof(kwargs),
         }(
             f, transition, observation, observables_noise, _observables,
-            u0, _tspan, p, noise, n_shocks, n_obs, kwargs
+            u0, _tspan, p, noise, n_shocks, n_obs, obs_syms, kwargs
         )
     end
 end
 # just forwards to a iip = false case
-function GenericStateSpaceProblem(args...; kwargs...)
-    return GenericStateSpaceProblem{false}(args...; kwargs...)
+function StateSpaceProblem(args...; kwargs...)
+    return StateSpaceProblem{false}(args...; kwargs...)
 end

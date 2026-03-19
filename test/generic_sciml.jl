@@ -34,7 +34,7 @@ end
 p_rbc = (; A = A_rbc, B = B_rbc, C = C_rbc)
 
 @testset "remake with u0 and p" begin
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
         observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
@@ -58,7 +58,7 @@ p_rbc = (; A = A_rbc, B = B_rbc, C = C_rbc)
 end
 
 @testset "Plotting given noise" begin
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
         observables_noise = D_rbc, noise = noise_rbc,
@@ -69,7 +69,7 @@ end
 end
 
 @testset "Ensemble simulation and plotting given noise" begin
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!,
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
         (0, T), p_rbc;
@@ -87,7 +87,7 @@ end
 end
 
 @testset "Dataframes" begin
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!,
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
         (0, T), p_rbc;
@@ -101,8 +101,96 @@ end
     @test size(df) == (T + 1, 3)
 end
 
+@testset "Symbolic indexing — state and obs" begin
+    prob = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
+        n_shocks = 1, n_obs = 2,
+        syms = (:capital, :productivity),
+        obs_syms = (:output, :consumption),
+        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+    )
+    sol = solve(prob)
+
+    # State indexing
+    @test sol[:capital] ≈ [sol.u[t][1] for t in eachindex(sol.u)]
+    @test sol[:productivity] ≈ [sol.u[t][2] for t in eachindex(sol.u)]
+
+    # Observation indexing
+    @test sol[:output] ≈ [sol.z[t][1] for t in eachindex(sol.z)]
+    @test sol[:consumption] ≈ [sol.z[t][2] for t in eachindex(sol.z)]
+
+    # Unknown symbol errors
+    @test_throws Exception sol[:nonexistent]
+
+    # Direct u access works
+    @test length(sol.u) == T + 1
+
+    # DataFrame still works
+    df = DataFrame(sol)
+    @test :capital in propertynames(df)
+end
+
+@testset "Symbolic indexing — syms only, no obs_syms" begin
+    prob = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
+        n_shocks = 1, n_obs = 2,
+        syms = (:capital, :productivity),
+        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+    )
+    sol = solve(prob)
+    @test sol[:capital] ≈ [sol.u[t][1] for t in eachindex(sol.u)]
+    @test_throws ArgumentError sol[:output]  # no obs_syms defined
+end
+
+@testset "Symbolic indexing — obs_syms only, no syms" begin
+    prob = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
+        n_shocks = 1, n_obs = 2,
+        obs_syms = (:output, :consumption),
+        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+    )
+    sol = solve(prob)
+    @test sol[:output] ≈ [sol.z[t][1] for t in eachindex(sol.z)]
+    @test_throws ArgumentError sol[:capital]  # no syms defined
+end
+
+@testset "Symbolic indexing — obs_syms but no observations in solution" begin
+    prob = StateSpaceProblem(
+        linear_f!!, nothing, u0_rbc, (0, T), p_rbc;
+        n_shocks = 1, n_obs = 0,
+        obs_syms = (:output, :consumption),
+        noise = noise_rbc
+    )
+    sol = solve(prob)
+    @test sol.z === nothing
+    @test_throws Exception sol[:output]  # obs_syms defined but z is nothing
+end
+
+@testset "Symbolic indexing survives remake" begin
+    prob = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
+        n_shocks = 1, n_obs = 2,
+        syms = (:capital, :productivity),
+        obs_syms = (:output, :consumption),
+        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+    )
+    prob2 = remake(prob; u0 = [0.1, 0.2])
+    sol2 = solve(prob2)
+    @test sol2[:capital] ≈ [sol2.u[t][1] for t in eachindex(sol2.u)]
+    @test sol2[:output] ≈ [sol2.z[t][1] for t in eachindex(sol2.z)]
+end
+
+@testset "No syms — backward compat" begin
+    prob = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
+        n_shocks = 1, n_obs = 2
+    )
+    sol = solve(prob)
+    @test length(sol.u) == T + 1
+end
+
 @testset "Plotting simulating noise" begin
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
         observables_noise = D_rbc, observables = observables_rbc,
@@ -113,7 +201,7 @@ end
 end
 
 @testset "Ensemble simulation and plotting, simulating noise" begin
-    prob = GenericStateSpaceProblem(
+    prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
         observables_noise = D_rbc, observables = observables_rbc,

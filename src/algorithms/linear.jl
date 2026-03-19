@@ -44,7 +44,7 @@ end
 # Generic DirectIteration solver — single loop for all problem types
 # =============================================================================
 
-# Function barrier: _noise_matrix may return a union type for GenericStateSpaceProblem
+# Function barrier: _noise_matrix may return a union type for StateSpaceProblem
 # (n_shocks is a runtime Int). Splitting here lets Julia specialize the hot loop
 # on the concrete B type.
 function _solve_with_cache!(

@@ -13,19 +13,19 @@ Base.size(ns::NoiseSpec, i::Int) = i == 2 ? ns.n_shocks : 1
 Base.eltype(::NoiseSpec{T}) where {T} = T
 
 # =============================================================================
-# Model interface methods for GenericStateSpaceProblem
+# Model interface methods for StateSpaceProblem
 # =============================================================================
 
-function _noise_matrix(prob::GenericStateSpaceProblem)
+function _noise_matrix(prob::StateSpaceProblem)
     return prob.n_shocks > 0 ? NoiseSpec(prob.n_shocks, eltype(prob.u0)) : nothing
 end
 
-_init_model_state!!(::GenericStateSpaceProblem, cache) = nothing
+_init_model_state!!(::StateSpaceProblem, cache) = nothing
 
-@inline function _transition!!(x_next, x, w, prob::GenericStateSpaceProblem, cache, t)
+@inline function _transition!!(x_next, x, w, prob::StateSpaceProblem, cache, t)
     return prob.transition(x_next, x, w, prob.p, t - 2)  # 0-based time
 end
 
-@inline function _observation!!(y, x, prob::GenericStateSpaceProblem, cache, t)
+@inline function _observation!!(y, x, prob::StateSpaceProblem, cache, t)
     return prob.observation(y, x, prob.p, t - 1)  # 0-based time
 end
