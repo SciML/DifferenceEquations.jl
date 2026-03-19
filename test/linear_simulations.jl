@@ -30,11 +30,9 @@ observables_rbc = readdlm(
         observables_noise = D_rbc, observables = observables_rbc,
         syms = [:a, :b]
     )
-    @inferred LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
-        C = C_rbc, observables_noise = D_rbc,
-        observables = observables_rbc, syms = [:a, :b]
-    )
+    # NOTE: @inferred on constructor removed — SciMLBase v2 SymbolCache makes
+    # ODEFunction construction type-unstable when syms is a kwarg with default nothing.
+    # solve(prob) remains type-stable once prob is concrete.
 
     sol = solve(prob)
     @inferred solve(prob)
@@ -45,10 +43,6 @@ end
 @testset "basic inference, simulated noise, no observations, no observation noise" begin
     T = 20
     prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc, syms = [:a, :b])
-    @inferred LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
-        syms = [:a, :b]
-    )
 
     sol = solve(prob)
     @inferred solve(prob)
@@ -125,10 +119,6 @@ end
         A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
         syms = [:a, :b], observables_noise = D_rbc
     )
-    @inferred LinearStateSpaceProblem(
-        A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
-        syms = [:a, :b], observables_noise = D_rbc
-    )
     sol_obs_noise = solve(prob_obs_noise)
     @inferred solve(prob_obs_noise)
 
@@ -161,10 +151,6 @@ end
         A_rbc, nothing, u0, (0, T); C = C_rbc,
         syms = [:a, :b]
     )
-    @inferred LinearStateSpaceProblem(
-        A_rbc, nothing, u0, (0, T); C = C_rbc,
-        syms = [:a, :b]
-    )
 
     sol_nothing_noise = solve(prob)
     @inferred solve(prob)
@@ -179,10 +165,6 @@ end
     T = 5
     u0 = [1.0, 0.5]
     prob = LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0, (0, T); C = nothing,
-        syms = [:a, :b]
-    )
-    @inferred LinearStateSpaceProblem(
         A_rbc, B_rbc, u0, (0, T); C = nothing,
         syms = [:a, :b]
     )

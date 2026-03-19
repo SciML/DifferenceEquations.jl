@@ -12,6 +12,7 @@ using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
     ODEFunction, remake, ConstantInterpolation, build_solution
 using StaticArrays: StaticArrays, SVector, SMatrix, ismutable
+using SymbolicIndexingInterface: SymbolicIndexingInterface, SymbolCache, variable_index
 
 include("utilities_bangbang.jl")
 include("utilities.jl")
@@ -25,7 +26,7 @@ include("algorithms/generic.jl")
 include("precompilation.jl")
 
 # Exports
-export AbstractStateSpaceProblem, LinearStateSpaceProblem, GenericStateSpaceProblem
+export AbstractStateSpaceProblem, LinearStateSpaceProblem, StateSpaceProblem
 export StateSpaceSolution, DirectIteration, KalmanFilter
 export StateSpaceWorkspace
 

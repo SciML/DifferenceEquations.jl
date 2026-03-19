@@ -76,6 +76,44 @@ end
     @test size(df) == (6, 3)
 end
 
+@testset "Symbolic indexing — state and obs (Linear)" begin
+    prob = LinearStateSpaceProblem(
+        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));
+        C = C_rbc,
+        observables_noise = D_rbc, noise = noise_rbc,
+        observables = observables_rbc,
+        syms = (:capital, :productivity),
+        obs_syms = (:output, :consumption)
+    )
+    sol = solve(prob)
+
+    # State indexing
+    @test sol[:capital] ≈ [sol.u[t][1] for t in eachindex(sol.u)]
+    @test sol[:productivity] ≈ [sol.u[t][2] for t in eachindex(sol.u)]
+
+    # Observation indexing
+    @test sol[:output] ≈ [sol.z[t][1] for t in eachindex(sol.z)]
+    @test sol[:consumption] ≈ [sol.z[t][2] for t in eachindex(sol.z)]
+
+    # Unknown symbol errors
+    @test_throws Exception sol[:nonexistent]
+
+    # Direct u access works
+    @test length(sol.u) == size(observables_rbc, 2) + 1
+
+    # DataFrame still works
+    df = DataFrame(sol)
+    @test :capital in propertynames(df)
+end
+
+@testset "No syms — backward compat (Linear)" begin
+    prob = LinearStateSpaceProblem(
+        A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2))
+    )
+    sol = solve(prob)
+    @test length(sol.u) == size(observables_rbc, 2) + 1
+end
+
 @testset "Plotting simulating noise" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, size(observables_rbc, 2));

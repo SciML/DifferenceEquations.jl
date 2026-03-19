@@ -138,7 +138,7 @@ alloc_cache(prob::LinearStateSpaceProblem, ::DirectIteration, T) =
 alloc_cache(prob::LinearStateSpaceProblem, ::KalmanFilter, T) =
     alloc_kalman_cache(prob, T)
 
-function alloc_cache(prob::GenericStateSpaceProblem, ::DirectIteration, T)
+function alloc_cache(prob::StateSpaceProblem, ::DirectIteration, T)
     (; u0, n_obs) = prob
     B = _noise_matrix(prob)
     return (;
