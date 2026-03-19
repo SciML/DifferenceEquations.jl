@@ -1,13 +1,12 @@
 abstract type AbstractStateSpaceProblem <: DEProblem end
-abstract type AbstractPerturbationProblem <: AbstractStateSpaceProblem end
 
 # TODO: Can add in more checks on the algorithm choice
 DiffEqBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothing
 
-# Perturbation problesm don't have f, g
+# Perturbation problems don't have f, g
 # In discrete time, tspan should not have a sensitivity so the concretization is less obvious
 function DiffEqBase.get_concrete_problem(
-        prob::AbstractPerturbationProblem, isadapt;
+        prob::AbstractStateSpaceProblem, isadapt;
         kwargs...
     )
     p = get_concrete_p(prob, kwargs)
@@ -24,7 +23,7 @@ function DiffEqBase.get_concrete_problem(
     end
 end
 
-SciMLBase.isinplace(prob::AbstractPerturbationProblem) = false  # necessary for the get_concrete_u0 overloads
+SciMLBase.isinplace(prob::AbstractStateSpaceProblem) = false  # necessary for the get_concrete_u0 overloads
 
 # the {iip} isn't relevant here at this point, but if we remove it then there are failures in the "remake" call above
 # when using the Ensemble unit tests
@@ -33,7 +32,7 @@ struct LinearStateSpaceProblem{
         BType, CType,
         RType, ObsType, K,
     } <:
-    AbstractPerturbationProblem
+    AbstractStateSpaceProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
     A::AType
     B::BType
@@ -88,43 +87,26 @@ function LinearStateSpaceProblem(args...; kwargs...)
     return LinearStateSpaceProblem{false}(args...; kwargs...)
 end
 
-# """
-# u_f(t+1) = A_1 u_f(t) .+ B * noise(t+1)
-# u(t+1) = A_0 + A_1 u(t) + quad(A_2, u_f(t)) .+ B noise(t+1)
-# z(t) = C_0 + C_1 u(t) + quad(C_2, u_f(t))
-# z_tilde(t) = z(t) + v(t+1)
-# """
-struct QuadraticStateSpaceProblem{
-        uType, uPriorMeanType, uPriorVarType, tType, P, NP, F,
-        A0Type, A1Type,
-        A2Type, BType, C0Type,
-        C1Type, C2Type, RType, ObsType, K,
-    } <:
-    AbstractPerturbationProblem
+struct GenericStateSpaceProblem{
+        uType, tType, P, NP, TF, GF, F,
+        RType, ObsType, K,
+    } <: AbstractStateSpaceProblem
     f::F # HACK: used only for standard interfaces/syms/etc., not used in calculations
-    A_0::A0Type
-    A_1::A1Type
-    A_2::A2Type
-    B::BType
-    C_0::C0Type
-    C_1::C1Type
-    C_2::C2Type
+    transition::TF     # f!!(x_next, x, w, p, t) -> x_next
+    observation::GF    # g!!(y, x, p, t) -> y (or nothing)
     observables_noise::RType
     observables::ObsType
     u0::uType
-    u0_prior_mean::uPriorMeanType
-    u0_prior_var::uPriorVarType
     tspan::tType
     p::P
     noise::NP
+    n_shocks::Int
+    n_obs::Int         # 0 if no observation equation
     kwargs::K
-    @add_kwonly function QuadraticStateSpaceProblem{iip}(
-            A_0, A_1, A_2, B, u0, tspan,
-            p = NullParameters();
-            u0_prior_mean = nothing,
-            u0_prior_var = nothing,
-            C_0 = nothing, C_1 = nothing,
-            C_2 = nothing,
+    @add_kwonly function GenericStateSpaceProblem{iip}(
+            transition, observation, u0, tspan, p = NullParameters();
+            n_shocks,
+            n_obs = 0,
             observables_noise = nothing,
             observables = nothing,
             noise = nothing,
@@ -136,45 +118,23 @@ struct QuadraticStateSpaceProblem{
             kwargs...
         ) where {iip}
         _tspan = promote_tspan(tspan)
-        # _observables = promote_vv(observables)
         _observables = observables
 
-        # Require integer distances between time periods for now.  Later could check with dt != 1
+        # Require integer distances between time periods for now.
         @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
 
         return new{
-            typeof(u0), typeof(u0_prior_mean), typeof(u0_prior_var), typeof(_tspan),
-            typeof(p),
-            typeof(noise), typeof(f),
-            typeof(A_0), typeof(A_1), typeof(A_2), typeof(B), typeof(C_0),
-            typeof(C_1),
-            typeof(C_2), typeof(observables_noise), typeof(_observables),
+            typeof(u0), typeof(_tspan), typeof(p), typeof(noise),
+            typeof(transition), typeof(observation), typeof(f),
+            typeof(observables_noise), typeof(_observables),
             typeof(kwargs),
         }(
-            f,
-            A_0,
-            A_1,
-            A_2,
-            B,
-            C_0,
-            C_1,
-            C_2,
-            observables_noise,
-            _observables,
-            u0,
-            u0_prior_mean,
-            u0_prior_var,
-            _tspan,
-            p,
-            noise,
-            kwargs
+            f, transition, observation, observables_noise, _observables,
+            u0, _tspan, p, noise, n_shocks, n_obs, kwargs
         )
     end
 end
 # just forwards to a iip = false case
-function QuadraticStateSpaceProblem(args...; kwargs...)
-    return QuadraticStateSpaceProblem{false}(
-        args...;
-        kwargs...
-    )
+function GenericStateSpaceProblem(args...; kwargs...)
+    return GenericStateSpaceProblem{false}(args...; kwargs...)
 end

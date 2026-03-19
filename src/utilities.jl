@@ -1,14 +1,80 @@
-# This file contains utilities for use in the algorithms to make the code more generic and able to handle different model variations (e.g., no observables, no observation equation, etc.)
+# Utilities for algorithms to handle different model variations
+# (e.g., no observables, no observation equation, etc.)
 
-# Temporary.  Eventually, move to use sciml NoiseProcess with better rng support/etc.
-get_concrete_noise(prob, noise, B, T) = noise # maybe do a promotion to an AbstractVectorOfVector type
-get_concrete_noise(prob, noise, B::Nothing, T) = nothing # if no noise matrix given, do not create noise
-get_concrete_noise(prob, noise::Nothing, B::Nothing, T) = nothing # if no noise matrix given, do not create noise
-get_concrete_noise(prob, noise::Nothing, B, T) = randn(eltype(B), size(B, 2), T) # default is unit Gaussian
-get_concrete_noise(prob, noise::UnivariateDistribution, B, T) = rand(noise, size(B, 2), T) # iid
-get_concrete_noise(prob, noise::UnivariateDistribution, B::Nothing, T) = nothing # disambiguation: no noise matrix takes precedence
+# =============================================================================
+# Noise handling — returns vector of vectors
+# =============================================================================
 
-# Utility functions to conditionally check size if not-nothing
+# Pass-through: already a vector of vectors
+get_concrete_noise(prob, noise::AbstractVector{<:AbstractVector}, B, T) = noise
+
+# Matrix noise: convert to vector of vectors
+function get_concrete_noise(prob, noise::AbstractMatrix, B, T)
+    return [noise[:, t] for t in 1:size(noise, 2)]
+end
+
+# No noise matrix: no noise regardless of noise argument
+get_concrete_noise(prob, noise, B::Nothing, T) = nothing
+get_concrete_noise(prob, noise::Nothing, B::Nothing, T) = nothing
+# Disambiguations: B=nothing takes precedence
+get_concrete_noise(prob, noise::AbstractVector{<:AbstractVector}, B::Nothing, T) = nothing
+get_concrete_noise(prob, noise::AbstractMatrix, B::Nothing, T) = nothing
+
+# Generate random noise as vector of vectors
+function get_concrete_noise(prob, noise::Nothing, B, T)
+    return [randn(eltype(B), size(B, 2)) for _ in 1:T]
+end
+
+# iid noise from distribution as vector of vectors
+function get_concrete_noise(prob, noise::UnivariateDistribution, B, T)
+    return [rand(noise, size(B, 2)) for _ in 1:T]
+end
+
+# Disambiguation: no noise matrix takes precedence over distribution
+get_concrete_noise(prob, noise::UnivariateDistribution, B::Nothing, T) = nothing
+
+# =============================================================================
+# Copy noise into cache buffers
+# =============================================================================
+
+"""
+    copy_noise_to_cache!(cache_noise, noise)
+
+Copy concrete noise into preallocated cache noise buffers.
+"""
+function copy_noise_to_cache!(cache_noise, noise)
+    @inbounds for t in eachindex(cache_noise)
+        assign!!(cache_noise[t], noise[t])
+    end
+    return cache_noise
+end
+copy_noise_to_cache!(cache_noise, ::Nothing) = nothing
+copy_noise_to_cache!(::Nothing, ::Nothing) = nothing
+
+# =============================================================================
+# Observables handling — support both matrix and vec-of-vecs
+# =============================================================================
+
+"""
+    get_observable(observables::AbstractMatrix, t)
+
+Get observation at time t from matrix-format observables.
+"""
+Base.@propagate_inbounds @inline get_observable(observables::AbstractMatrix, t) =
+    view(observables, :, t)
+
+"""
+    get_observable(observables::AbstractVector{<:AbstractVector}, t)
+
+Get observation at time t from vector-of-vectors observables.
+"""
+Base.@propagate_inbounds @inline get_observable(observables::AbstractVector{<:AbstractVector}, t) =
+    observables[t]
+
+# =============================================================================
+# Conditional size checking
+# =============================================================================
+
 maybe_check_size(m::AbstractMatrix, index::Integer, val::Integer) = (size(m, index) == val)
 maybe_check_size(m::AbstractVector, index::Integer, val::Integer) = (index == 1 ? length(m) == val : true)
 maybe_check_size(m::Nothing, index::Integer, val::Integer) = true
@@ -17,34 +83,87 @@ function maybe_check_size(
         m1::AbstractArray, index1::Integer,
         m2::AbstractArray, index2::Integer
     )
-    return (
-        size(m1, index1) ==
-            size(m2, index2)
-    )
+    return size(m1, index1) == size(m2, index2)
 end
 maybe_check_size(m1::Nothing, index1::Integer, m2, index2::Integer) = true
 maybe_check_size(m1, index1::Integer, m2::Nothing, index2::Integer) = true
 maybe_check_size(m1::Nothing, index1::Integer, m2::Nothing, index2::Integer) = true
 
+# Size check for vector of vectors
+function maybe_check_size(m::AbstractVector{<:AbstractVector}, index::Integer, val::Integer)
+    if index == 1
+        return isempty(m) || length(m[1]) == val
+    elseif index == 2
+        return length(m) == val
+    end
+    return true
+end
+
+# =============================================================================
+# Conditional log-likelihood computation
+# =============================================================================
+
+"""
+    maybe_logpdf(observables_noise, observables, t, z, s)
+
+Compute log-likelihood contribution if observations and noise are provided.
+Supports both matrix and vector-of-vectors observables formats.
+"""
 Base.@propagate_inbounds @inline function maybe_logpdf(
         observables_noise::Distribution,
         observables::AbstractMatrix, t,
         z::AbstractVector, s
     )
-    return logpdf(
-        observables_noise,
-        view(
-            observables,
-            :,
-            t
-        ) -
-            z[s]
-    )
+    return logpdf(observables_noise, view(observables, :, t) - z[s])
 end
-# Don't accumulate likelihoods if no observations or observatino noise
+
+Base.@propagate_inbounds @inline function maybe_logpdf(
+        observables_noise::Distribution,
+        observables::AbstractVector{<:AbstractVector}, t,
+        z::AbstractVector, s
+    )
+    return logpdf(observables_noise, observables[t] - z[s])
+end
+
+# Don't accumulate likelihoods if no observations or observation noise
 maybe_logpdf(observables_noise, observable, t, z, s) = 0.0
 
-# If no noise process is given, don't add in noise in simulation
+# =============================================================================
+# Observation noise distribution construction
+# =============================================================================
+
+make_observables_noise(observables_noise::Nothing) = nothing
+make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
+function make_observables_noise(observables_noise::AbstractVector)
+    return MvNormal(Diagonal(observables_noise))
+end
+
+# Covariance matrix for Kalman filter
+make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
+function make_observables_covariance_matrix(observables_noise::AbstractVector)
+    return Diagonal(observables_noise)
+end
+
+# =============================================================================
+# Observation noise simulation
+# =============================================================================
+
+function maybe_add_observation_noise!(
+        z, observables_noise::Distribution,
+        observables::Nothing
+    )
+    for z_val in z
+        z_val .+= rand(observables_noise)
+    end
+    return nothing
+end
+maybe_add_observation_noise!(z, observables_noise, observables) = nothing
+
+# =============================================================================
+# Legacy helpers (kept for backward compatibility during transition)
+# =============================================================================
+
+# Conditional matrix-vector multiply-add
 Base.@propagate_inbounds @inline function maybe_muladd!(x, B, noise, t)
     return mul!(x, B, view(noise, :, t), 1, 1)
 end
@@ -53,153 +172,21 @@ maybe_muladd!(x, B::Nothing, noise, t) = nothing
 Base.@propagate_inbounds @inline maybe_muladd!(x, A, B) = mul!(x, A, B, 1, 1)
 maybe_muladd!(x, A::Nothing, B) = nothing
 
-#= AD-only helpers — disabled, will restore with Enzyme
-# need transpose versions for gradients
-Base.@propagate_inbounds @inline maybe_muladd_transpose!(x, C, Δz) = mul!(x, C', Δz, 1, 1)
-maybe_muladd_transpose!(x, C::Nothing, Δz) = nothing
-Base.@propagate_inbounds @inline function maybe_muladd_transpose!(
-        ΔB::AbstractMatrix,
-        Δu_temp,
-        noise::AbstractMatrix, t
-    )
-    mul!(ΔB, Δu_temp, view(noise, :, t)', 1, 1)
-    return nothing
-end
-maybe_muladd_transpose!(ΔB, Δu_temp, noise, t) = nothing
-=#
 Base.@propagate_inbounds @inline maybe_mul!(x, t, A, y, s) = mul!(x[t], A, y[s])
 maybe_mul!(x::Nothing, t, A, y, s) = nothing
-#= AD-only helpers — disabled, will restore with Enzyme
-# Need transpose versions for rrule
-Base.@propagate_inbounds @inline maybe_mul_transpose!(x, t, A, y, s) = mul!(x[t], A', y[s])
-maybe_mul_transpose!(x::Nothing, t, A, y, s) = nothing
-Base.@propagate_inbounds @inline function maybe_mul_transpose!(Δnoise, t, B, y)
-    return mul!(
-        view(Δnoise, :, t),
-        B', y
-    )
-end
-maybe_mul_transpose!(Δnoise::Nothing, t, B, y) = nothing
-=#
-
-# Utilities to get distribution for logpdf from observation error argument
-make_observables_noise(observables_noise::Nothing) = nothing
-make_observables_noise(observables_noise::AbstractMatrix) = MvNormal(observables_noise)
-function make_observables_noise(observables_noise::AbstractVector)
-    return MvNormal(Diagonal(observables_noise))
-end
-
-# Utilities to get covariance matrix from observation error argument for kalman filter.  e.g. vector is diagonal, etc.
-make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
-function make_observables_covariance_matrix(observables_noise::AbstractVector)
-    return Diagonal(observables_noise)
-end
-
-#Add in observation noise to the output if simulated (i.e, observables not given) and there is observation_noise provided
-function maybe_add_observation_noise!(
-        z, observables_noise::Distribution,
-        observables::Nothing
-    )
-    # add noise to the vector of vectors componentwise
-    for z_val in z
-        z_val .+= rand(observables_noise)
-    end
-    return nothing
-end
-maybe_add_observation_noise!(z, observables_noise, observables) = nothing  #otherwise do nothing
-
-#= AD-only helpers — disabled, will restore with Enzyme
-#Maybe add observation noise, if observables and their adjoints given
-Base.@propagate_inbounds @inline function maybe_add_Δ!(Δz, Δsol_z::AbstractVector, t)
-    Δz .+= Δsol_z[t]
-    return nothing
-end
-maybe_add_Δ!(Δz, Δsol_z, t) = nothing
-
-Base.@propagate_inbounds @inline function maybe_add_Δ_slice!(
-        Δnoise::AbstractMatrix,
-        ΔW::AbstractMatrix, t
-    )
-    Δnoise[:, t] .+= view(ΔW, :, t)
-    return nothing
-end
-maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
-
-# Don't add logpdf to observables unless provided
-# TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
-# ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
-# rmul!(Δlogpdf, Δz)
-Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(
-        Δz::AbstractArray{<:Real, 1},
-        Δlogpdf::Number,
-        observables::AbstractArray{
-            <:Real,
-            2,
-        },
-        z::AbstractArray{T, 1},
-        t,
-        observables_noise_cov::AbstractArray{
-            <:Real,
-            1,
-        }
-    ) where {
-        T,
-    }
-    Δz .= Δlogpdf * (view(observables, :, t - 1) - z[t]) ./
-        observables_noise_cov
-    return nothing
-end
-# Otherwise do nothing
-function maybe_add_Δ_logpdf!(Δz, Δlogpdf, observables, z, t, observables_noise_cov)
-    return nothing
-end
-=#
 
 # Only allocate if observation equation
 allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
 allocate_z(prob, C::Nothing, u0, T) = nothing
 
-#= AD-only helpers — disabled, will restore with Enzyme
-# Maybe zero
-maybe_zero(A::AbstractArray) = zero(A)
-maybe_zero(A::Nothing) = nothing
-maybe_zero(A::AbstractArray, i::Int64) = zero(A[i])
-maybe_zero(A::Nothing, i) = nothing
-=#
+# =============================================================================
+# Quadratic form helpers (legacy, kept for reference)
+# =============================================================================
 
-# old quad and adjoint replaced by inplace accumulation versions.
-# function quad(A::AbstractArray{<:Number,3}, x)
-#     return map(j -> dot(x, view(A, j, :, :), x), 1:size(A, 1))
-# end
-# # quadratic form pullback
-# function quad_pb(Δres::AbstractVector, A::AbstractArray{<:Number,3}, x::AbstractVector)
-#     ΔA = similar(A)
-#     Δx = zeros(length(x))
-#     tmp = x * x'
-#     for i in 1:size(A, 1)
-#         ΔA[i, :, :] .= tmp .* Δres[i]
-#         Δx += (A[i, :, :] + A[i, :, :]') * x .* Δres[i]
-#     end
-#     return ΔA, Δx
-# end
-
-# y += quad(A, x)
-# The quad_muladd! uses on a vector of matrices for A
+# y += quad(A, x) using vector of matrices
 function quad_muladd!(y, A, x)
     @inbounds for j in 1:size(A, 1)
         @views y[j] += dot(x, A[j], x)
     end
     return y
 end
-
-#= AD-only helper — disabled, will restore with Enzyme
-# inplace version with accumulation and using the cache of A[i] + A[i]', etc.
-function quad_muladd_pb!(ΔA_vec, Δx, Δres, A_vec_sum, x)
-    tmp = x * x'  # could add in a temp here
-    @inbounds for (i, A_sum) in enumerate(A_vec_sum)  # @views @inbounds  ADD
-        ΔA_vec[i] .+= tmp .* Δres[i]
-        Δx .+= A_sum * x .* Δres[i]
-    end
-    return nothing
-end
-=#
