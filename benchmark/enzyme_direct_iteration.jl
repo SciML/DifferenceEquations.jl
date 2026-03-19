@@ -141,30 +141,25 @@ end
 # Raw benchmarks (include cache zeroing in the call)
 # =============================================================================
 
-function raw_di_mutable!(A, B, C, u0, noise, y, H, cache)
-    zero_direct_loglik_cache!!(cache)
-    return _direct_iteration_loglik!(A, B, C, u0, noise, y, H, cache)
-end
-
-function raw_di_static!(A, B, C, u0, noise, y, H, cache)
+function raw_di!(A, B, C, u0, noise, y, H, cache)
     zero_direct_loglik_cache!!(cache)
     return _direct_iteration_loglik!(A, B, C, u0, noise, y, H, cache)
 end
 
 # Warmup
-raw_di_mutable!(di_s.A, di_s.B, di_s.C, di_s.u0, di_s.noise, di_s.y, di_s.H, di_s.cache)
-raw_di_static!(di_ss.A, di_ss.B, di_ss.C, di_ss.u0, di_ss.noise, di_ss.y, di_ss.H, di_ss.cache)
-raw_di_mutable!(di_l.A, di_l.B, di_l.C, di_l.u0, di_l.noise, di_l.y, di_l.H, di_l.cache)
+raw_di!(di_s.A, di_s.B, di_s.C, di_s.u0, di_s.noise, di_s.y, di_s.H, di_s.cache)
+raw_di!(di_ss.A, di_ss.B, di_ss.C, di_ss.u0, di_ss.noise, di_ss.y, di_ss.H, di_ss.cache)
+raw_di!(di_l.A, di_l.B, di_l.C, di_l.u0, di_l.noise, di_l.y, di_l.H, di_l.cache)
 
-DI_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_di_mutable!(
+DI_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_di!(
     $(di_s.A), $(di_s.B), $(di_s.C), $(di_s.u0),
     $(di_s.noise), $(di_s.y), $(di_s.H), $(di_s.cache))
 
-DI_ENZYME["raw"]["small_static"] = @benchmarkable raw_di_static!(
+DI_ENZYME["raw"]["small_static"] = @benchmarkable raw_di!(
     $(di_ss.A), $(di_ss.B), $(di_ss.C), $(di_ss.u0),
     $(di_ss.noise), $(di_ss.y), $(di_ss.H), $(di_ss.cache))
 
-DI_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_di_mutable!(
+DI_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_di!(
     $(di_l.A), $(di_l.B), $(di_l.C), $(di_l.u0),
     $(di_l.noise), $(di_l.y), $(di_l.H), $(di_l.cache))
 

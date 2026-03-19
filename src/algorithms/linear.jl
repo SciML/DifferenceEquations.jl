@@ -163,6 +163,7 @@ function _direct_iteration_loglik!(A, B, C, u0, noise, observables, H, cache;
 
     T = length(noise)
     loglik = zero(eltype(u0))
+    is_mutable = ismutable(u[1])
 
     @inbounds for t in 1:T
         # Linear transition: x_{t+1} = A * x_t + B * w_t
@@ -174,9 +175,9 @@ function _direct_iteration_loglik!(A, B, C, u0, noise, observables, H, cache;
 
         # Innovation: ν = obs_t - z_t
         ν = innovation_buf[t]
-        ν = copyto!!(ν, observables[t])
-        if ismutable(ν)
-            @inbounds for i in eachindex(ν)
+        ν = copyto!!(ν, get_observable(observables, t))
+        if is_mutable
+            for i in eachindex(ν)
                 ν[i] -= z[t][i]
             end
         else
@@ -233,6 +234,8 @@ function _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, c
     loglik = zero(eltype(u0_prior_var))
     is_mutable = ismutable(u[1])
     T_obs = length(cache.mu_pred)
+    M_obs = size(C, 1)
+    log_const_kf = M_obs * log(2π)
 
     @inbounds for t in 1:T_obs
         # Get cache buffers for this timestep
@@ -326,9 +329,8 @@ function _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, c
         cache.innovation[t] = ν
         cache.innovation_solved[t] = ν_solved
         logdetS = logdet_chol(F)
-        M_obs = length(ν)
         quad = dot(ν_solved, ν)
-        loglik -= 0.5 * (M_obs * log(2π) + logdetS + quad)
+        loglik -= 0.5 * (log_const_kf + logdetS + quad)
     end
 
     return loglik
