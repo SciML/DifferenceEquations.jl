@@ -165,6 +165,56 @@ end
 end
 
 # =============================================================================
+# Large mutable arrays - EnzymeTestUtils validation
+# =============================================================================
+
+# Uncomment to run large matrix AD validation (~12 min due to finite differencing at N=30).
+# Verified passing 2026-03-19: 606 checks, forward + reverse.
+#=
+@testset "EnzymeTestUtils - Kalman large mutable (model Const)" begin
+    N_lg, M_lg, K_lg, L_lg, T_lg = 30, 10, 10, 10, 10
+
+    Random.seed!(42)
+    A_raw_lg = randn(N_lg, N_lg)
+    A_lg = 0.5 * A_raw_lg / maximum(abs.(eigvals(A_raw_lg)))
+    B_lg = 0.1 * randn(N_lg, K_lg)
+    C_lg = randn(M_lg, N_lg)
+    H_lg = 0.1 * randn(M_lg, L_lg)
+    R_lg = H_lg * H_lg'
+    mu_0_lg = zeros(N_lg)
+    Sigma_0_lg = Matrix{Float64}(I, N_lg, N_lg)
+
+    Random.seed!(123)
+    y_lg, _ = generate_observations(A_lg, B_lg, C_lg, H_lg, mu_0_lg, Sigma_0_lg, T_lg)
+
+    prob_lg = make_kalman_prob(A_lg, B_lg, C_lg, R_lg, mu_0_lg, Sigma_0_lg, y_lg)
+    T_total_lg = T_lg + 1
+
+    # Test forward mode against finite differences
+    test_forward(scalar_kalman_loglik!, Const,
+        (copy(A_lg), Const),
+        (copy(B_lg), Const),
+        (copy(C_lg), Const),
+        (copy(mu_0_lg), Duplicated),
+        (copy(Sigma_0_lg), Const),
+        (copy(R_lg), Const),
+        ([copy(y_lg[t]) for t in 1:T_lg], Duplicated),
+        (alloc_kalman_cache(prob_lg, T_total_lg), Duplicated))
+
+    # Test reverse mode against finite differences
+    test_reverse(scalar_kalman_loglik!, Const,
+        (copy(A_lg), Const),
+        (copy(B_lg), Const),
+        (copy(C_lg), Const),
+        (copy(mu_0_lg), Duplicated),
+        (copy(Sigma_0_lg), Const),
+        (copy(R_lg), Const),
+        ([copy(y_lg[t]) for t in 1:T_lg], Duplicated),
+        (alloc_kalman_cache(prob_lg, T_total_lg), Duplicated))
+end
+=#
+
+# =============================================================================
 # Static arrays - EnzymeTestUtils validation
 # =============================================================================
 

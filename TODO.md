@@ -1,0 +1,5 @@
+- [ ] Change `generate_observations` to use the package itself.
+- [ ] Investigate the large N failures of kalman filter in enzyme.
+  - ** On entry to DSYMM  parameter number  9 had an illegal value **
+- [ ] Consider option for linsolve.
+- [ ] Cleanup unit tests to remote all zygote refernces are gone, and unit tests are correct.
