@@ -10,7 +10,7 @@ using StaticArrays
     # Create noise as vector of SVector
     noise = [SVector{1, Float64}(randn()) for _ in 1:9]
 
-    prob = LinearStateSpaceProblem(A, B, u0, (0, 9); C = C, noise = noise)
+    prob = LinearStateSpaceProblem(A, B, u0, (0, 9); C, noise)
 
     # Compare SVector result to Vector result
     A_v = Matrix(A)
@@ -38,7 +38,7 @@ end
     C = @SMatrix [1.0 0.0; 0.0 1.0]
     u0 = @SVector [1.0, 0.5]
 
-    prob = LinearStateSpaceProblem(A, nothing, u0, (0, 5); C = C)
+    prob = LinearStateSpaceProblem(A, nothing, u0, (0, 5); C)
 
     A_v = Matrix(A)
     C_v = Matrix(C)
@@ -60,7 +60,7 @@ end
 
     noise = [SVector{1, Float64}(randn()) for _ in 1:4]
 
-    prob = LinearStateSpaceProblem(A, B, u0, (0, 4); C = nothing, noise = noise)
+    prob = LinearStateSpaceProblem(A, B, u0, (0, 4); C = nothing, noise)
     sol = solve(prob)
 
     @test sol.z === nothing

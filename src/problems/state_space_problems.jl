@@ -19,7 +19,7 @@ function DiffEqBase.get_concrete_problem(
             p === prob.p &&
             return prob
     else
-        return remake(prob; u0 = u0_promote, p = p)
+        return remake(prob; u0 = u0_promote, p)
     end
 end
 

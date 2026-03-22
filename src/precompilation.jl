@@ -17,11 +17,11 @@ using LinearAlgebra: I
         sol_sim = solve(prob_sim)
 
         # Simulation with observation equation
-        prob_obs = LinearStateSpaceProblem(A, B, u0, (0, T); C = C)
+        prob_obs = LinearStateSpaceProblem(A, B, u0, (0, T); C)
         sol_obs = solve(prob_obs)
 
         # Simulation with observation noise
-        prob_noise = LinearStateSpaceProblem(A, B, u0, (0, T); C = C, observables_noise = D)
+        prob_noise = LinearStateSpaceProblem(A, B, u0, (0, T); C, observables_noise = D)
         sol_noise = solve(prob_noise)
 
         # === init/solve! API ===
@@ -35,8 +35,8 @@ using LinearAlgebra: I
 
         prob_kalman = LinearStateSpaceProblem(
             A, B, u0, (0, length(observables));
-            C = C, observables_noise = D, observables = observables,
-            u0_prior_mean = u0_prior_mean, u0_prior_var = u0_prior_var
+            C, observables_noise = D, observables,
+            u0_prior_mean, u0_prior_var
         )
         sol_kalman = solve(prob_kalman)
 
@@ -45,7 +45,7 @@ using LinearAlgebra: I
         sol_k = CommonSolve.solve!(ws_k)
 
         # === LinearStateSpaceProblem with no noise matrix ===
-        prob_no_noise = LinearStateSpaceProblem(A, nothing, u0, (0, T); C = C)
+        prob_no_noise = LinearStateSpaceProblem(A, nothing, u0, (0, T); C)
         sol_no_noise = solve(prob_no_noise)
 
         # === StateSpaceProblem with DirectIteration ===

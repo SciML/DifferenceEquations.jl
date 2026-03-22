@@ -136,8 +136,8 @@ function alloc_kalman_cache(prob::LinearStateSpaceProblem, T)
         P = [alloc_like(u0_prior_var) for _ in 1:T],
         z = [alloc_like(u0_prior_mean, L) for _ in 1:T],
         # Precomputed matrices
-        B_prod = B_prod,
-        B_t = B_t
+        B_prod,
+        B_t
     )
 end
 
