@@ -165,6 +165,147 @@ end
 end
 
 # =============================================================================
+# Rectangular B (N≠K) — validates mul_aat!! workaround for Enzyme syrk bug
+# https://github.com/EnzymeAD/Enzyme.jl/issues/2355
+# =============================================================================
+
+@testset "EnzymeTestUtils - Kalman mutable rectangular B (model Duplicated)" begin
+    # N≠K triggers BLAS syrk for B*B'; Enzyme's syrk adjoint is broken for rectangular B.
+    # mul_aat!! workaround materializes transpose to avoid syrk.
+    N_rect, M_rect, K_rect, T_rect = 5, 3, 2, 3
+
+    A_rect = [0.3 0.1 0.0 0.05 0.02;
+              -0.1 0.3 0.05 0.0 0.01;
+              0.02 -0.05 0.3 0.1 0.0;
+              0.0 0.02 -0.1 0.3 0.05;
+              0.01 0.0 0.02 -0.05 0.3]
+    B_rect = 0.1 * [1.0 0.5; 0.3 -0.2; 0.7 0.1; -0.4 0.6; 0.2 -0.3]
+    C_rect = [1.0 0.0 0.5 0.0 0.0; 0.0 1.0 0.0 0.5 0.0; 0.0 0.0 1.0 0.0 0.5]
+    R_rect = 0.01 * Matrix{Float64}(I, M_rect, M_rect)
+    mu_0_rect = zeros(N_rect)
+    Sigma_0_rect = Matrix{Float64}(I, N_rect, N_rect)
+    y_rect = [[0.5, 0.3, 0.1], [0.2, -0.1, 0.4], [0.8, 0.4, -0.2]]
+
+    prob_rect = make_kalman_prob(A_rect, B_rect, C_rect, R_rect,
+        mu_0_rect, Sigma_0_rect, y_rect)
+
+    # Forward mode with model Duplicated (including B)
+    test_forward(scalar_kalman_loglik!, Const,
+        (copy(A_rect), Duplicated),
+        (copy(B_rect), Duplicated),
+        (copy(C_rect), Duplicated),
+        (copy(mu_0_rect), Const),
+        (copy(Sigma_0_rect), Const),
+        (copy(R_rect), Const),
+        ([copy(y) for y in y_rect], Duplicated),
+        (alloc_kalman_cache(prob_rect, T_rect + 1), Duplicated))
+
+    # Reverse mode with model Duplicated (including B)
+    test_reverse(scalar_kalman_loglik!, Const,
+        (copy(A_rect), Duplicated),
+        (copy(B_rect), Duplicated),
+        (copy(C_rect), Duplicated),
+        (copy(mu_0_rect), Const),
+        (copy(Sigma_0_rect), Const),
+        (copy(R_rect), Const),
+        ([copy(y) for y in y_rect], Duplicated),
+        (alloc_kalman_cache(prob_rect, T_rect + 1), Duplicated))
+end
+
+# =============================================================================
+# Explicit shadow perturbation tests — forward and reverse with rectangular B
+# =============================================================================
+
+@testset "Enzyme - explicit shadow perturbations (rectangular B)" begin
+    N_rect, M_rect, K_rect, T_rect = 5, 3, 2, 3
+
+    A_rect = [0.3 0.1 0.0 0.05 0.02;
+              -0.1 0.3 0.05 0.0 0.01;
+              0.02 -0.05 0.3 0.1 0.0;
+              0.0 0.02 -0.1 0.3 0.05;
+              0.01 0.0 0.02 -0.05 0.3]
+    B_rect = 0.1 * [1.0 0.5; 0.3 -0.2; 0.7 0.1; -0.4 0.6; 0.2 -0.3]
+    C_rect = [1.0 0.0 0.5 0.0 0.0; 0.0 1.0 0.0 0.5 0.0; 0.0 0.0 1.0 0.0 0.5]
+    R_rect = 0.01 * Matrix{Float64}(I, M_rect, M_rect)
+    mu_0_rect = zeros(N_rect)
+    Sigma_0_rect = Matrix{Float64}(I, N_rect, N_rect)
+    y_rect = [[0.5, 0.3, 0.1], [0.2, -0.1, 0.4], [0.8, 0.4, -0.2]]
+
+    prob_rect = make_kalman_prob(A_rect, B_rect, C_rect, R_rect,
+        mu_0_rect, Sigma_0_rect, y_rect)
+
+    # --- Forward mode: perturb B[1,1] and compare with finite differences ---
+    eps_fd = 1e-7
+    cache_p = alloc_kalman_cache(prob_rect, T_rect + 1)
+    cache_m = alloc_kalman_cache(prob_rect, T_rect + 1)
+    B_p = copy(B_rect); B_p[1, 1] += eps_fd
+    B_m = copy(B_rect); B_m[1, 1] -= eps_fd
+    f_p = scalar_kalman_loglik!(A_rect, B_p, C_rect, mu_0_rect, Sigma_0_rect, R_rect,
+        y_rect, cache_p)
+    f_m = scalar_kalman_loglik!(A_rect, B_m, C_rect, mu_0_rect, Sigma_0_rect, R_rect,
+        y_rect, cache_m)
+    fd_dB11 = (f_p - f_m) / (2 * eps_fd)
+
+    # Forward AD with unit perturbation in dB[1,1]
+    dA = zeros(N_rect, N_rect)
+    dB = zeros(N_rect, K_rect); dB[1, 1] = 1.0
+    dC = zeros(M_rect, N_rect)
+    dmu_0 = zeros(N_rect)
+    dSigma_0 = zeros(N_rect, N_rect)
+    dy = [zeros(M_rect) for _ in 1:T_rect]
+    cache_fwd = alloc_kalman_cache(prob_rect, T_rect + 1)
+    dcache_fwd = Enzyme.make_zero(cache_fwd)
+
+    result_fwd = autodiff(Forward, scalar_kalman_loglik!,
+        Duplicated(copy(A_rect), dA),
+        Duplicated(copy(B_rect), dB),
+        Duplicated(copy(C_rect), dC),
+        Duplicated(copy(mu_0_rect), dmu_0),
+        Duplicated(copy(Sigma_0_rect), dSigma_0),
+        Const(copy(R_rect)),
+        Duplicated([copy(y) for y in y_rect], dy),
+        Duplicated(cache_fwd, dcache_fwd))
+
+    @test result_fwd[1] ≈ fd_dB11 rtol = 1e-4
+
+    # --- Reverse mode: check dB gradient against finite differences ---
+    dA_rev = zeros(N_rect, N_rect)
+    dB_rev = zeros(N_rect, K_rect)
+    dC_rev = zeros(M_rect, N_rect)
+    dmu_0_rev = zeros(N_rect)
+    dSigma_0_rev = zeros(N_rect, N_rect)
+    dy_rev = [zeros(M_rect) for _ in 1:T_rect]
+    cache_rev = alloc_kalman_cache(prob_rect, T_rect + 1)
+    dcache_rev = Enzyme.make_zero(cache_rev)
+
+    autodiff(Reverse, scalar_kalman_loglik!,
+        Duplicated(copy(A_rect), dA_rev),
+        Duplicated(copy(B_rect), dB_rev),
+        Duplicated(copy(C_rect), dC_rev),
+        Duplicated(copy(mu_0_rect), dmu_0_rev),
+        Duplicated(copy(Sigma_0_rect), dSigma_0_rev),
+        Const(copy(R_rect)),
+        Duplicated([copy(y) for y in y_rect], dy_rev),
+        Duplicated(cache_rev, dcache_rev))
+
+    # Verify dB[1,1] matches FD
+    @test dB_rev[1, 1] ≈ fd_dB11 rtol = 1e-4
+
+    # Verify full dB gradient: spot-check several entries against FD
+    for (i, j) in [(1, 2), (3, 1), (5, 2)]
+        B_p2 = copy(B_rect); B_p2[i, j] += eps_fd
+        B_m2 = copy(B_rect); B_m2[i, j] -= eps_fd
+        cp = alloc_kalman_cache(prob_rect, T_rect + 1)
+        cm = alloc_kalman_cache(prob_rect, T_rect + 1)
+        fd_val = (scalar_kalman_loglik!(A_rect, B_p2, C_rect, mu_0_rect, Sigma_0_rect,
+                      R_rect, y_rect, cp) -
+                  scalar_kalman_loglik!(A_rect, B_m2, C_rect, mu_0_rect, Sigma_0_rect,
+                      R_rect, y_rect, cm)) / (2 * eps_fd)
+        @test dB_rev[i, j] ≈ fd_val rtol = 1e-4
+    end
+end
+
+# =============================================================================
 # Large mutable arrays - EnzymeTestUtils validation
 # =============================================================================
 

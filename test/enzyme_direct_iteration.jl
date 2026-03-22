@@ -129,6 +129,48 @@ end
 end
 
 # =============================================================================
+# Rectangular H (M≠L) — validates mul_aat!! workaround for Enzyme syrk bug
+# https://github.com/EnzymeAD/Enzyme.jl/issues/2355
+# =============================================================================
+
+@testset "EnzymeTestUtils - DirectIteration mutable rectangular H (H Duplicated)" begin
+    # M≠L triggers BLAS syrk for H*H'; Enzyme's syrk adjoint is broken for rectangular H.
+    # Need L > M so R = H*H' is positive definite (full row rank).
+    N_rect, M_rect, K_rect, L_rect, T_rect = 3, 2, 2, 3, 2
+
+    A_rect = [0.5 0.1 0.0; -0.1 0.5 0.05; 0.02 -0.05 0.5]
+    B_rect = 0.1 * [1.0 0.5; 0.3 -0.2; 0.7 0.1]
+    C_rect = [1.0 0.0 0.5; 0.0 1.0 0.0]  # M_rect × N_rect
+    H_rect = 0.1 * [1.0 0.5 0.3; -0.2 0.7 0.1]  # M_rect × L_rect, rectangular (L > M)
+
+    u0_rect = zeros(N_rect)
+    noise_rect = [[0.1, -0.1], [0.2, 0.05]]
+    y_rect = [[0.5, 0.3], [0.2, -0.1]]
+
+    # Forward mode with H Duplicated
+    test_forward(scalar_di_loglik!, Const,
+        (copy(A_rect), Const),
+        (copy(B_rect), Const),
+        (copy(C_rect), Const),
+        (copy(u0_rect), Duplicated),
+        ([copy(n) for n in noise_rect], Duplicated),
+        ([copy(y) for y in y_rect], Duplicated),
+        (copy(H_rect), Duplicated),
+        (make_di_cache(A_rect, B_rect, C_rect, H_rect, u0_rect, T_rect + 1), Duplicated))
+
+    # Reverse mode with H Duplicated
+    test_reverse(scalar_di_loglik!, Const,
+        (copy(A_rect), Const),
+        (copy(B_rect), Const),
+        (copy(C_rect), Const),
+        (copy(u0_rect), Duplicated),
+        ([copy(n) for n in noise_rect], Duplicated),
+        ([copy(y) for y in y_rect], Duplicated),
+        (copy(H_rect), Duplicated),
+        (make_di_cache(A_rect, B_rect, C_rect, H_rect, u0_rect, T_rect + 1), Duplicated))
+end
+
+# =============================================================================
 # Static arrays - EnzymeTestUtils validation
 # =============================================================================
 

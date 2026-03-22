@@ -170,7 +170,9 @@ function _direct_iteration_loglik!(A, B, C, u0, noise, observables, H, cache;
     innovation_solved_buf = cache.innovation_solved
 
     # Compute R = H*H' and Cholesky factorize (once, outside loop)
-    R = mul!!(R, H, transpose(H))
+    # mul_aat!! avoids BLAS syrk path for Enzyme AD correctness
+    H_t = cache.H_t
+    R = mul_aat!!(R, H, H_t)
     R_chol_buf = symmetrize_upper!!(R_chol_buf, R, perturb_diagonal)
     F = cholesky!!(R_chol_buf, :U)
 
@@ -242,10 +244,10 @@ Returns only the scalar log-likelihood. No exceptions, no solution construction.
 """
 function _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, cache;
         perturb_diagonal = 0.0)
-    (; u, P, z, B_prod) = cache
+    (; u, P, z, B_prod, B_t) = cache
 
-    # Compute B*B' once
-    B_prod = mul!!(B_prod, B, transpose(B))
+    # Compute B*B' once (mul_aat!! avoids BLAS syrk path for Enzyme AD correctness)
+    B_prod = mul_aat!!(B_prod, B, B_t)
 
     # Initialize
     u[1] = copyto!!(u[1], u0_prior_mean)

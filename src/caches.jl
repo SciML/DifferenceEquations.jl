@@ -38,6 +38,7 @@ Extends the basic DI cache with R = H*H' and Cholesky workspace.
 """
 function alloc_direct_loglik_cache(u0, A, B, C, H, T)
     M = size(C, 1)
+    L_noise = size(H, 2)
     T_obs = T - 1
     return (;
         u = [alloc_like(u0) for _ in 1:T],
@@ -45,6 +46,7 @@ function alloc_direct_loglik_cache(u0, A, B, C, H, T)
         # Loglik workspace: R = H*H' computed at runtime, then Cholesky factored
         R = alloc_like(H, M, M),
         R_chol = alloc_like(H, M, M),
+        H_t = alloc_like(H, L_noise, M),  # transpose buffer for mul_aat!! workaround
         innovation = [alloc_like(u0, M) for _ in 1:T_obs],
         innovation_solved = [alloc_like(u0, M) for _ in 1:T_obs]
     )
@@ -64,6 +66,7 @@ function zero_direct_loglik_cache!!(cache)
     end
     fill_zero!!(cache.R)
     fill_zero!!(cache.R_chol)
+    fill_zero!!(cache.H_t)
     @inbounds for t in eachindex(cache.innovation)
         cache.innovation[t] = fill_zero!!(cache.innovation[t])
         cache.innovation_solved[t] = fill_zero!!(cache.innovation_solved[t])
@@ -109,7 +112,9 @@ function alloc_kalman_cache(prob::LinearStateSpaceProblem, T)
     T_obs = T - 1  # number of observation timesteps in Kalman loop
 
     # B_prod = B * B' computed once and stored
+    K_noise = size(B, 2)
     B_prod = alloc_like(u0_prior_var)
+    B_t = alloc_like(B, K_noise, N)  # transpose buffer for mul_aat!! workaround
 
     return (;
         # Per-timestep workspace buffers (T_obs entries for the Kalman loop)
@@ -130,8 +135,9 @@ function alloc_kalman_cache(prob::LinearStateSpaceProblem, T)
         u = [alloc_like(u0_prior_mean) for _ in 1:T],
         P = [alloc_like(u0_prior_var) for _ in 1:T],
         z = [alloc_like(u0_prior_mean, L) for _ in 1:T],
-        # Precomputed matrix
-        B_prod = B_prod
+        # Precomputed matrices
+        B_prod = B_prod,
+        B_t = B_t
     )
 end
 
@@ -164,6 +170,7 @@ function zero_kalman_cache!!(cache)
         cache.z[t] = fill_zero!!(cache.z[t])
     end
     fill_zero!!(cache.B_prod)
+    fill_zero!!(cache.B_t)
     return cache
 end
 
