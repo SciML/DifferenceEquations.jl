@@ -24,5 +24,3 @@ SUITE["enzyme_kalman"] = include(
     joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_kalman.jl"))
 SUITE["enzyme_direct_iteration"] = include(
     joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_direct_iteration.jl"))
-
-# results = run(SUITE; verbose = true)
