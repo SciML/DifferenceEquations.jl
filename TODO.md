@@ -1,5 +1,8 @@
 - [ ] Change `generate_observations` to use the package itself.
-- [ ] Investigate the large N failures of kalman filter in enzyme.
-  - ** On entry to DSYMM  parameter number  9 had an illegal value **
+- [x] DSYMM parameter 9 bug: Enzyme's syrk adjoint for `mul!(Y, B, transpose(B))` with rectangular B (N≠K) produces wrong gradients.
+  - Workaround applied: `mul_aat!!` materializes transpose into a buffer to avoid syrk BLAS path.
+  - Upstream: [Enzyme.jl#2355](https://github.com/EnzymeAD/Enzyme.jl/issues/2355), [Enzyme#2447](https://github.com/EnzymeAD/Enzyme/pull/2447) (unmerged fix).
+  - Can revert to `mul!(Y, B, transpose(B))` once upstream fix is merged.
 - [ ] Consider option for linsolve.
 - [ ] Cleanup unit tests to remote all zygote refernces are gone, and unit tests are correct.
+- [ ] The test-forward shouldn't be using the scalar function?  It has the outputs pre-allocated and inplace (which can be shadowed).

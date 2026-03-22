@@ -153,6 +153,27 @@ Transposes `X` into `Y`.
 end
 
 """
+    mul_aat!!(Y, A, A_t)
+
+Computes `Y = A * A'` without triggering the BLAS `syrk` self-transpose path.
+Workaround for Enzyme syrk adjoint bug (https://github.com/EnzymeAD/Enzyme.jl/issues/2355):
+when `A` is rectangular, `mul!(Y, A, transpose(A))` dispatches to `syrk` whose Enzyme
+reverse-mode rule generates a `DSYMM` call with invalid leading dimension.
+
+- If `Y` is mutable, materializes `transpose(A)` into buffer `A_t`, then calls `mul!(Y, A, A_t)`.
+- If `Y` is immutable, returns `A * transpose(A)` (StaticArrays don't use BLAS).
+"""
+@inline function mul_aat!!(Y, A, A_t)
+    if ismutable(Y)
+        transpose!(A_t, A)
+        mul!(Y, A, A_t)
+        return Y
+    else
+        return A * transpose(A)
+    end
+end
+
+"""
     logdet_chol(F)
 
 Compute log-determinant from Cholesky factorization without allocations.
