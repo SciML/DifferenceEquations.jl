@@ -343,7 +343,7 @@ function quadratic_joint_likelihood(
     problem = StateSpaceProblem(
         f!!, g!!, u0, (0, length(observables));
         n_shocks = size(B, 2), n_obs = length(C_0),
-        observables_noise = D, noise = noise, observables = observables,
+        observables_noise = D, noise, observables,
         kwargs...
     )
     return solve(problem).logpdf
@@ -475,10 +475,10 @@ end
     u0 = @SVector [0.5, 0.3]
     noise = [SVector{1, Float64}(randn()) for _ in 1:9]
 
-    prob_linear = LinearStateSpaceProblem(A, B, u0, (0, 9); C = C, noise = noise)
+    prob_linear = LinearStateSpaceProblem(A, B, u0, (0, 9); C, noise)
     sol_linear = solve(prob_linear)
 
-    p = (; A = A, B = B, C = C)
+    p = (; A, B, C)
     prob_generic = StateSpaceProblem(
         f_lss!!, g_lss!!, u0, (0, 9), p;
         n_shocks = 1, n_obs = 2, noise = noise
@@ -498,11 +498,11 @@ end
     C = @SMatrix [1.0 0.0; 0.0 1.0]
     u0 = @SVector [1.0, 0.5]
 
-    prob_linear = LinearStateSpaceProblem(A, nothing, u0, (0, 5); C = C)
+    prob_linear = LinearStateSpaceProblem(A, nothing, u0, (0, 5); C)
     sol_linear = solve(prob_linear)
 
     # f_lss!! handles w=nothing via muladd!!(x_p, B, nothing) → x_p
-    p = (; A = A, B = nothing, C = C)
+    p = (; A, B = nothing, C)
     prob_generic = StateSpaceProblem(
         f_lss!!, g_lss!!, u0, (0, 5), p;
         n_shocks = 0, n_obs = 2

@@ -21,6 +21,7 @@ BenchmarkTools.DEFAULT_PARAMETERS.evals = 3
 
 # Enzyme reverse-mode AD corrupts GC metadata under repeated invocation, causing segfaults.
 # Disabling GC avoids the crash without distorting timings (allocation counts still tracked).
+# Left disabled through run(SUITE) since PkgBenchmark calls run() after including this file.
 # Upstream: https://github.com/EnzymeAD/Enzyme.jl/issues/2355
 # TODO: remove once upstream fix is merged.
 GC.enable(false)
@@ -30,5 +31,3 @@ SUITE["enzyme_kalman"] = include(
     joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_kalman.jl"))
 SUITE["enzyme_direct_iteration"] = include(
     joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_direct_iteration.jl"))
-
-GC.enable(true)

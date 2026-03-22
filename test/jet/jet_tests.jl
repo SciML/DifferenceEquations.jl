@@ -14,7 +14,7 @@ using Test
         tspan = (0, 10)
         noise = randn(2, 10)
 
-        prob = LinearStateSpaceProblem(A, B, u0, tspan; noise = noise)
+        prob = LinearStateSpaceProblem(A, B, u0, tspan; noise)
         rep = JET.report_call(solve, (typeof(prob), typeof(DirectIteration())))
         @test length(JET.get_reports(rep)) == 0
     end
@@ -33,11 +33,11 @@ using Test
 
         prob = LinearStateSpaceProblem(
             A, B, u0, tspan;
-            C = C,
-            u0_prior_mean = u0_prior_mean,
-            u0_prior_var = u0_prior_var,
-            observables_noise = observables_noise,
-            observables = observables
+            C,
+            u0_prior_mean,
+            u0_prior_var,
+            observables_noise,
+            observables
         )
         rep = JET.report_call(solve, (typeof(prob), typeof(KalmanFilter())))
         @test length(JET.get_reports(rep)) == 0
@@ -51,7 +51,7 @@ using Test
         u0 = [1.0, 0.5]
         tspan = (0, 10)
 
-        prob = LinearStateSpaceProblem(A, B, u0, tspan; C = C)
+        prob = LinearStateSpaceProblem(A, B, u0, tspan; C)
         rep = JET.report_call(solve, (typeof(prob), typeof(DirectIteration())))
         @test length(JET.get_reports(rep)) == 0
     end
