@@ -55,7 +55,8 @@ function _solve_with_cache!(
     return _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
 end
 
-function _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
+function _solve_direct_iteration!(prob, alg, cache, B, T;
+        perturb_diagonal = 0.0, kwargs...)
     # Get concrete noise and copy into cache
     noise_concrete = get_concrete_noise(prob, prob.noise, B, T - 1)
 
@@ -83,17 +84,27 @@ function _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
         z[1] = _observation!!(z[1], u[1], prob, cache, 1)
     end
 
-    # Pre-compute Cholesky-based loglik constants if observables provided
-    has_obs = !isnothing(prob.observables) && !isnothing(prob.observables_noise)
-    if has_obs
+    # Pre-compute observation noise Cholesky (used for loglik and/or simulation noise)
+    has_obs_noise = !isnothing(prob.observables_noise) && !isnothing(cache.R)
+    has_obs = has_obs_noise && !isnothing(prob.observables)
+    if has_obs_noise
         R_cov = make_observables_covariance_matrix(prob.observables_noise)
-        F_obs = cholesky(Symmetric(R_cov))
-        logdetR = logdet(F_obs)
-        M_obs = size(R_cov, 1)
+        # Use pre-allocated cache buffers for Enzyme AD compatibility
+        R_buf = cache.R
+        R_chol_buf = cache.R_chol
+        R_buf = copyto!!(R_buf, R_cov)
+        R_chol_buf = symmetrize_upper!!(R_chol_buf, R_buf, perturb_diagonal)
+        F_obs = cholesky!!(R_chol_buf, :U)
+    end
+    if has_obs
+        logdetR = logdet_chol(F_obs)
+        M_obs = size(R_buf, 1)
         log_const = M_obs * log(2π) + logdetR
     end
 
     loglik = zero(eltype(prob.u0))
+    is_mutable = ismutable(u[1])
+
     @inbounds for t in 2:T
         w_t = isnothing(noise) ? nothing : noise[t - 1]
         u[t] = _transition!!(u[t], u[t - 1], w_t, prob, cache, t)
@@ -102,19 +113,31 @@ function _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
             z[t] = _observation!!(z[t], u[t], prob, cache, t)
         end
 
-        # Log-likelihood contribution (Cholesky-based, no MvNormal)
+        # Log-likelihood contribution (Cholesky-based, allocation-free)
         if has_obs
             obs_t = get_observable(prob.observables, t - 1)
-            innovation = obs_t - z[t]
-            innovation_solved = F_obs \ innovation
-            loglik -= 0.5 * (log_const + dot(innovation, innovation_solved))
+            ν = cache.innovation[t - 1]
+            ν = copyto!!(ν, obs_t)
+            if is_mutable
+                for i in eachindex(ν)
+                    ν[i] -= z[t][i]
+                end
+            else
+                ν = ν - z[t]
+            end
+            cache.innovation[t - 1] = ν
+
+            ν_solved = cache.innovation_solved[t - 1]
+            ν_solved = ldiv!!(ν_solved, F_obs, ν)
+            cache.innovation_solved[t - 1] = ν_solved
+            quad = dot(ν, ν_solved)
+            loglik -= 0.5 * (log_const + quad)
         end
     end
 
     # Add observation noise for simulation (when no observables provided)
-    if !isnothing(prob.observables_noise)
-        R_sim = make_observables_covariance_matrix(prob.observables_noise)
-        maybe_add_observation_noise!(z, R_sim, prob.observables)
+    if has_obs_noise && isnothing(prob.observables)
+        _add_observation_noise!(z, F_obs)
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]
@@ -137,113 +160,19 @@ function DiffEqBase.__solve(
 end
 
 # =============================================================================
-# Enzyme AD-compatible DirectIteration loglik (standalone, no prob struct)
-# =============================================================================
-
-"""
-    _direct_iteration_loglik!(A, B, C, u0, noise, observables, H, cache;
-                              perturb_diagonal = 0.0)
-
-Linear DirectIteration simulation with log-likelihood (Enzyme AD-compatible hot path).
-Computes R = H*H' via `muladd!!`, factors it once, then uses Cholesky-based loglik
-per timestep. Returns scalar log-likelihood.
-
-# Arguments
-- `A`: State transition matrix
-- `B`: Noise input matrix (state noise)
-- `C`: Observation matrix
-- `u0`: Initial state
-- `noise`: Concrete noise vectors (vector-of-vectors)
-- `observables`: Observations (vector-of-vectors or matrix)
-- `H`: Observation noise input matrix (M×L), R = H*H' computed internally
-- `cache`: DirectIteration loglik cache from `alloc_direct_loglik_cache`
-- `perturb_diagonal`: Diagonal perturbation for numerical stability
-"""
-function _direct_iteration_loglik!(A, B, C, u0, noise, observables, H, cache;
-        perturb_diagonal = 0.0)
-    (; u, z) = cache
-
-    # Extract cache arrays once (avoids repeated named tuple field access in loop)
-    R = cache.R
-    R_chol_buf = cache.R_chol
-    innovation_buf = cache.innovation
-    innovation_solved_buf = cache.innovation_solved
-
-    # Compute R = H*H' and Cholesky factorize (once, outside loop)
-    # mul_aat!! avoids BLAS syrk path for Enzyme AD correctness
-    H_t = cache.H_t
-    R = mul_aat!!(R, H, H_t)
-    R_chol_buf = symmetrize_upper!!(R_chol_buf, R, perturb_diagonal)
-    F = cholesky!!(R_chol_buf, :U)
-
-    # Precompute constant term
-    M_obs = size(C, 1)
-    logdetR = logdet_chol(F)
-    log_const = M_obs * log(2π) + logdetR
-
-    # Initialize state
-    u[1] = copyto!!(u[1], u0)
-
-    T = length(noise)
-    loglik = zero(eltype(u0))
-    is_mutable = ismutable(u[1])
-
-    @inbounds for t in 1:T
-        # Linear transition: x_{t+1} = A * x_t + B * w_t
-        u[t + 1] = mul!!(u[t + 1], A, u[t])
-        u[t + 1] = muladd!!(u[t + 1], B, noise[t])
-
-        # Predicted observation: z = C * x
-        z[t] = mul!!(z[t], C, u[t])
-
-        # Innovation: ν = obs_t - z_t
-        ν = innovation_buf[t]
-        ν = copyto!!(ν, get_observable(observables, t))
-        if is_mutable
-            for i in eachindex(ν)
-                ν[i] -= z[t][i]
-            end
-        else
-            ν = ν - z[t]
-        end
-        innovation_buf[t] = ν
-
-        # Quadratic form: ν' * R⁻¹ * ν
-        ν_solved = innovation_solved_buf[t]
-        ν_solved = ldiv!!(ν_solved, F, ν)
-        innovation_solved_buf[t] = ν_solved
-        quad = dot(ν, ν_solved)
-
-        loglik -= 0.5 * (log_const + quad)
-    end
-
-    return loglik
-end
-
-# =============================================================================
 # KalmanFilter solver — specific to LinearStateSpaceProblem
 # =============================================================================
 
-"""
-    _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, cache;
-                    perturb_diagonal = 0.0)
+function _solve_with_cache!(
+        prob::LinearStateSpaceProblem, alg::KalmanFilter, cache;
+        perturb_diagonal = 0.0, kwargs...
+    )
+    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
+    @assert length(prob.observables) == T - 1
 
-Kalman filter log-likelihood on individual arrays (Enzyme AD-compatible hot path).
-Returns only the scalar log-likelihood. No exceptions, no solution construction.
+    (; A, B, C, u0_prior_mean, u0_prior_var) = prob
+    R = make_observables_covariance_matrix(prob.observables_noise)
 
-# Arguments
-- `A`: State transition matrix
-- `B`: State noise input matrix
-- `C`: Observation matrix
-- `u0_prior_mean`: Prior mean
-- `u0_prior_var`: Prior covariance
-- `R`: Observation noise covariance (precomputed)
-- `observables`: Observations (vector-of-vectors or matrix)
-- `cache`: Kalman cache from `alloc_kalman_cache`
-- `perturb_diagonal`: Diagonal perturbation for numerical stability
-"""
-function _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, cache;
-        perturb_diagonal = 0.0)
     (; u, P, z, B_prod, B_t) = cache
 
     # Compute B*B' once (mul_aat!! avoids BLAS syrk path for Enzyme AD correctness)
@@ -298,7 +227,7 @@ function _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, c
         z[t + 1] = mul!!(z[t + 1], C, μp)
 
         # Innovation: ν = observables[t] - z[t+1]
-        obs_t = get_observable(observables, t)
+        obs_t = get_observable(prob.observables, t)
         ν = copyto!!(ν, obs_t)
         ν = mul!!(ν, C, μp, -1.0, 1.0)
 
@@ -356,34 +285,10 @@ function _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R, observables, c
         loglik -= 0.5 * (log_const_kf + logdetS + quad)
     end
 
-    return loglik
-end
-
-function _solve_with_cache!(
-        prob::LinearStateSpaceProblem, alg::KalmanFilter, cache;
-        perturb_diagonal = 0.0, kwargs...
-    )
-    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    @assert length(prob.observables) == T - 1
-
-    (; A, B, C, u0_prior_mean, u0_prior_var) = prob
-    R = make_observables_covariance_matrix(prob.observables_noise)
-
-    # Error handling kept in the SciML wrapper (not in the Enzyme hot path)
-    retcode = :Failure
-    loglik = convert(eltype(u0_prior_var), -Inf)
-    try
-        loglik = _kalman_loglik!(A, B, C, u0_prior_mean, u0_prior_var, R,
-            prob.observables, cache; perturb_diagonal)
-        retcode = :Success
-    catch
-        loglik = convert(eltype(u0_prior_var), -Inf)
-    end
-
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(
         prob, alg, t_values, cache.u; P = cache.P, W = nothing, logpdf = loglik,
-        z = cache.z, retcode
+        z = cache.z, retcode = :Success
     )
 end
 
