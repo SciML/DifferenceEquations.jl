@@ -40,10 +40,12 @@ function make_di_benchmark(p; seed = 42)
     prob = LinearStateSpaceProblem(A, B, u0, (0, T); C,
         observables_noise = R, observables = y, noise)
     ws = init(prob, DirectIteration())
+    sol_out = ws.sol
     cache = ws.cache
 
     # Shadow copies for AD (all Duplicated)
     dprob = make_zero(prob)
+    dsol_out = make_zero(sol_out)
     dcache = make_zero(cache)
     dA = make_zero(A)
     dB = make_zero(B)
@@ -53,18 +55,18 @@ function make_di_benchmark(p; seed = 42)
     dnoise = [make_zero(noise[1]) for _ in 1:T]
     dy = [make_zero(y[1]) for _ in 1:T]
 
-    return (; A, B, C, H, R, u0, noise, y, prob, cache,
-        dprob, dcache, dA, dB, dC, dH, du0, dnoise, dy)
+    return (; A, B, C, H, R, u0, noise, y, prob, sol_out, cache,
+        dprob, dsol_out, dcache, dA, dB, dC, dH, du0, dnoise, dy)
 end
 
 # =============================================================================
 # Scalar wrapper for reverse mode (returns logpdf)
 # =============================================================================
 
-function di_loglik_bench!(A, B, C, u0, noise, y, H, prob, cache)
+function di_loglik_bench!(A, B, C, u0, noise, y, H, prob, sol_out, cache)
     R = H * H'
     prob_new = remake(prob; A, B, C, u0, observables_noise = R, observables = y, noise)
-    ws = StateSpaceWorkspace(prob_new, DirectIteration(), cache)
+    ws = StateSpaceWorkspace(prob_new, DirectIteration(), sol_out, cache)
     return solve!(ws).logpdf
 end
 
@@ -72,12 +74,12 @@ end
 # Forward wrapper (returns matrices from cache)
 # =============================================================================
 
-function di_forward_bench!(A, B, C, u0, noise, y, H, prob, cache)
+function di_forward_bench!(A, B, C, u0, noise, y, H, prob, sol_out, cache)
     R = H * H'
     prob_new = remake(prob; A, B, C, u0, observables_noise = R, observables = y, noise)
-    ws = StateSpaceWorkspace(prob_new, DirectIteration(), cache)
+    ws = StateSpaceWorkspace(prob_new, DirectIteration(), sol_out, cache)
     solve!(ws)
-    return (cache.u[end], cache.z[end])
+    return (sol_out.u[end], sol_out.z[end])
 end
 
 # =============================================================================
@@ -91,14 +93,14 @@ const di_l = make_di_benchmark(p_di_large)
 # Raw benchmarks (primal solve through public API)
 # =============================================================================
 
-function raw_di!(prob, cache)
-    ws = StateSpaceWorkspace(prob, DirectIteration(), cache)
+function raw_di!(prob, sol_out, cache)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
     return solve!(ws).logpdf
 end
 
 # Warmup
-raw_di!(di_s.prob, di_s.cache)
-raw_di!(di_l.prob, di_l.cache)
+raw_di!(di_s.prob, di_s.sol_out, di_s.cache)
+raw_di!(di_l.prob, di_l.sol_out, di_l.cache)
 
 DI_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_di!($(di_s.prob), $(di_s.cache))
 DI_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_di!($(di_l.prob), $(di_l.cache))
@@ -107,10 +109,11 @@ DI_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_di!($(di_l.prob), $(di_l.
 # Forward mode AD — perturb A[1,1], return computed matrices
 # =============================================================================
 
-function forward_di_bench!(A, B, C, u0, noise, y, H, prob, cache,
-        dA, dB, dC, du0, dnoise, dy, dH, dprob, dcache)
+function forward_di_bench!(A, B, C, u0, noise, y, H, prob, sol_out, cache,
+        dA, dB, dC, du0, dnoise, dy, dH, dprob, dsol_out, dcache)
     # Zero all shadows
     make_zero!(dprob)
+    make_zero!(dsol_out)
     make_zero!(dcache)
     make_zero!(dA); make_zero!(dB); make_zero!(dC); make_zero!(dH)
     make_zero!(du0)
@@ -127,7 +130,7 @@ function forward_di_bench!(A, B, C, u0, noise, y, H, prob, cache,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(u0, du0), Duplicated(noise, dnoise), Duplicated(y, dy),
         Duplicated(H, dH),
-        Duplicated(prob, dprob), Duplicated(cache, dcache))
+        Duplicated(prob, dprob), Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return nothing
 end
 
@@ -135,9 +138,9 @@ end
 forward_di_bench!(
     copy(di_s.A), copy(di_s.B), copy(di_s.C),
     copy(di_s.u0), [copy(n) for n in di_s.noise], [copy(yi) for yi in di_s.y],
-    copy(di_s.H), di_s.prob, di_s.cache,
+    copy(di_s.H), di_s.prob, di_s.sol_out, di_s.cache,
     di_s.dA, di_s.dB, di_s.dC, di_s.du0, di_s.dnoise, di_s.dy, di_s.dH,
-    di_s.dprob, di_s.dcache)
+    di_s.dprob, di_s.dsol_out, di_s.dcache)
 
 DI_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_di_bench!(
     $(copy(di_s.A)), $(copy(di_s.B)), $(copy(di_s.C)),
@@ -150,9 +153,9 @@ DI_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_di_bench!(
 forward_di_bench!(
     copy(di_l.A), copy(di_l.B), copy(di_l.C),
     copy(di_l.u0), [copy(n) for n in di_l.noise], [copy(yi) for yi in di_l.y],
-    copy(di_l.H), di_l.prob, di_l.cache,
+    copy(di_l.H), di_l.prob, di_l.sol_out, di_l.cache,
     di_l.dA, di_l.dB, di_l.dC, di_l.du0, di_l.dnoise, di_l.dy, di_l.dH,
-    di_l.dprob, di_l.dcache)
+    di_l.dprob, di_l.dsol_out, di_l.dcache)
 
 DI_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_di_bench!(
     $(copy(di_l.A)), $(copy(di_l.B)), $(copy(di_l.C)),
@@ -165,10 +168,11 @@ DI_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_di_bench!(
 # Reverse mode AD — all Duplicated, scalar logpdf output
 # =============================================================================
 
-function reverse_di_bench!(A, B, C, u0, noise, y, H, prob, cache,
-        dA, dB, dC, du0, dnoise, dy, dH, dprob, dcache)
+function reverse_di_bench!(A, B, C, u0, noise, y, H, prob, sol_out, cache,
+        dA, dB, dC, du0, dnoise, dy, dH, dprob, dsol_out, dcache)
     # Zero all shadows
     make_zero!(dprob)
+    make_zero!(dsol_out)
     make_zero!(dcache)
     make_zero!(dA); make_zero!(dB); make_zero!(dC); make_zero!(dH)
     make_zero!(du0)
@@ -183,7 +187,7 @@ function reverse_di_bench!(A, B, C, u0, noise, y, H, prob, cache,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(u0, du0), Duplicated(noise, dnoise), Duplicated(y, dy),
         Duplicated(H, dH),
-        Duplicated(prob, dprob), Duplicated(cache, dcache))
+        Duplicated(prob, dprob), Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return nothing
 end
 
@@ -191,9 +195,9 @@ end
 reverse_di_bench!(
     copy(di_s.A), copy(di_s.B), copy(di_s.C),
     copy(di_s.u0), [copy(n) for n in di_s.noise], [copy(yi) for yi in di_s.y],
-    copy(di_s.H), di_s.prob, di_s.cache,
+    copy(di_s.H), di_s.prob, di_s.sol_out, di_s.cache,
     di_s.dA, di_s.dB, di_s.dC, di_s.du0, di_s.dnoise, di_s.dy, di_s.dH,
-    di_s.dprob, di_s.dcache)
+    di_s.dprob, di_s.dsol_out, di_s.dcache)
 
 DI_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_di_bench!(
     $(copy(di_s.A)), $(copy(di_s.B)), $(copy(di_s.C)),
@@ -206,9 +210,9 @@ DI_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_di_bench!(
 reverse_di_bench!(
     copy(di_l.A), copy(di_l.B), copy(di_l.C),
     copy(di_l.u0), [copy(n) for n in di_l.noise], [copy(yi) for yi in di_l.y],
-    copy(di_l.H), di_l.prob, di_l.cache,
+    copy(di_l.H), di_l.prob, di_l.sol_out, di_l.cache,
     di_l.dA, di_l.dB, di_l.dC, di_l.du0, di_l.dnoise, di_l.dy, di_l.dH,
-    di_l.dprob, di_l.dcache)
+    di_l.dprob, di_l.dsol_out, di_l.dcache)
 
 DI_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_di_bench!(
     $(copy(di_l.A)), $(copy(di_l.B)), $(copy(di_l.C)),

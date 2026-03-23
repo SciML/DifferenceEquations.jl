@@ -6,3 +6,5 @@
 - [ ] Consider option for linsolve.
 - [ ] Cleanup unit tests to remote all zygote refernces are gone, and unit tests are correct.
 - [ ] The test-forward shouldn't be using the scalar function?  It has the outputs pre-allocated and inplace (which can be shadowed).
+- [ ] No _kalman_loglik! function.  This is what the 'solve' is supposed to do.
+- [ ] Make sure all variations on duplicated/etc. are passing for the small models.
