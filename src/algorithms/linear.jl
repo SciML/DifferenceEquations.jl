@@ -12,8 +12,8 @@ _cache_noise(cache) = cache.noise
 # --- Model-specific initialization (e.g., quadratic u_f) ---
 _init_model_state!!(::LinearStateSpaceProblem, cache) = nothing
 
-# --- Observation flag (does this problem have an observation equation?) ---
-_has_observations(cache) = !isnothing(cache.z)
+# --- Observation flag ---
+_has_observations(sol) = !isnothing(sol.z)
 
 # =============================================================================
 # Linear state-space callbacks
@@ -47,15 +47,15 @@ end
 # Function barrier: _noise_matrix may return a union type for StateSpaceProblem
 # (n_shocks is a runtime Int). Splitting here lets Julia specialize the hot loop
 # on the concrete B type.
-function _solve_with_cache!(
-        prob::AbstractStateSpaceProblem, alg::DirectIteration, cache; kwargs...
+function _solve!(
+        prob::AbstractStateSpaceProblem, alg::DirectIteration, sol, cache; kwargs...
     )
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
     B = _noise_matrix(prob)
-    return _solve_direct_iteration!(prob, alg, cache, B, T; kwargs...)
+    return _solve_direct_iteration!(prob, alg, sol, cache, B, T; kwargs...)
 end
 
-function _solve_direct_iteration!(prob, alg, cache, B, T;
+function _solve_direct_iteration!(prob, alg, sol, cache, B, T;
         perturb_diagonal = 0.0, kwargs...)
     # Get concrete noise and copy into cache
     noise_concrete = get_concrete_noise(prob, prob.noise, B, T - 1)
@@ -67,7 +67,7 @@ function _solve_direct_iteration!(prob, alg, cache, B, T;
     end
     @assert maybe_check_size(prob.observables, 2, T - 1)
 
-    (; u, z) = cache
+    (; u, z) = sol
     noise = _cache_noise(cache)
 
     # Copy noise into cache buffers
@@ -80,7 +80,7 @@ function _solve_direct_iteration!(prob, alg, cache, B, T;
     _init_model_state!!(prob, cache)
 
     # Initial observation
-    if _has_observations(cache)
+    if _has_observations(sol)
         z[1] = _observation!!(z[1], u[1], prob, cache, 1)
     end
 
@@ -89,7 +89,6 @@ function _solve_direct_iteration!(prob, alg, cache, B, T;
     has_obs = has_obs_noise && !isnothing(prob.observables)
     if has_obs_noise
         R_cov = make_observables_covariance_matrix(prob.observables_noise)
-        # Use pre-allocated cache buffers for Enzyme AD compatibility
         R_buf = cache.R
         R_chol_buf = cache.R_chol
         R_buf = copyto!!(R_buf, R_cov)
@@ -109,7 +108,7 @@ function _solve_direct_iteration!(prob, alg, cache, B, T;
         w_t = isnothing(noise) ? nothing : noise[t - 1]
         u[t] = _transition!!(u[t], u[t - 1], w_t, prob, cache, t)
 
-        if _has_observations(cache)
+        if _has_observations(sol)
             z[t] = _observation!!(z[t], u[t], prob, cache, t)
         end
 
@@ -163,8 +162,8 @@ end
 # KalmanFilter solver — specific to LinearStateSpaceProblem
 # =============================================================================
 
-function _solve_with_cache!(
-        prob::LinearStateSpaceProblem, alg::KalmanFilter, cache;
+function _solve!(
+        prob::LinearStateSpaceProblem, alg::KalmanFilter, sol, cache;
         perturb_diagonal = 0.0, kwargs...
     )
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
@@ -173,7 +172,8 @@ function _solve_with_cache!(
     (; A, B, C, u0_prior_mean, u0_prior_var) = prob
     R = make_observables_covariance_matrix(prob.observables_noise)
 
-    (; u, P, z, B_prod, B_t) = cache
+    (; u, P, z) = sol
+    (; B_prod, B_t) = cache
 
     # Compute B*B' once (mul_aat!! avoids BLAS syrk path for Enzyme AD correctness)
     B_prod = mul_aat!!(B_prod, B, B_t)
@@ -190,7 +190,7 @@ function _solve_with_cache!(
     log_const_kf = M_obs * log(2π)
 
     @inbounds for t in 1:T_obs
-        # Get cache buffers for this timestep
+        # Get scratch buffers for this timestep
         μp = cache.mu_pred[t]
         Σp = cache.sigma_pred[t]
         AΣ = cache.A_sigma[t]
@@ -205,7 +205,7 @@ function _solve_with_cache!(
         KGS = cache.KgSigma[t]
         μu = cache.mu_update[t]
 
-        # Current state
+        # Current state (from solution output)
         μt = u[t]
         Σt = P[t]
 
@@ -287,8 +287,8 @@ function _solve_with_cache!(
 
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(
-        prob, alg, t_values, cache.u; P = cache.P, W = nothing, logpdf = loglik,
-        z = cache.z, retcode = :Success
+        prob, alg, t_values, sol.u; P = sol.P, W = nothing, logpdf = loglik,
+        z = sol.z, retcode = :Success
     )
 end
 
