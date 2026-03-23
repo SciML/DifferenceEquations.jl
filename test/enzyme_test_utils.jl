@@ -1,0 +1,67 @@
+# Shared utilities for Enzyme AD tests
+
+using LinearAlgebra: LowerTriangular, Symmetric, cholesky
+
+"""
+    vech_length(n)
+
+Number of elements in the lower triangle of an n×n matrix.
+"""
+vech_length(n) = n * (n + 1) ÷ 2
+
+"""
+    vech(L::AbstractMatrix)
+
+Extract lower-triangular elements of L into a vector (column-major order).
+"""
+function vech(L::AbstractMatrix)
+    n = size(L, 1)
+    v = zeros(eltype(L), vech_length(n))
+    k = 1
+    for j in 1:n
+        for i in j:n
+            v[k] = L[i, j]
+            k += 1
+        end
+    end
+    return v
+end
+
+"""
+    unvech(v, n)
+
+Reconstruct an n×n `LowerTriangular` matrix from a vech vector.
+"""
+function unvech(v, n)
+    L = zeros(eltype(v), n, n)
+    k = 1
+    for j in 1:n
+        for i in j:n
+            L[i, j] = v[k]
+            k += 1
+        end
+    end
+    return LowerTriangular(L)
+end
+
+"""
+    make_posdef_from_vech(v, n)
+
+Construct a guaranteed positive-definite Symmetric matrix from a vech vector.
+Computes L = unvech(v, n), then returns Symmetric(L * L').
+"""
+function make_posdef_from_vech(v, n)
+    L = unvech(v, n)
+    return Symmetric(L * L')
+end
+
+"""
+    make_vech_for(M::AbstractMatrix)
+
+Given a positive-definite matrix M, compute its Cholesky L factor and return vech(L).
+Round-trips: make_posdef_from_vech(make_vech_for(M), n) ≈ Symmetric(M).
+"""
+function make_vech_for(M::AbstractMatrix)
+    F = cholesky(Symmetric(M))
+    return vech(F.L)
+end

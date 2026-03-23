@@ -27,7 +27,7 @@ SciMLBase.isinplace(prob::AbstractStateSpaceProblem) = false  # necessary for th
 
 # the {iip} isn't relevant here at this point, but if we remove it then there are failures in the "remake" call above
 # when using the Ensemble unit tests
-struct LinearStateSpaceProblem{
+mutable struct LinearStateSpaceProblem{
         uType, uPriorMeanType, uPriorVarType, tType, P, NP, F, AType,
         BType, CType,
         RType, ObsType, OS, K,
@@ -147,4 +147,32 @@ end
 # just forwards to a iip = false case
 function StateSpaceProblem(args...; kwargs...)
     return StateSpaceProblem{false}(args...; kwargs...)
+end
+
+# =============================================================================
+# In-place remake for Enzyme AD compatibility
+# =============================================================================
+
+"""
+    remake!(prob::LinearStateSpaceProblem; kwargs...)
+
+Mutate problem fields in-place. For use in Enzyme AD paths where struct
+construction triggers RuntimeActivityError. Only updates fields that are
+provided as keyword arguments.
+"""
+function remake!(prob::LinearStateSpaceProblem;
+        A = nothing, B = nothing, C = nothing, u0 = nothing,
+        u0_prior_mean = nothing, u0_prior_var = nothing,
+        observables_noise = nothing, observables = nothing,
+        noise = nothing)
+    if !isnothing(A) prob.A = A end
+    if !isnothing(B) prob.B = B end
+    if !isnothing(C) prob.C = C end
+    if !isnothing(u0) prob.u0 = u0 end
+    if !isnothing(u0_prior_mean) prob.u0_prior_mean = u0_prior_mean end
+    if !isnothing(u0_prior_var) prob.u0_prior_var = u0_prior_var end
+    if !isnothing(observables_noise) prob.observables_noise = observables_noise end
+    if !isnothing(observables) prob.observables = observables end
+    if !isnothing(noise) prob.noise = noise end
+    return prob
 end
