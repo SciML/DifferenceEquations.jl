@@ -144,7 +144,7 @@ function _solve_direct_iteration!(prob, alg, sol, cache, B, T;
     ObsType = typeof(prob.observables)
     return build_solution(
         prob, alg, t_values, u; W = noise_concrete,
-        logpdf = ObsType <: Nothing ? nothing : loglik, z,
+        logpdf = loglik, z,
         retcode = :Success
     )
 end

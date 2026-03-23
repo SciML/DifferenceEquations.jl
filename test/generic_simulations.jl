@@ -104,8 +104,8 @@ noise_rbc = [noise_rbc_matrix[:, t] for t in 1:size(noise_rbc_matrix, 2)]
     @test sol_linear.u ≈ sol_generic.u
     @test sol_linear.z ≈ sol_generic.z
     @test sol_linear.W ≈ sol_generic.W
-    @test sol_linear.logpdf === nothing
-    @test sol_generic.logpdf === nothing
+    @test sol_linear.logpdf == 0.0
+    @test sol_generic.logpdf == 0.0
 end
 
 @testset "Generic linear matches — with explicit noise and observables" begin
@@ -296,7 +296,7 @@ end
     sol = solve(prob)
     @test length(sol.u) == T + 1
     @test length(sol.z) == T + 1
-    @test sol.logpdf === nothing
+    @test sol.logpdf == 0.0
 end
 
 @testset "Quadratic RBC deterministic with observation noise" begin

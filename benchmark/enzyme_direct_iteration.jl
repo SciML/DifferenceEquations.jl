@@ -40,7 +40,7 @@ function make_di_benchmark(p; seed = 42)
     prob = LinearStateSpaceProblem(A, B, u0, (0, T); C,
         observables_noise = R, observables = y, noise)
     ws = init(prob, DirectIteration())
-    sol_out = ws.sol
+    sol_out = ws.output
     cache = ws.cache
 
     # Shadow copies for AD (all Duplicated)

@@ -2,6 +2,7 @@ module DifferenceEquations
 
 # using ChainRulesCore: ChainRulesCore, NoTangent, Tangent, ZeroTangent  # AD disabled — will restore with Enzyme
 using CommonSolve: CommonSolve, solve, init, solve!
+using ConcreteStructs: @concrete
 using DiffEqBase: DiffEqBase, DEProblem, get_concrete_u0, get_concrete_p, isconcreteu0,
     promote_u0
 using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
