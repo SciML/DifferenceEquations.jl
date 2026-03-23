@@ -5,10 +5,11 @@
 using LinearAlgebra, Test, Enzyme, EnzymeTestUtils
 
 # =============================================================================
-# Minimal problem type (2 fields, mutable for Enzyme compatibility)
+# Minimal problem type (immutable — Enzyme handles struct construction fine
+# when all args are Duplicated)
 # =============================================================================
 
-mutable struct MinimalProblem{AT, UT}
+struct MinimalProblem{AT, UT}
     A::AT
     u0::UT
 end
@@ -44,16 +45,17 @@ end
 # Wrapper functions for Enzyme AD
 # =============================================================================
 
-# In-place: constructs problem, solves, mutates cache. Returns nothing.
+# Forward: constructs problem, solves, returns mutated cache (not nothing).
+# Rule: a function that mutates an argument must return that argument.
 function minimal_solve_wrapper!(A, u0, cache)
     prob = MinimalProblem(A, u0)
     zero_minimal_cache!(cache)
     minimal_solve!(prob, cache)
-    return nothing
+    return cache
 end
 
-# Scalar: constructs problem, solves, returns scalar summary of cache state.
-function minimal_loss(A, u0, cache)
+# Scalar: constructs problem, solves, returns scalar for reverse mode.
+function minimal_loss(A, u0, cache)::Float64
     prob = MinimalProblem(A, u0)
     zero_minimal_cache!(cache)
     minimal_solve!(prob, cache)

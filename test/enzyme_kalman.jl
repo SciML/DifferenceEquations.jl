@@ -54,20 +54,32 @@ end
 # All array arguments MUST be Duplicated (no Const in struct fields)
 # =============================================================================
 
+# Forward wrapper: returns mutated output arrays (not workspace) for tangent validation.
+# Rule: return only the outputs being differentiated, never the workspace.
 function kalman_solve!(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
     prob = make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol, cache)
-    return solve!(ws)
+    solve!(ws)
+    return (sol.u, sol.P, sol.z)
 end
 
-function kalman_loglik(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
+function kalman_loglik(A, B, C, mu_0, Sigma_0, R, y, sol, cache)::Float64
     prob = make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol, cache)
     return solve!(ws).logpdf
 end
 
-function kalman_loglik_vech(A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
+# Forward vech wrapper: returns output arrays through vech-parameterized posdef matrices
+function kalman_solve_vech!(A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
         n_state, n_obs)
+    Sigma_0 = make_posdef_from_vech(sigma_0_vech, n_state)
+    R = make_posdef_from_vech(r_vech, n_obs)
+    return kalman_solve!(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
+end
+
+# Reverse vech wrapper: returns scalar logpdf through vech-parameterized posdef matrices
+function kalman_loglik_vech(A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
+        n_state, n_obs)::Float64
     Sigma_0 = make_posdef_from_vech(sigma_0_vech, n_state)
     R = make_posdef_from_vech(r_vech, n_obs)
     return kalman_loglik(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
@@ -98,6 +110,9 @@ end
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_s, mu_0_s, Sigma_0_s, y_s)
 
+    # Const return: validates tangents of sol/cache mutations via shadows.
+    # Duplicated return would also FD-perturb sol/cache initial values, triggering
+    # ArgumentError in solver bounds checks.
     test_forward(kalman_solve!, Const,
         (copy(A_s), Duplicated), (copy(B_s), Duplicated),
         (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
