@@ -91,22 +91,20 @@ end
 # =============================================================================
 
 """
-    maybe_add_observation_noise!(z, R, observables)
+    _add_observation_noise!(z, F_chol)
 
-Add observation noise to simulated observations when `observables` is `nothing` (simulation mode).
-Uses Cholesky factorization of covariance matrix R. No-op when observables are provided.
+Add observation noise to simulated observations using a pre-computed Cholesky factor.
+`F_chol` is an upper-triangular Cholesky factor (R = U'U), so L = U'.
 """
-function maybe_add_observation_noise!(z, R, observables::Nothing)
-    F = cholesky(Symmetric(R))
-    M = size(R, 1)
+function _add_observation_noise!(z, F_chol)
+    M = size(F_chol, 1)
     for z_val in z
-        z_val .+= F.L * randn(M)
+        if !isnothing(z_val)
+            z_val .+= F_chol.L * randn(M)
+        end
     end
     return nothing
 end
-maybe_add_observation_noise!(z, R, observables) = nothing
-maybe_add_observation_noise!(z, R::Nothing, observables) = nothing
-maybe_add_observation_noise!(z, R::Nothing, observables::Nothing) = nothing
 
 # =============================================================================
 # Legacy helpers (kept for backward compatibility during transition)

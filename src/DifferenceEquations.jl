@@ -4,9 +4,8 @@ module DifferenceEquations
 using CommonSolve: CommonSolve, solve, init, solve!
 using DiffEqBase: DiffEqBase, DEProblem, get_concrete_u0, get_concrete_p, isconcreteu0,
     promote_u0
-    # Distributions removed — loglik computed via Cholesky, not MvNormal
 using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
-    cholesky!, dot, ldiv!, logdet, mul!, transpose!
+    cholesky!, dot, ldiv!, mul!, transpose!
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
     ODEFunction, remake, ConstantInterpolation, build_solution
 using StaticArrays: StaticArrays, SVector, SMatrix, ismutable

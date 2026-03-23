@@ -241,9 +241,8 @@ end
         observables_noise = D_rbc, observables = observables_rbc,
         u0_prior_mean = u0_rbc, u0_prior_var
     )
-    sol = solve(prob)
-    @test sol.logpdf ≈ -Inf
-    @test sol.retcode != :Success
+    # Ill-conditioned A causes Cholesky failure — try/catch removed for Enzyme AD compat
+    @test_throws Exception solve(prob)
 end
 
 #= AD disabled — will restore with Enzyme
