@@ -65,9 +65,9 @@ end
 # =============================================================================
 
 function kalman_loglik_bench!(A, B, C, mu_0, Sigma_0, R, y, prob, cache)
-    remake!(prob; A, B, C, u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
+    prob_new = remake(prob; A, B, C, u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
         observables_noise = R, observables = y)
-    ws = StateSpaceWorkspace(prob, KalmanFilter(), cache)
+    ws = StateSpaceWorkspace(prob_new, KalmanFilter(), cache)
     return solve!(ws).logpdf
 end
 
@@ -76,9 +76,9 @@ end
 # =============================================================================
 
 function kalman_forward_bench!(A, B, C, mu_0, Sigma_0, R, y, prob, cache)
-    remake!(prob; A, B, C, u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
+    prob_new = remake(prob; A, B, C, u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
         observables_noise = R, observables = y)
-    ws = StateSpaceWorkspace(prob, KalmanFilter(), cache)
+    ws = StateSpaceWorkspace(prob_new, KalmanFilter(), cache)
     solve!(ws)
     # Return computed matrices (not the workspace) for tangent output
     return (cache.u[end], cache.P[end])

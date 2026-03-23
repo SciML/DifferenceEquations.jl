@@ -47,12 +47,13 @@ end
 """
     make_posdef_from_vech(v, n)
 
-Construct a guaranteed positive-definite Symmetric matrix from a vech vector.
-Computes L = unvech(v, n), then returns Symmetric(L * L').
+Construct a guaranteed positive-definite matrix from a vech vector.
+Computes L = unvech(v, n), then returns L * L' as a plain Matrix
+(not Symmetric, to avoid type instability with Enzyme AD).
 """
 function make_posdef_from_vech(v, n)
     L = unvech(v, n)
-    return Symmetric(L * L')
+    return Matrix(L * L')
 end
 
 """
