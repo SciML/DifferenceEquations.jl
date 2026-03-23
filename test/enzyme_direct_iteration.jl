@@ -38,7 +38,7 @@ end
 
 function make_di_sol_cache(A, B, C, u0, noise, y, H)
     ws = init(make_di_prob(A, B, C, u0, noise, y, H), DirectIteration())
-    return ws.sol, ws.cache
+    return ws.output, ws.cache
 end
 
 # =============================================================================

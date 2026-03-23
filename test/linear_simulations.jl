@@ -72,7 +72,7 @@ end
     ]
     @test sol.W ≈
         [[-0.3597289068234817], [1.0872084924285859], [-0.4195896169388487], [0.7189099374659392], [0.4202471777937789]]
-    @test sol.logpdf === nothing
+    @test sol.logpdf == 0.0
 end
 
 @testset "simulation with observations and noise, no observation noise" begin
@@ -102,7 +102,7 @@ end
     ]
     @test sol.W ≈
         [[-0.3597289068234817], [1.0872084924285859], [-0.4195896169388487], [0.7189099374659392], [0.4202471777937789]]
-    @test sol.logpdf === nothing
+    @test sol.logpdf == 0.0
 end
 
 @testset "basic inference, no simulated noise, no observations with observation noise" begin
@@ -182,5 +182,5 @@ end
     ]
     @test sol.W ≈
         [[-0.3597289068234817], [1.0872084924285859], [-0.4195896169388487], [0.7189099374659392], [0.4202471777937789]]
-    @test sol.logpdf === nothing
+    @test sol.logpdf == 0.0
 end

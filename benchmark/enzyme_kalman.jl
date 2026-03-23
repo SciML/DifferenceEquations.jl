@@ -43,7 +43,7 @@ function make_kalman_benchmark(p; seed = 42)
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
         observables_noise = R, observables = y)
     ws = init(prob, KalmanFilter())
-    sol_out = ws.sol
+    sol_out = ws.output
     cache = ws.cache
 
     # Shadow copies for AD (all Duplicated)

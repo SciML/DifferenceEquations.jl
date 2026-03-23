@@ -45,7 +45,7 @@ end
 
 function make_kalman_sol_cache(A, B, C, R, mu_0, Sigma_0, y)
     ws = init(make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y), KalmanFilter())
-    return ws.sol, ws.cache
+    return ws.output, ws.cache
 end
 
 # =============================================================================
