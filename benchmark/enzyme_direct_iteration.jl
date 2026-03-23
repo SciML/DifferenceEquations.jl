@@ -63,8 +63,8 @@ end
 
 function di_loglik_bench!(A, B, C, u0, noise, y, H, prob, cache)
     R = H * H'
-    remake!(prob; A, B, C, u0, observables_noise = R, observables = y, noise)
-    ws = StateSpaceWorkspace(prob, DirectIteration(), cache)
+    prob_new = remake(prob; A, B, C, u0, observables_noise = R, observables = y, noise)
+    ws = StateSpaceWorkspace(prob_new, DirectIteration(), cache)
     return solve!(ws).logpdf
 end
 
@@ -74,8 +74,8 @@ end
 
 function di_forward_bench!(A, B, C, u0, noise, y, H, prob, cache)
     R = H * H'
-    remake!(prob; A, B, C, u0, observables_noise = R, observables = y, noise)
-    ws = StateSpaceWorkspace(prob, DirectIteration(), cache)
+    prob_new = remake(prob; A, B, C, u0, observables_noise = R, observables = y, noise)
+    ws = StateSpaceWorkspace(prob_new, DirectIteration(), cache)
     solve!(ws)
     return (cache.u[end], cache.z[end])
 end

@@ -52,12 +52,11 @@ end
 # Wrapper functions for Enzyme AD
 # =============================================================================
 
-# In-place: validates tangents of state trajectory (u) and observations (z)
+# Forward: returns solution struct (validates tangents of u, z, logpdf)
 function di_solve!(A, B, C, u0, noise, y, H, cache)
     prob = make_di_prob(A, B, C, u0, noise, y, H)
     ws = StateSpaceWorkspace(prob, DirectIteration(), cache)
-    solve!(ws)
-    return nothing
+    return solve!(ws)
 end
 
 # Scalar: validates gradient of logpdf

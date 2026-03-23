@@ -57,12 +57,11 @@ end
 # mixed Const/Duplicated activity in struct fields.
 # =============================================================================
 
-# In-place: validates tangents of filtered means (u), covariances (P), observations (z)
+# Forward: returns solution struct (validates tangents of u, P, z, logpdf)
 function kalman_solve!(A, B, C, mu_0, Sigma_0, R, y, cache)
     prob = make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
     ws = StateSpaceWorkspace(prob, KalmanFilter(), cache)
-    solve!(ws)
-    return nothing
+    return solve!(ws)
 end
 
 # Scalar: validates gradient of logpdf
