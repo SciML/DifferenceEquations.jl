@@ -45,13 +45,15 @@ end
 # Wrapper functions for Enzyme AD
 # =============================================================================
 
+# Forward wrapper: returns mutated output arrays (not workspace) for tangent validation.
 function di_solve!(A, B, C, u0, noise, y, H, sol, cache)
     prob = make_di_prob(A, B, C, u0, noise, y, H)
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
-    return solve!(ws)
+    solve!(ws)
+    return (sol.u, sol.z)
 end
 
-function di_loglik(A, B, C, u0, noise, y, H, sol, cache)
+function di_loglik(A, B, C, u0, noise, y, H, sol, cache)::Float64
     prob = make_di_prob(A, B, C, u0, noise, y, H)
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     return solve!(ws).logpdf
@@ -97,7 +99,10 @@ end
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
 
-    # 1 of 75 FD checks has marginal cache gradient mismatch
+    # 1 of 75 FD checks fails: Enzyme computes nonzero gradient for a cache buffer
+    # that the function overwrites before reading (write-first scratch). FD perturbation
+    # of the initial cache value gets overwritten, so FD sees ~0, but Enzyme tracks
+    # derivative flow through the overwrite differently. Filed as known issue.
     @test_broken test_reverse(di_loglik, Active,
         (copy(A_s), Duplicated), (copy(B_s), Duplicated),
         (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
