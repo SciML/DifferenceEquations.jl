@@ -5,7 +5,8 @@
 # Returns SA_BENCH BenchmarkGroup
 
 using StaticArrays
-using DifferenceEquations: init, solve!, mul!!, muladd!!
+using Enzyme: make_zero, make_zero!
+using DifferenceEquations: init, solve!, mul!!, muladd!!, fill_zero!!, StateSpaceWorkspace
 
 const SA_BENCH = BenchmarkGroup()
 SA_BENCH["linear"] = BenchmarkGroup()
@@ -218,5 +219,115 @@ const p_qm = (; A_0 = Vector(A_0_qs), A_1 = Matrix(A_1_qs), A_2 = copy(A_2_q), B
 const ws_qm = init(StateSpaceProblem(quad_f_bb!!, quad_g_bb!!, u0_qm, (0, 10), p_qm;
     n_shocks = 1, n_obs = 2, noise = [[n] for n in noise_q]), DirectIteration())
 SA_BENCH["quadratic"]["mutable_2x2"] = @benchmarkable bench_quad_solve!($ws_qm)
+
+# =============================================================================
+# AD benchmarks for Linear 2x2 (static and mutable)
+# =============================================================================
+
+SA_BENCH["linear"]["forward"] = BenchmarkGroup()
+SA_BENCH["linear"]["reverse"] = BenchmarkGroup()
+
+function sim_fwd_sa!(A, B, C, u0, noise, sol_out, cache)
+    prob = LinearStateSpaceProblem(A, B, u0, (0, length(noise)); C, noise)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
+    solve!(ws)
+    return (sol_out.u[end], sol_out.z[end])
+end
+
+function sim_rev_sa!(A, B, C, u0, noise, sol_out, cache)::Float64
+    prob = LinearStateSpaceProblem(A, B, u0, (0, length(noise)); C, noise)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
+    return sum(solve!(ws).u[end])
+end
+
+function forward_sa!(A, B, C, u0, noise, sol_out, cache,
+        dA, dB, dC, du0, dnoise, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA = fill_zero!!(dA); dB = fill_zero!!(dB); dC = fill_zero!!(dC); du0 = fill_zero!!(du0)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
+    if ismutable(dA); dA[1,1] = 1.0; else; dA = setindex(dA, 1.0, 1, 1); end
+    autodiff(Forward, sim_fwd_sa!,
+        Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
+        Duplicated(u0, du0), Duplicated(noise, dnoise),
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+    return nothing
+end
+
+function reverse_sa!(A, B, C, u0, noise, sol_out, cache,
+        dA, dB, dC, du0, dnoise, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA = fill_zero!!(dA); dB = fill_zero!!(dB); dC = fill_zero!!(dC); du0 = fill_zero!!(du0)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
+    autodiff(Reverse, sim_rev_sa!, Active,
+        Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
+        Duplicated(u0, du0), Duplicated(noise, dnoise),
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+    return nothing
+end
+
+# --- Static 2x2 AD shadows ---
+
+const dA_s2 = make_zero(A_sa_2)
+const dB_s2 = make_zero(B_sa_2)
+const dC_s2 = make_zero(C_sa_2)
+const du0_s2 = make_zero(u0_sa_2)
+const dnoise_s2 = [make_zero(noise_sa_2[1]) for _ in 1:20]
+const dsol_s2 = make_zero(ws_ls2.output)
+const dcache_s2 = make_zero(ws_ls2.cache)
+
+# --- Mutable 2x2 AD shadows ---
+
+const A_m2 = Matrix(A_sa_2)
+const B_m2 = Matrix(B_sa_2)
+const C_m2 = Matrix(C_sa_2)
+const u0_m2 = Vector(u0_sa_2)
+const noise_m2 = [Vector(n) for n in noise_sa_2]
+const dA_m2 = make_zero(A_m2)
+const dB_m2 = make_zero(B_m2)
+const dC_m2 = make_zero(C_m2)
+const du0_m2 = make_zero(u0_m2)
+const dnoise_m2 = [make_zero(noise_m2[1]) for _ in 1:20]
+const dsol_m2 = make_zero(ws_lm2.output)
+const dcache_m2 = make_zero(ws_lm2.cache)
+
+# --- Warmups ---
+
+forward_sa!(A_sa_2, B_sa_2, C_sa_2, u0_sa_2, noise_sa_2,
+    ws_ls2.output, ws_ls2.cache,
+    dA_s2, dB_s2, dC_s2, du0_s2, dnoise_s2, dsol_s2, dcache_s2)
+
+forward_sa!(A_m2, B_m2, C_m2, u0_m2, noise_m2,
+    ws_lm2.output, ws_lm2.cache,
+    dA_m2, dB_m2, dC_m2, du0_m2, dnoise_m2, dsol_m2, dcache_m2)
+
+reverse_sa!(A_sa_2, B_sa_2, C_sa_2, u0_sa_2, noise_sa_2,
+    ws_ls2.output, ws_ls2.cache,
+    dA_s2, dB_s2, dC_s2, du0_s2, dnoise_s2, dsol_s2, dcache_s2)
+
+reverse_sa!(A_m2, B_m2, C_m2, u0_m2, noise_m2,
+    ws_lm2.output, ws_lm2.cache,
+    dA_m2, dB_m2, dC_m2, du0_m2, dnoise_m2, dsol_m2, dcache_m2)
+
+# --- Benchmarkables ---
+
+SA_BENCH["linear"]["forward"]["static_2x2"] = @benchmarkable forward_sa!(
+    $A_sa_2, $B_sa_2, $C_sa_2, $u0_sa_2, $noise_sa_2,
+    $(ws_ls2.output), $(ws_ls2.cache),
+    $dA_s2, $dB_s2, $dC_s2, $du0_s2, $dnoise_s2, $dsol_s2, $dcache_s2)
+
+SA_BENCH["linear"]["forward"]["mutable_2x2"] = @benchmarkable forward_sa!(
+    $A_m2, $B_m2, $C_m2, $u0_m2, $noise_m2,
+    $(ws_lm2.output), $(ws_lm2.cache),
+    $dA_m2, $dB_m2, $dC_m2, $du0_m2, $dnoise_m2, $dsol_m2, $dcache_m2)
+
+SA_BENCH["linear"]["reverse"]["static_2x2"] = @benchmarkable reverse_sa!(
+    $A_sa_2, $B_sa_2, $C_sa_2, $u0_sa_2, $noise_sa_2,
+    $(ws_ls2.output), $(ws_ls2.cache),
+    $dA_s2, $dB_s2, $dC_s2, $du0_s2, $dnoise_s2, $dsol_s2, $dcache_s2)
+
+SA_BENCH["linear"]["reverse"]["mutable_2x2"] = @benchmarkable reverse_sa!(
+    $A_m2, $B_m2, $C_m2, $u0_m2, $noise_m2,
+    $(ws_lm2.output), $(ws_lm2.cache),
+    $dA_m2, $dB_m2, $dC_m2, $du0_m2, $dnoise_m2, $dsol_m2, $dcache_m2)
 
 SA_BENCH
