@@ -1,6 +1,7 @@
 using DifferenceEquations, Distributions, LinearAlgebra, Test, Random
 using DelimitedFiles
 using DiffEqBase
+using DifferenceEquations: init, solve!
 
 # --- RBC Model Data ---
 
@@ -375,4 +376,87 @@ end
     u_nonzero = [0.1, 0.2]
     val = last_observable_pass_noise(A_rbc, B_rbc, C_rbc, u_nonzero, impulse_noise)
     @test isfinite(val)
+end
+
+# --- Workspace (init/solve!) tests ---
+
+@testset "solve!() matches solve() — simulation with noise, C, and obs_noise" begin
+    Random.seed!(1234)
+    prob = LinearStateSpaceProblem(
+        A_rbc, B_rbc, u0_rbc, (0, 5); C = C_rbc,
+        observables_noise = D_rbc
+    )
+    Random.seed!(1234)
+    sol_direct = solve(prob)
+    Random.seed!(1234)
+    ws = init(prob, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "solve!() matches solve() — joint likelihood (noise + obs + obs_noise)" begin
+    prob = LinearStateSpaceProblem(
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc_5));
+        C = C_rbc, observables_noise = D_rbc,
+        noise = noise_rbc_5, observables = observables_rbc_5
+    )
+    sol_direct = solve(prob)
+    ws = init(prob, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "solve!() matches solve() — no observables (noise + C, no obs/obs_noise)" begin
+    Random.seed!(1234)
+    prob = LinearStateSpaceProblem(A_rbc, B_rbc, u0_rbc, (0, 5); C = C_rbc)
+    Random.seed!(1234)
+    sol_direct = solve(prob)
+    Random.seed!(1234)
+    ws = init(prob, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "solve!() matches solve() — no noise (B=nothing, C present)" begin
+    u_nonzero = [1.1, 0.2]
+    prob = LinearStateSpaceProblem(A_rbc, nothing, u_nonzero, (0, 5); C = C_rbc)
+    sol_direct = solve(prob)
+    ws = init(prob, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.W === nothing
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "solve!() matches solve() — no observation equation (B=nothing, C=nothing)" begin
+    u_nonzero = [1.1, 0.2]
+    prob = LinearStateSpaceProblem(A_rbc, nothing, u_nonzero, (0, 5))
+    sol_direct = solve(prob)
+    ws = init(prob, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z === nothing
+    @test sol_ws.W === nothing
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "solve!() repeated — idempotent results" begin
+    prob = LinearStateSpaceProblem(
+        A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc_5));
+        C = C_rbc, observables_noise = D_rbc,
+        noise = noise_rbc_5, observables = observables_rbc_5
+    )
+    ws = init(prob, DirectIteration())
+    sol1 = solve!(ws)
+    sol2 = solve!(ws)
+    @test sol1.u ≈ sol2.u
+    @test sol1.z ≈ sol2.z
+    @test sol1.logpdf ≈ sol2.logpdf
 end

@@ -1,4 +1,5 @@
 using DifferenceEquations, Distributions, LinearAlgebra, Test, Random, DelimitedFiles, DiffEqBase
+using DifferenceEquations: init, solve!
 
 # --- Helper: quadratic callbacks ---
 
@@ -379,4 +380,144 @@ noise_2_FVGQ = [noise_2_FVGQ_matrix[:, t] for t in 1:size(noise_2_FVGQ_matrix, 2
         A_0_FVGQ, A_1_FVGQ, A_2_FVGQ, B_2_FVGQ, C_0_FVGQ, C_1_FVGQ, C_2_FVGQ,
         u0_2_FVGQ, noise_2_FVGQ, observables_2_FVGQ, D_2_FVGQ
     ) ≈ -1.4728927648336522e7
+end
+
+# --- Workspace (init/solve!) tests ---
+
+@testset "solve!() matches solve() — generic linear with noise + obs + obs_noise" begin
+    T = 5
+    obs = observables_rbc[1:T]
+    nse = noise_rbc[1:T]
+
+    sol_direct = solve(LinearStateSpaceProblem(
+        A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
+        observables_noise = D_rbc, noise = nse, observables = obs
+    ))
+
+    linear_f!! = (x_next, x, w, p, t) -> begin
+        mul!(x_next, p.A, x)
+        mul!(x_next, p.B, w, 1.0, 1.0)
+        return x_next
+    end
+    linear_g!! = (y, x, p, t) -> begin
+        mul!(y, p.C, x)
+        return y
+    end
+    p = (; A = A_rbc, B = B_rbc, C = C_rbc)
+
+    prob_gen = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p;
+        n_shocks = 1, n_obs = 2,
+        observables_noise = D_rbc, noise = nse, observables = obs
+    )
+    ws = init(prob_gen, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "solve!() matches solve() — quadratic RBC with noise + obs + obs_noise" begin
+    f!!, g!! = make_quadratic_callbacks(
+        A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc
+    )
+    prob = StateSpaceProblem(
+        f!!, g!!, u0_2_rbc, (0, length(observables_2_rbc_short));
+        n_shocks = 1, n_obs = 2,
+        observables_noise = D_2_rbc, noise = noise_2_rbc_short,
+        observables = observables_2_rbc_short
+    )
+    sol_direct = solve(prob)
+
+    f!!2, g!!2 = make_quadratic_callbacks(
+        A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, C_0_rbc, C_1_rbc, C_2_rbc, u0_2_rbc
+    )
+    prob2 = StateSpaceProblem(
+        f!!2, g!!2, u0_2_rbc, (0, length(observables_2_rbc_short));
+        n_shocks = 1, n_obs = 2,
+        observables_noise = D_2_rbc, noise = noise_2_rbc_short,
+        observables = observables_2_rbc_short
+    )
+    ws = init(prob2, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "solve!() matches solve() — generic no observation (n_obs=0)" begin
+    linear_f!! = (x_next, x, w, p, t) -> begin
+        mul!(x_next, p.A, x)
+        mul!(x_next, p.B, w, 1.0, 1.0)
+        return x_next
+    end
+    p = (; A = A_rbc, B = B_rbc)
+
+    Random.seed!(1234)
+    sol_direct = solve(StateSpaceProblem(
+        linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
+        n_shocks = 1, n_obs = 0
+    ))
+
+    prob_gen = StateSpaceProblem(
+        linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
+        n_shocks = 1, n_obs = 0
+    )
+    Random.seed!(1234)
+    ws = init(prob_gen, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.z === nothing
+    @test sol_ws.u ≈ sol_direct.u
+end
+
+@testset "solve!() matches solve() — generic no noise (n_shocks=0)" begin
+    linear_f!! = (x_next, x, w, p, t) -> begin
+        mul!(x_next, p.A, x)
+        return x_next
+    end
+    linear_g!! = (y, x, p, t) -> begin
+        mul!(y, p.C, x)
+        return y
+    end
+    p = (; A = A_rbc, C = C_rbc)
+
+    prob_gen = StateSpaceProblem(
+        linear_f!!, linear_g!!, [1.0, 0.5], (0, 5), p;
+        n_shocks = 0, n_obs = 2
+    )
+    sol_direct = solve(prob_gen)
+    ws = init(prob_gen, DirectIteration())
+    sol_ws = solve!(ws)
+    @test sol_ws.W === nothing
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+end
+
+@testset "solve!() repeated — idempotent generic results" begin
+    T = 5
+    obs = observables_rbc[1:T]
+    nse = noise_rbc[1:T]
+
+    linear_f!! = (x_next, x, w, p, t) -> begin
+        mul!(x_next, p.A, x)
+        mul!(x_next, p.B, w, 1.0, 1.0)
+        return x_next
+    end
+    linear_g!! = (y, x, p, t) -> begin
+        mul!(y, p.C, x)
+        return y
+    end
+    p = (; A = A_rbc, B = B_rbc, C = C_rbc)
+
+    prob_gen = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p;
+        n_shocks = 1, n_obs = 2,
+        observables_noise = D_rbc, noise = nse, observables = obs
+    )
+    ws = init(prob_gen, DirectIteration())
+    sol1 = solve!(ws)
+    sol2 = solve!(ws)
+    @test sol1.u ≈ sol2.u
+    @test sol1.z ≈ sol2.z
+    @test sol1.logpdf ≈ sol2.logpdf
 end

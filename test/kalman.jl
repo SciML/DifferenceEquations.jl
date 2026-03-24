@@ -1,4 +1,5 @@
 using DifferenceEquations, Distributions, LinearAlgebra, Test, DelimitedFiles, DiffEqBase
+using DifferenceEquations: init, solve!
 
 # --- Helpers ---
 
@@ -349,4 +350,84 @@ end
         u0_prior_mean = u0_rbc, u0_prior_var
     )
     @test_throws Exception solve(prob)
+end
+
+# --- Workspace (init/solve!) tests ---
+
+@testset "solve!() matches solve() — basic Kalman (5x5, non-square)" begin
+    z_ref, u_ref, P_ref, loglik_ref = solve_manual(
+        observables_kalman, A_kalman, B_kalman, C_kalman,
+        D_kalman, u0_mean_kalman, u0_var_kalman, [0, T_kalman]
+    )
+    prob = LinearStateSpaceProblem(
+        A_kalman, B_kalman, u0_mean_kalman, (0, length(observables_kalman));
+        C = C_kalman, observables_noise = D_kalman,
+        u0_prior_mean = u0_mean_kalman, u0_prior_var = u0_var_kalman,
+        noise = nothing, observables = observables_kalman
+    )
+    ws = init(prob, KalmanFilter())
+    sol_ws = solve!(ws)
+    @test sol_ws.logpdf ≈ loglik_ref
+    @test sol_ws.logpdf ≈ 329.7550738722514
+    @test sol_ws.z ≈ z_ref
+    @test sol_ws.u ≈ u_ref
+    @test sol_ws.P ≈ P_ref
+end
+
+@testset "solve!() matches solve() — off-diagonal D" begin
+    sol_direct = solve_kalman(
+        A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
+        observables_kalman, D_offdiag
+    )
+    prob = LinearStateSpaceProblem(
+        A_kalman, B_kalman, u0_mean_kalman, (0, length(observables_kalman));
+        C = C_kalman, observables_noise = D_offdiag,
+        u0_prior_mean = u0_mean_kalman, u0_prior_var = u0_var_kalman,
+        noise = nothing, observables = observables_kalman
+    )
+    ws = init(prob, KalmanFilter())
+    sol_ws = solve!(ws)
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+    @test sol_ws.logpdf ≈ 124.86949661078718
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.P ≈ sol_direct.P
+end
+
+@testset "solve!() matches solve() — covariance prior likelihood" begin
+    sol_direct = solve_kalman_cov(
+        A_kalman, B_kalman, C_kalman, u0_mean, u0_var_vech,
+        observables_kalman, R
+    )
+    u0_variance_cholesky = unvech_5(u0_var_vech)
+    u0_variance = u0_variance_cholesky * u0_variance_cholesky'
+    prob = LinearStateSpaceProblem(
+        A_kalman, B_kalman, zeros(length(u0_mean)),
+        (0, length(observables_kalman));
+        C = C_kalman, observables_noise = R,
+        u0_prior_mean = u0_mean, u0_prior_var = u0_variance,
+        noise = nothing, observables = observables_kalman
+    )
+    ws = init(prob, KalmanFilter())
+    sol_ws = solve!(ws)
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.P ≈ sol_direct.P
+end
+
+@testset "solve!() repeated — idempotent Kalman results" begin
+    prob = LinearStateSpaceProblem(
+        A_kalman, B_kalman, u0_mean_kalman, (0, length(observables_kalman));
+        C = C_kalman, observables_noise = D_kalman,
+        u0_prior_mean = u0_mean_kalman, u0_prior_var = u0_var_kalman,
+        noise = nothing, observables = observables_kalman
+    )
+    ws = init(prob, KalmanFilter())
+    sol1 = solve!(ws)
+    sol2 = solve!(ws)
+    @test sol1.u ≈ sol2.u
+    @test sol1.z ≈ sol2.z
+    @test sol1.P ≈ sol2.P
+    @test sol1.logpdf ≈ sol2.logpdf
 end
