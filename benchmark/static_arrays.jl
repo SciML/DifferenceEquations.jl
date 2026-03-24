@@ -139,4 +139,84 @@ const ws_km5 = init(LinearStateSpaceProblem(Matrix(A_kf_5), Matrix(B_kf_5), Vect
     observables_noise = Matrix(R_kf_5), observables = [Vector(y) for y in y_kf_5]), KalmanFilter())
 SA_BENCH["kalman"]["mutable_5x5"] = @benchmarkable bench_solve!($ws_km5)
 
+# --- Quadratic StateSpaceProblem (bang-bang, Ref-based state) ---
+
+SA_BENCH["quadratic"] = BenchmarkGroup()
+
+using DifferenceEquations: copyto!!
+
+# Bang-bang quadratic callbacks — work for both mutable and static arrays.
+# Mutable state u_f stored in Ref so it persists across callback invocations.
+function quad_f_bb!!(x_next, x, w, p, t)
+    (; A_0, A_1, A_2, B, u_f_ref, u_f_new_ref) = p
+    u_f = u_f_ref[]
+    u_f_new = u_f_new_ref[]
+    n_x = length(x)
+    u_f_new = mul!!(u_f_new, A_1, u_f)
+    u_f_new = muladd!!(u_f_new, B, w)
+    x_next = copyto!!(x_next, A_0)
+    x_next = mul!!(x_next, A_1, x, 1.0, 1.0)
+    if ismutable(x_next)
+        @inbounds for i in 1:n_x
+            x_next[i] += dot(u_f, view(A_2, i, :, :), u_f)
+        end
+    else
+        x_next = x_next + typeof(x_next)(ntuple(i -> dot(u_f, view(A_2, i, :, :), u_f), n_x))
+    end
+    x_next = muladd!!(x_next, B, w)
+    u_f_ref[] = u_f_new
+    return x_next
+end
+
+function quad_g_bb!!(y, x, p, t)
+    (; C_0, C_1, C_2, u_f_ref) = p
+    u_f = u_f_ref[]
+    n_obs = length(C_0)
+    y = copyto!!(y, C_0)
+    y = mul!!(y, C_1, x, 1.0, 1.0)
+    if ismutable(y)
+        @inbounds for i in 1:n_obs
+            y[i] += dot(u_f, view(C_2, i, :, :), u_f)
+        end
+    else
+        y = y + typeof(y)(ntuple(i -> dot(u_f, view(C_2, i, :, :), u_f), n_obs))
+    end
+    return y
+end
+
+# Reset u_f state before each solve (quadratic state is NOT in the solver cache)
+function bench_quad_solve!(ws)
+    ws.prob.p.u_f_ref[] = zero(ws.prob.p.u_f_ref[])
+    solve!(ws)
+    return nothing
+end
+
+# N=2, K=1, M=2, T=10
+Random.seed!(42)
+const A_2_q = 0.01 * randn(2, 2, 2)
+const C_2_q = 0.01 * randn(2, 2, 2)
+const noise_q = [randn() for _ in 1:10]
+
+const A_1_qs = @SMatrix [0.3 0.1; -0.1 0.3]
+const A_0_qs = @SVector [0.001, -0.001]
+const B_qs = @SMatrix [0.1; 0.0;;]
+const C_0_qs = @SVector [0.001, -0.001]
+const C_1_qs = @SMatrix [1.0 0.0; 0.0 1.0]
+const u0_qs = @SVector zeros(2)
+
+const p_qs = (; A_0 = A_0_qs, A_1 = A_1_qs, A_2 = A_2_q, B = B_qs,
+    C_0 = C_0_qs, C_1 = C_1_qs, C_2 = C_2_q,
+    u_f_ref = Ref(copy(u0_qs)), u_f_new_ref = Ref(similar(u0_qs)))
+const ws_qs = init(StateSpaceProblem(quad_f_bb!!, quad_g_bb!!, u0_qs, (0, 10), p_qs;
+    n_shocks = 1, n_obs = 2, noise = [SVector{1}(n) for n in noise_q]), DirectIteration())
+SA_BENCH["quadratic"]["static_2x2"] = @benchmarkable bench_quad_solve!($ws_qs)
+
+const u0_qm = zeros(2)
+const p_qm = (; A_0 = Vector(A_0_qs), A_1 = Matrix(A_1_qs), A_2 = copy(A_2_q), B = Matrix(B_qs),
+    C_0 = Vector(C_0_qs), C_1 = Matrix(C_1_qs), C_2 = copy(C_2_q),
+    u_f_ref = Ref(copy(u0_qm)), u_f_new_ref = Ref(similar(u0_qm)))
+const ws_qm = init(StateSpaceProblem(quad_f_bb!!, quad_g_bb!!, u0_qm, (0, 10), p_qm;
+    n_shocks = 1, n_obs = 2, noise = [[n] for n in noise_q]), DirectIteration())
+SA_BENCH["quadratic"]["mutable_2x2"] = @benchmarkable bench_quad_solve!($ws_qm)
+
 SA_BENCH
