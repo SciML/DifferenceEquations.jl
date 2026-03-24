@@ -4,9 +4,7 @@ using DifferenceEquations: init, solve!, StateSpaceWorkspace
 
 include("enzyme_test_utils.jl")
 
-# =============================================================================
-# Test setup — generate observations using the package's own solve()
-# =============================================================================
+# --- Test setup ---
 
 const N_kf = 3
 const M_kf = 2
@@ -32,9 +30,7 @@ const sim_sol_kf = solve(LinearStateSpaceProblem(
     A_kf, B_kf, x0_kf, (0, T_kf); C = C_kf, noise = noise_kf))
 const y_kf = [sim_sol_kf.z[t + 1] + H_kf * obs_noise_kf[t] for t in 1:T_kf]
 
-# =============================================================================
-# Helpers
-# =============================================================================
+# --- Helpers ---
 
 function make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
     return LinearStateSpaceProblem(
@@ -48,14 +44,8 @@ function make_kalman_sol_cache(A, B, C, R, mu_0, Sigma_0, y)
     return ws.output, ws.cache
 end
 
-# =============================================================================
-# Wrapper functions for Enzyme AD
-# sol = pre-allocated solution output, cache = scratch workspace
-# All array arguments MUST be Duplicated (no Const in struct fields)
-# =============================================================================
+# --- Wrapper functions for Enzyme AD ---
 
-# Forward wrapper: returns mutated output arrays (not workspace) for tangent validation.
-# Rule: return only the outputs being differentiated, never the workspace.
 function kalman_solve!(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
     prob = make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol, cache)
@@ -69,7 +59,6 @@ function kalman_loglik(A, B, C, mu_0, Sigma_0, R, y, sol, cache)::Float64
     return solve!(ws).logpdf
 end
 
-# Forward vech wrapper: returns output arrays through vech-parameterized posdef matrices
 function kalman_solve_vech!(A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
         n_state, n_obs)
     Sigma_0 = make_posdef_from_vech(sigma_0_vech, n_state)
@@ -77,7 +66,6 @@ function kalman_solve_vech!(A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
     return kalman_solve!(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
 end
 
-# Reverse vech wrapper: returns scalar logpdf through vech-parameterized posdef matrices
 function kalman_loglik_vech(A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
         n_state, n_obs)::Float64
     Sigma_0 = make_posdef_from_vech(sigma_0_vech, n_state)
@@ -85,9 +73,7 @@ function kalman_loglik_vech(A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
     return kalman_loglik(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
 end
 
-# =============================================================================
-# Basic sanity test
-# =============================================================================
+# --- Basic sanity test ---
 
 @testset "Kalman loglik via solve!() - sanity" begin
     sol, cache = make_kalman_sol_cache(A_kf, B_kf, C_kf, R_kf, mu_0_kf, Sigma_0_kf, y_kf)
@@ -99,9 +85,7 @@ end
     @test loglik ≈ loglik2 rtol = 1e-12
 end
 
-# =============================================================================
-# Mutable arrays — all Duplicated (small model, N=M=K=L=2, T=2)
-# =============================================================================
+# --- Mutable arrays — all Duplicated (small model, N=M=K=L=2, T=2) ---
 
 @testset "EnzymeTestUtils - Kalman forward (all Duplicated)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
@@ -110,9 +94,6 @@ end
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_s, mu_0_s, Sigma_0_s, y_s)
 
-    # Const return: validates tangents of sol/cache mutations via shadows.
-    # Duplicated return would also FD-perturb sol/cache initial values, triggering
-    # ArgumentError in solver bounds checks.
     test_forward(kalman_solve!, Const,
         (copy(A_s), Duplicated), (copy(B_s), Duplicated),
         (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
@@ -139,9 +120,7 @@ end
         (2, Const), (2, Const))
 end
 
-# =============================================================================
-# Rectangular B (N≠K) — validates mul_aat!! workaround
-# =============================================================================
+# --- Rectangular B (N≠K) — validates mul_aat!! workaround ---
 
 @testset "EnzymeTestUtils - Kalman rectangular B forward (all Duplicated)" begin
     A_r = [0.3 0.1 0.0 0.05 0.02; -0.1 0.3 0.05 0.0 0.01;
@@ -185,9 +164,7 @@ end
         (N_r, Const), (M_r, Const))
 end
 
-# =============================================================================
-# Regression test
-# =============================================================================
+# --- Regression test ---
 
 @testset "Kalman loglik - regression test" begin
     A_reg = [0.9 0.1; -0.1 0.9]; B_reg = [0.1 0.0; 0.0 0.1]

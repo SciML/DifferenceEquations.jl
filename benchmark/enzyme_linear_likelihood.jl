@@ -102,8 +102,8 @@ end
 raw_di!(di_s.prob, di_s.sol_out, di_s.cache)
 raw_di!(di_l.prob, di_l.sol_out, di_l.cache)
 
-DI_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_di!($(di_s.prob), $(di_s.cache))
-DI_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_di!($(di_l.prob), $(di_l.cache))
+DI_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_di!($(di_s.prob), $(di_s.sol_out), $(di_s.cache))
+DI_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_di!($(di_l.prob), $(di_l.sol_out), $(di_l.cache))
 
 # =============================================================================
 # Forward mode AD — perturb A[1,1], return computed matrices
@@ -145,9 +145,9 @@ forward_di_bench!(
 DI_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_di_bench!(
     $(copy(di_s.A)), $(copy(di_s.B)), $(copy(di_s.C)),
     $(copy(di_s.u0)), $([copy(n) for n in di_s.noise]), $([copy(yi) for yi in di_s.y]),
-    $(copy(di_s.H)), $(di_s.prob), $(di_s.cache),
+    $(copy(di_s.H)), $(di_s.prob), $(di_s.sol_out), $(di_s.cache),
     $(di_s.dA), $(di_s.dB), $(di_s.dC), $(di_s.du0), $(di_s.dnoise), $(di_s.dy), $(di_s.dH),
-    $(di_s.dprob), $(di_s.dcache))
+    $(di_s.dprob), $(di_s.dsol_out), $(di_s.dcache))
 
 # Warmup large
 forward_di_bench!(
@@ -160,9 +160,9 @@ forward_di_bench!(
 DI_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_di_bench!(
     $(copy(di_l.A)), $(copy(di_l.B)), $(copy(di_l.C)),
     $(copy(di_l.u0)), $([copy(n) for n in di_l.noise]), $([copy(yi) for yi in di_l.y]),
-    $(copy(di_l.H)), $(di_l.prob), $(di_l.cache),
+    $(copy(di_l.H)), $(di_l.prob), $(di_l.sol_out), $(di_l.cache),
     $(di_l.dA), $(di_l.dB), $(di_l.dC), $(di_l.du0), $(di_l.dnoise), $(di_l.dy), $(di_l.dH),
-    $(di_l.dprob), $(di_l.dcache))
+    $(di_l.dprob), $(di_l.dsol_out), $(di_l.dcache))
 
 # =============================================================================
 # Reverse mode AD — all Duplicated, scalar logpdf output
@@ -202,9 +202,9 @@ reverse_di_bench!(
 DI_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_di_bench!(
     $(copy(di_s.A)), $(copy(di_s.B)), $(copy(di_s.C)),
     $(copy(di_s.u0)), $([copy(n) for n in di_s.noise]), $([copy(yi) for yi in di_s.y]),
-    $(copy(di_s.H)), $(di_s.prob), $(di_s.cache),
+    $(copy(di_s.H)), $(di_s.prob), $(di_s.sol_out), $(di_s.cache),
     $(di_s.dA), $(di_s.dB), $(di_s.dC), $(di_s.du0), $(di_s.dnoise), $(di_s.dy), $(di_s.dH),
-    $(di_s.dprob), $(di_s.dcache))
+    $(di_s.dprob), $(di_s.dsol_out), $(di_s.dcache))
 
 # Warmup large
 reverse_di_bench!(
@@ -217,8 +217,8 @@ reverse_di_bench!(
 DI_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_di_bench!(
     $(copy(di_l.A)), $(copy(di_l.B)), $(copy(di_l.C)),
     $(copy(di_l.u0)), $([copy(n) for n in di_l.noise]), $([copy(yi) for yi in di_l.y]),
-    $(copy(di_l.H)), $(di_l.prob), $(di_l.cache),
+    $(copy(di_l.H)), $(di_l.prob), $(di_l.sol_out), $(di_l.cache),
     $(di_l.dA), $(di_l.dB), $(di_l.dC), $(di_l.du0), $(di_l.dnoise), $(di_l.dy), $(di_l.dH),
-    $(di_l.dprob), $(di_l.dcache))
+    $(di_l.dprob), $(di_l.dsol_out), $(di_l.dcache))
 
 DI_ENZYME
