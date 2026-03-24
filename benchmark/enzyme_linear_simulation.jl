@@ -202,4 +202,25 @@ SIM_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_sim_bench!(
     $(sim_l.dA), $(sim_l.dB), $(sim_l.dC), $(sim_l.du0), $(sim_l.dnoise),
     $(sim_l.dprob), $(sim_l.dsol_out), $(sim_l.dcache))
 
+# --- Edge cases: no noise, no observation equation (raw primal only) ---
+
+SIM_ENZYME["raw"]["no_noise"] = let
+    A = sim_s.A; C = sim_s.C; u0 = sim_s.u0
+    prob = LinearStateSpaceProblem(A, nothing, u0, (0, p_sim_small.T); C)
+    ws = init(prob, DirectIteration())
+    @benchmarkable bench_nn!(ws_nn) setup=(ws_nn = $ws)
+end
+
+function bench_nn!(ws)
+    solve!(ws)
+    return nothing
+end
+
+SIM_ENZYME["raw"]["no_obs_eq"] = let
+    A = sim_s.A; u0 = sim_s.u0
+    prob = LinearStateSpaceProblem(A, nothing, u0, (0, p_sim_small.T))
+    ws = init(prob, DirectIteration())
+    @benchmarkable bench_nn!(ws_nn) setup=(ws_nn = $ws)
+end
+
 SIM_ENZYME
