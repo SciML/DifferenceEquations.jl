@@ -1,0 +1,142 @@
+# StaticArrays primal performance via workspace pattern (init/solve!)
+# Vector{SVector} workspace works because the solver uses reassignment:
+#   u[t] = _transition!!(u[t], ...) — bang-bang returns new SVector, outer = replaces element
+#
+# Returns SA_BENCH BenchmarkGroup
+
+using StaticArrays
+using DifferenceEquations: init, solve!, mul!!, muladd!!
+
+const SA_BENCH = BenchmarkGroup()
+SA_BENCH["linear"] = BenchmarkGroup()
+SA_BENCH["generic"] = BenchmarkGroup()
+SA_BENCH["kalman"] = BenchmarkGroup()
+
+function bench_solve!(ws)
+    solve!(ws)
+    return nothing
+end
+
+# --- Linear DirectIteration N=2, T=20 ---
+
+const A_sa_2 = @SMatrix [0.9 0.1; 0.0 0.8]
+const B_sa_2 = @SMatrix [0.0; 0.1;;]
+const C_sa_2 = @SMatrix [1.0 0.0; 0.0 1.0]
+const u0_sa_2 = @SVector [0.5, 0.3]
+const noise_sa_2 = [SVector{1}(randn()) for _ in 1:20]
+
+const ws_ls2 = init(LinearStateSpaceProblem(A_sa_2, B_sa_2, u0_sa_2, (0, 20);
+    C = C_sa_2, noise = noise_sa_2), DirectIteration())
+SA_BENCH["linear"]["static_2x2"] = @benchmarkable bench_solve!($ws_ls2)
+
+const ws_lm2 = init(LinearStateSpaceProblem(Matrix(A_sa_2), Matrix(B_sa_2), Vector(u0_sa_2), (0, 20);
+    C = Matrix(C_sa_2), noise = [Vector(n) for n in noise_sa_2]), DirectIteration())
+SA_BENCH["linear"]["mutable_2x2"] = @benchmarkable bench_solve!($ws_lm2)
+
+# --- Linear DirectIteration N=5, T=50 ---
+
+Random.seed!(123)
+const A_sa_5_raw = randn(5, 5)
+const A_sa_5 = SMatrix{5, 5}(0.5 * A_sa_5_raw / maximum(abs.(eigvals(A_sa_5_raw))))
+const B_sa_5 = SMatrix{5, 2}(0.1 * randn(5, 2))
+const C_sa_5 = SMatrix{3, 5}(randn(3, 5))
+const u0_sa_5 = SVector{5}(zeros(5))
+const noise_sa_5 = [SVector{2}(randn(2)) for _ in 1:50]
+
+const ws_ls5 = init(LinearStateSpaceProblem(A_sa_5, B_sa_5, u0_sa_5, (0, 50);
+    C = C_sa_5, noise = noise_sa_5), DirectIteration())
+SA_BENCH["linear"]["static_5x5"] = @benchmarkable bench_solve!($ws_ls5)
+
+const ws_lm5 = init(LinearStateSpaceProblem(Matrix(A_sa_5), Matrix(B_sa_5), Vector(u0_sa_5), (0, 50);
+    C = Matrix(C_sa_5), noise = [Vector(n) for n in noise_sa_5]), DirectIteration())
+SA_BENCH["linear"]["mutable_5x5"] = @benchmarkable bench_solve!($ws_lm5)
+
+# --- Generic !! callbacks ---
+
+@inline function f_lss_sa!!(x_p, x, w, p, t)
+    x_p = mul!!(x_p, p.A, x)
+    return muladd!!(x_p, p.B, w)
+end
+
+@inline function g_lss_sa!!(y, x, p, t)
+    return mul!!(y, p.C, x)
+end
+
+# --- Generic N=2, T=20 ---
+
+const p_gen_s2 = (; A = A_sa_2, B = B_sa_2, C = C_sa_2)
+const ws_gs2 = init(StateSpaceProblem(f_lss_sa!!, g_lss_sa!!, u0_sa_2, (0, 20), p_gen_s2;
+    n_shocks = 1, n_obs = 2, noise = noise_sa_2), DirectIteration())
+SA_BENCH["generic"]["static_2x2"] = @benchmarkable bench_solve!($ws_gs2)
+
+const p_gen_m2 = (; A = Matrix(A_sa_2), B = Matrix(B_sa_2), C = Matrix(C_sa_2))
+const ws_gm2 = init(StateSpaceProblem(f_lss_sa!!, g_lss_sa!!, Vector(u0_sa_2), (0, 20), p_gen_m2;
+    n_shocks = 1, n_obs = 2, noise = [Vector(n) for n in noise_sa_2]), DirectIteration())
+SA_BENCH["generic"]["mutable_2x2"] = @benchmarkable bench_solve!($ws_gm2)
+
+# --- Generic N=5, T=50 ---
+
+const p_gen_s5 = (; A = A_sa_5, B = B_sa_5, C = C_sa_5)
+const ws_gs5 = init(StateSpaceProblem(f_lss_sa!!, g_lss_sa!!, u0_sa_5, (0, 50), p_gen_s5;
+    n_shocks = 2, n_obs = 3, noise = noise_sa_5), DirectIteration())
+SA_BENCH["generic"]["static_5x5"] = @benchmarkable bench_solve!($ws_gs5)
+
+const p_gen_m5 = (; A = Matrix(A_sa_5), B = Matrix(B_sa_5), C = Matrix(C_sa_5))
+const ws_gm5 = init(StateSpaceProblem(f_lss_sa!!, g_lss_sa!!, Vector(u0_sa_5), (0, 50), p_gen_m5;
+    n_shocks = 2, n_obs = 3, noise = [Vector(n) for n in noise_sa_5]), DirectIteration())
+SA_BENCH["generic"]["mutable_5x5"] = @benchmarkable bench_solve!($ws_gm5)
+
+# --- Kalman filter N=3, M=2, T=10 ---
+
+Random.seed!(789)
+const A_kf_3_raw = randn(3, 3)
+const A_kf_3 = SMatrix{3, 3}(0.5 * A_kf_3_raw / maximum(abs.(eigvals(A_kf_3_raw))))
+const B_kf_3 = SMatrix{3, 2}(0.1 * randn(3, 2))
+const C_kf_3 = SMatrix{2, 3}(randn(2, 3))
+const R_kf_3 = SMatrix{2, 2}(0.01 * I(2))
+const mu0_kf_3 = SVector{3}(zeros(3))
+const Sig0_kf_3 = SMatrix{3, 3}(1.0 * I(3))
+
+# Generate observations for Kalman
+const noise_kf_3 = [SVector{2}(randn(2)) for _ in 1:10]
+const sim_kf_3 = solve(LinearStateSpaceProblem(A_kf_3, B_kf_3, mu0_kf_3, (0, 10);
+    C = C_kf_3, noise = noise_kf_3))
+const y_kf_3 = [sim_kf_3.z[t + 1] + SVector{2}(0.1 * randn(2)) for t in 1:10]
+
+const ws_ks3 = init(LinearStateSpaceProblem(A_kf_3, B_kf_3, mu0_kf_3, (0, 10);
+    C = C_kf_3, u0_prior_mean = mu0_kf_3, u0_prior_var = Sig0_kf_3,
+    observables_noise = R_kf_3, observables = y_kf_3), KalmanFilter())
+SA_BENCH["kalman"]["static_3x3"] = @benchmarkable bench_solve!($ws_ks3)
+
+const ws_km3 = init(LinearStateSpaceProblem(Matrix(A_kf_3), Matrix(B_kf_3), Vector(mu0_kf_3), (0, 10);
+    C = Matrix(C_kf_3), u0_prior_mean = Vector(mu0_kf_3), u0_prior_var = Matrix(Sig0_kf_3),
+    observables_noise = Matrix(R_kf_3), observables = [Vector(y) for y in y_kf_3]), KalmanFilter())
+SA_BENCH["kalman"]["mutable_3x3"] = @benchmarkable bench_solve!($ws_km3)
+
+# --- Kalman filter N=5, M=3, T=20 ---
+
+Random.seed!(101)
+const A_kf_5_raw = randn(5, 5)
+const A_kf_5 = SMatrix{5, 5}(0.5 * A_kf_5_raw / maximum(abs.(eigvals(A_kf_5_raw))))
+const B_kf_5 = SMatrix{5, 2}(0.1 * randn(5, 2))
+const C_kf_5 = SMatrix{3, 5}(randn(3, 5))
+const R_kf_5 = SMatrix{3, 3}(0.01 * I(3))
+const mu0_kf_5 = SVector{5}(zeros(5))
+const Sig0_kf_5 = SMatrix{5, 5}(1.0 * I(5))
+
+const noise_kf_5 = [SVector{2}(randn(2)) for _ in 1:20]
+const sim_kf_5 = solve(LinearStateSpaceProblem(A_kf_5, B_kf_5, mu0_kf_5, (0, 20);
+    C = C_kf_5, noise = noise_kf_5))
+const y_kf_5 = [sim_kf_5.z[t + 1] + SVector{3}(0.1 * randn(3)) for t in 1:20]
+
+const ws_ks5 = init(LinearStateSpaceProblem(A_kf_5, B_kf_5, mu0_kf_5, (0, 20);
+    C = C_kf_5, u0_prior_mean = mu0_kf_5, u0_prior_var = Sig0_kf_5,
+    observables_noise = R_kf_5, observables = y_kf_5), KalmanFilter())
+SA_BENCH["kalman"]["static_5x5"] = @benchmarkable bench_solve!($ws_ks5)
+
+const ws_km5 = init(LinearStateSpaceProblem(Matrix(A_kf_5), Matrix(B_kf_5), Vector(mu0_kf_5), (0, 20);
+    C = Matrix(C_kf_5), u0_prior_mean = Vector(mu0_kf_5), u0_prior_var = Matrix(Sig0_kf_5),
+    observables_noise = Matrix(R_kf_5), observables = [Vector(y) for y in y_kf_5]), KalmanFilter())
+SA_BENCH["kalman"]["mutable_5x5"] = @benchmarkable bench_solve!($ws_km5)
+
+SA_BENCH

@@ -16,18 +16,19 @@ end
 println("Threads.nthreads = $(Threads.nthreads()), MKL = $julia_mkl, " *
         "BLAS.num_threads = $(BLAS.get_num_threads())\n")
 
-BenchmarkTools.DEFAULT_PARAMETERS.seconds = 15.0
-BenchmarkTools.DEFAULT_PARAMETERS.evals = 3
+BenchmarkTools.DEFAULT_PARAMETERS.seconds = 5.0
+BenchmarkTools.DEFAULT_PARAMETERS.evals = 1
 
 # Enzyme reverse-mode AD corrupts GC metadata under repeated invocation, causing segfaults.
-# Disabling GC avoids the crash without distorting timings (allocation counts still tracked).
-# Left disabled through run(SUITE) since PkgBenchmark calls run() after including this file.
+# GC disabled globally; seconds/evals reduced to keep memory within bounds across 6 groups.
 # Upstream: https://github.com/EnzymeAD/Enzyme.jl/issues/2355
-# TODO: remove once upstream fix is merged.
 GC.enable(false)
 
 const SUITE = BenchmarkGroup()
-SUITE["enzyme_kalman"] = include(
-    joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_kalman.jl"))
-SUITE["enzyme_direct_iteration"] = include(
-    joinpath(pkgdir(DifferenceEquations), "benchmark", "enzyme_direct_iteration.jl"))
+const _bdir = joinpath(pkgdir(DifferenceEquations), "benchmark")
+SUITE["kalman"] = include(joinpath(_bdir, "enzyme_kalman.jl"))
+SUITE["linear_likelihood"] = include(joinpath(_bdir, "enzyme_linear_likelihood.jl"))
+SUITE["linear_simulation"] = include(joinpath(_bdir, "enzyme_linear_simulation.jl"))
+SUITE["quadratic"] = include(joinpath(_bdir, "enzyme_quadratic.jl"))
+SUITE["static_arrays"] = include(joinpath(_bdir, "static_arrays.jl"))
+SUITE["ensemble"] = include(joinpath(_bdir, "ensemble.jl"))

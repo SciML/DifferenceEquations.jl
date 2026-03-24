@@ -13,18 +13,15 @@ end
 
 include("qa.jl")
 include("explicit_imports.jl")
-include("kalman_likelihood.jl")
-include("linear_likelihood.jl")
-# include("linear_gradients.jl")  # AD tests disabled — will restore with Enzyme
-include("linear_simulations.jl")
-include("generic_simulations.jl")
-include("generic_sciml.jl")
-include("cache_reuse.jl")
+include("linear_direct_iteration.jl")
+include("kalman.jl")
+include("direct_iteration.jl")
 include("static_arrays.jl")
+include("cache_reuse.jl")
 include("sciml_interfaces.jl")
 include("sensitivity_interface.jl")
-include("enzyme_kalman.jl")
-include("enzyme_direct_iteration.jl")
+include("linear_direct_iteration_enzyme.jl")
+include("kalman_enzyme.jl")
 
 if get(ENV, "GROUP", "") == "JET"
     activate_jet_env()

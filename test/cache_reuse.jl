@@ -18,6 +18,19 @@ T = 5
 observables_rbc = [observables_rbc_matrix[:, t] for t in 1:T]
 noise_rbc = [noise_rbc_matrix[:, t] for t in 1:T]
 
+# --- Generic callbacks for StateSpaceProblem tests ---
+linear_f!! = (x_next, x, w, p, t) -> begin
+    mul!(x_next, p.A, x)
+    mul!(x_next, p.B, w, 1.0, 1.0)
+    return x_next
+end
+linear_g!! = (y, x, p, t) -> begin
+    mul!(y, p.C, x)
+    return y
+end
+
+# --- LinearStateSpaceProblem cache reuse ---
+
 @testset "init/solve! matches solve for DirectIteration" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
@@ -85,3 +98,40 @@ end
     @test sol1.P ≈ sol2.P
 end
 
+# --- StateSpaceProblem cache reuse ---
+
+@testset "Generic init/solve! matches solve" begin
+    p = (; A = A_rbc, B = B_rbc, C = C_rbc)
+
+    prob = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p;
+        n_shocks = 1, n_obs = 2,
+        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+    )
+
+    sol_direct = solve(prob)
+    ws = init(prob, DirectIteration())
+    sol_ws = solve!(ws)
+
+    @test sol_ws.u ≈ sol_direct.u
+    @test sol_ws.z ≈ sol_direct.z
+    @test sol_ws.logpdf ≈ sol_direct.logpdf
+end
+
+@testset "Generic repeated solve! gives consistent results" begin
+    p = (; A = A_rbc, B = B_rbc, C = C_rbc)
+
+    prob = StateSpaceProblem(
+        linear_f!!, linear_g!!, u0_rbc, (0, T), p;
+        n_shocks = 1, n_obs = 2,
+        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+    )
+
+    ws = init(prob, DirectIteration())
+    sol1 = solve!(ws)
+    sol2 = solve!(ws)
+
+    @test sol1.u ≈ sol2.u
+    @test sol1.z ≈ sol2.z
+    @test sol1.logpdf ≈ sol2.logpdf
+end
