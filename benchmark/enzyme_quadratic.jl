@@ -3,7 +3,7 @@
 # Returns QUAD_ENZYME BenchmarkGroup
 
 using Enzyme: make_zero, make_zero!
-using DifferenceEquations: init, solve!, StateSpaceWorkspace, mul!!, muladd!!, copyto!!
+using DifferenceEquations: init, solve!, StateSpaceWorkspace, mul!!, muladd!!, copyto!!, fill_zero!!
 
 const QUAD_ENZYME = BenchmarkGroup()
 QUAD_ENZYME["simulation"] = BenchmarkGroup()
@@ -107,16 +107,16 @@ function make_quad_benchmark(psz; seed = 42)
     du_f = make_zero(u0); du_f_new = make_zero(u0)
     dnoise = [make_zero(noise[1]) for _ in 1:T]
     dH = make_zero(H); dy = [make_zero(y[1]) for _ in 1:T]
-    dprob_sim = make_zero(prob_sim); dsol_sim = make_zero(ws_sim.output)
+    dsol_sim = make_zero(ws_sim.output)
     dcache_sim = make_zero(ws_sim.cache)
-    dprob_lik = make_zero(prob_lik); dsol_lik = make_zero(ws_lik.output)
+    dsol_lik = make_zero(ws_lik.output)
     dcache_lik = make_zero(ws_lik.cache)
 
-    return (; mats, u0, noise, y, H, R,
+    return (; mats, u0, noise, y, H, R, T,
         prob_sim, sol_sim = ws_sim.output, cache_sim = ws_sim.cache,
         prob_lik, sol_lik = ws_lik.output, cache_lik = ws_lik.cache,
         dA_0, dA_1, dA_2, dB, dC_0, dC_1, dC_2, du0, du_f, du_f_new, dnoise,
-        dH, dy, dprob_sim, dsol_sim, dcache_sim, dprob_lik, dsol_lik, dcache_lik)
+        dH, dy, dsol_sim, dcache_sim, dsol_lik, dcache_lik)
 end
 
 const quad_s = make_quad_benchmark(p_quad_small)
@@ -165,59 +165,59 @@ end
 # --- AD wrappers (standard formulation: all matrices as separate Duplicated args) ---
 
 function quad_sim_fwd_inner!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise,
-        u_f, u_f_new, prob, sol_out, cache)
+        u_f, u_f_new, sol_out, cache)
     p = (; A_0, A_1, A_2, B, C_0, C_1, C_2, u_f, u_f_new)
-    prob_new = StateSpaceProblem(quad_f!!, quad_g!!, u0, prob.tspan, p;
+    prob = StateSpaceProblem(quad_f!!, quad_g!!, u0, (0, length(noise)), p;
         n_shocks = size(B, 2), n_obs = length(C_0), noise)
-    ws = StateSpaceWorkspace(prob_new, DirectIteration(), sol_out, cache)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
     solve!(ws)
     return (sol_out.u[end], sol_out.z[end])
 end
 
 function quad_sim_rev_inner!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise,
-        u_f, u_f_new, prob, sol_out, cache)::Float64
+        u_f, u_f_new, sol_out, cache)::Float64
     p = (; A_0, A_1, A_2, B, C_0, C_1, C_2, u_f, u_f_new)
-    prob_new = StateSpaceProblem(quad_f!!, quad_g!!, u0, prob.tspan, p;
+    prob = StateSpaceProblem(quad_f!!, quad_g!!, u0, (0, length(noise)), p;
         n_shocks = size(B, 2), n_obs = length(C_0), noise)
-    ws = StateSpaceWorkspace(prob_new, DirectIteration(), sol_out, cache)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
     solve!(ws)
     return sum(sol_out.u[end])
 end
 
 function quad_lik_fwd_inner!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, y, H,
-        u_f, u_f_new, prob, sol_out, cache)
+        u_f, u_f_new, sol_out, cache)
     R = H * H'
     p = (; A_0, A_1, A_2, B, C_0, C_1, C_2, u_f, u_f_new)
-    prob_new = StateSpaceProblem(quad_f!!, quad_g!!, u0, prob.tspan, p;
+    prob = StateSpaceProblem(quad_f!!, quad_g!!, u0, (0, length(noise)), p;
         n_shocks = size(B, 2), n_obs = length(C_0),
         noise, observables = y, observables_noise = R)
-    ws = StateSpaceWorkspace(prob_new, DirectIteration(), sol_out, cache)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
     solve!(ws)
     return (sol_out.u[end], sol_out.z[end])
 end
 
 function quad_lik_rev_inner!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, y, H,
-        u_f, u_f_new, prob, sol_out, cache)::Float64
+        u_f, u_f_new, sol_out, cache)::Float64
     R = H * H'
     p = (; A_0, A_1, A_2, B, C_0, C_1, C_2, u_f, u_f_new)
-    prob_new = StateSpaceProblem(quad_f!!, quad_g!!, u0, prob.tspan, p;
+    prob = StateSpaceProblem(quad_f!!, quad_g!!, u0, (0, length(noise)), p;
         n_shocks = size(B, 2), n_obs = length(C_0),
         noise, observables = y, observables_noise = R)
-    ws = StateSpaceWorkspace(prob_new, DirectIteration(), sol_out, cache)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
     return solve!(ws).logpdf
 end
 
 # --- Forward mode: simulation ---
 
 function forward_quad_sim!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise,
-        u_f, u_f_new, prob, sol_out, cache,
+        u_f, u_f_new, sol_out, cache,
         dA_0, dA_1, dA_2, dB, dC_0, dC_1, dC_2, du0, dnoise,
-        du_f, du_f_new, dprob, dsol_out, dcache)
-    make_zero!(dprob); make_zero!(dsol_out); make_zero!(dcache)
-    make_zero!(dA_0); make_zero!(dA_1); make_zero!(dA_2); make_zero!(dB)
-    make_zero!(dC_0); make_zero!(dC_1); make_zero!(dC_2); make_zero!(du0)
-    make_zero!(du_f); make_zero!(du_f_new)
-    @inbounds for i in eachindex(dnoise); make_zero!(dnoise[i]); end
+        du_f, du_f_new, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA_0 = fill_zero!!(dA_0); dA_1 = fill_zero!!(dA_1); dA_2 = fill_zero!!(dA_2); dB = fill_zero!!(dB)
+    dC_0 = fill_zero!!(dC_0); dC_1 = fill_zero!!(dC_1); dC_2 = fill_zero!!(dC_2); du0 = fill_zero!!(du0)
+    du_f = fill_zero!!(du_f); du_f_new = fill_zero!!(du_f_new)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
     dA_1[1, 1] = 1.0
 
     autodiff(Forward, quad_sim_fwd_inner!,
@@ -225,7 +225,7 @@ function forward_quad_sim!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise,
         Duplicated(B, dB), Duplicated(C_0, dC_0), Duplicated(C_1, dC_1),
         Duplicated(C_2, dC_2), Duplicated(u0, du0), Duplicated(noise, dnoise),
         Duplicated(u_f, du_f), Duplicated(u_f_new, du_f_new),
-        Duplicated(prob, dprob), Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return nothing
 end
 
@@ -235,59 +235,59 @@ forward_quad_sim!(
     copy(quad_s.mats.B), copy(quad_s.mats.C_0), copy(quad_s.mats.C_1),
     copy(quad_s.mats.C_2), copy(quad_s.u0), [copy(n) for n in quad_s.noise],
     copy(quad_s.u0), similar(quad_s.u0),
-    quad_s.prob_sim, quad_s.sol_sim, quad_s.cache_sim,
+    quad_s.sol_sim, quad_s.cache_sim,
     quad_s.dA_0, quad_s.dA_1, quad_s.dA_2, quad_s.dB,
     quad_s.dC_0, quad_s.dC_1, quad_s.dC_2, quad_s.du0, quad_s.dnoise,
-    quad_s.du_f, quad_s.du_f_new, quad_s.dprob_sim, quad_s.dsol_sim, quad_s.dcache_sim)
+    quad_s.du_f, quad_s.du_f_new, quad_s.dsol_sim, quad_s.dcache_sim)
 
 QUAD_ENZYME["simulation"]["forward"]["small_mutable"] = @benchmarkable forward_quad_sim!(
     $(copy(quad_s.mats.A_0)), $(copy(quad_s.mats.A_1)), $(copy(quad_s.mats.A_2)),
     $(copy(quad_s.mats.B)), $(copy(quad_s.mats.C_0)), $(copy(quad_s.mats.C_1)),
     $(copy(quad_s.mats.C_2)), $(copy(quad_s.u0)), $([copy(n) for n in quad_s.noise]),
     $(copy(quad_s.u0)), $(similar(quad_s.u0)),
-    $(quad_s.prob_sim), $(quad_s.sol_sim), $(quad_s.cache_sim),
+    $(quad_s.sol_sim), $(quad_s.cache_sim),
     $(quad_s.dA_0), $(quad_s.dA_1), $(quad_s.dA_2), $(quad_s.dB),
     $(quad_s.dC_0), $(quad_s.dC_1), $(quad_s.dC_2), $(quad_s.du0), $(quad_s.dnoise),
-    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dprob_sim), $(quad_s.dsol_sim), $(quad_s.dcache_sim))
+    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dsol_sim), $(quad_s.dcache_sim))
 
 forward_quad_sim!(
     copy(quad_l.mats.A_0), copy(quad_l.mats.A_1), copy(quad_l.mats.A_2),
     copy(quad_l.mats.B), copy(quad_l.mats.C_0), copy(quad_l.mats.C_1),
     copy(quad_l.mats.C_2), copy(quad_l.u0), [copy(n) for n in quad_l.noise],
     copy(quad_l.u0), similar(quad_l.u0),
-    quad_l.prob_sim, quad_l.sol_sim, quad_l.cache_sim,
+    quad_l.sol_sim, quad_l.cache_sim,
     quad_l.dA_0, quad_l.dA_1, quad_l.dA_2, quad_l.dB,
     quad_l.dC_0, quad_l.dC_1, quad_l.dC_2, quad_l.du0, quad_l.dnoise,
-    quad_l.du_f, quad_l.du_f_new, quad_l.dprob_sim, quad_l.dsol_sim, quad_l.dcache_sim)
+    quad_l.du_f, quad_l.du_f_new, quad_l.dsol_sim, quad_l.dcache_sim)
 
 QUAD_ENZYME["simulation"]["forward"]["large_mutable"] = @benchmarkable forward_quad_sim!(
     $(copy(quad_l.mats.A_0)), $(copy(quad_l.mats.A_1)), $(copy(quad_l.mats.A_2)),
     $(copy(quad_l.mats.B)), $(copy(quad_l.mats.C_0)), $(copy(quad_l.mats.C_1)),
     $(copy(quad_l.mats.C_2)), $(copy(quad_l.u0)), $([copy(n) for n in quad_l.noise]),
     $(copy(quad_l.u0)), $(similar(quad_l.u0)),
-    $(quad_l.prob_sim), $(quad_l.sol_sim), $(quad_l.cache_sim),
+    $(quad_l.sol_sim), $(quad_l.cache_sim),
     $(quad_l.dA_0), $(quad_l.dA_1), $(quad_l.dA_2), $(quad_l.dB),
     $(quad_l.dC_0), $(quad_l.dC_1), $(quad_l.dC_2), $(quad_l.du0), $(quad_l.dnoise),
-    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dprob_sim), $(quad_l.dsol_sim), $(quad_l.dcache_sim))
+    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dsol_sim), $(quad_l.dcache_sim))
 
 # --- Reverse mode: simulation ---
 
 function reverse_quad_sim!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise,
-        u_f, u_f_new, prob, sol_out, cache,
+        u_f, u_f_new, sol_out, cache,
         dA_0, dA_1, dA_2, dB, dC_0, dC_1, dC_2, du0, dnoise,
-        du_f, du_f_new, dprob, dsol_out, dcache)
-    make_zero!(dprob); make_zero!(dsol_out); make_zero!(dcache)
-    make_zero!(dA_0); make_zero!(dA_1); make_zero!(dA_2); make_zero!(dB)
-    make_zero!(dC_0); make_zero!(dC_1); make_zero!(dC_2); make_zero!(du0)
-    make_zero!(du_f); make_zero!(du_f_new)
-    @inbounds for i in eachindex(dnoise); make_zero!(dnoise[i]); end
+        du_f, du_f_new, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA_0 = fill_zero!!(dA_0); dA_1 = fill_zero!!(dA_1); dA_2 = fill_zero!!(dA_2); dB = fill_zero!!(dB)
+    dC_0 = fill_zero!!(dC_0); dC_1 = fill_zero!!(dC_1); dC_2 = fill_zero!!(dC_2); du0 = fill_zero!!(du0)
+    du_f = fill_zero!!(du_f); du_f_new = fill_zero!!(du_f_new)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
 
     autodiff(Reverse, quad_sim_rev_inner!, Active,
         Duplicated(A_0, dA_0), Duplicated(A_1, dA_1), Duplicated(A_2, dA_2),
         Duplicated(B, dB), Duplicated(C_0, dC_0), Duplicated(C_1, dC_1),
         Duplicated(C_2, dC_2), Duplicated(u0, du0), Duplicated(noise, dnoise),
         Duplicated(u_f, du_f), Duplicated(u_f_new, du_f_new),
-        Duplicated(prob, dprob), Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return nothing
 end
 
@@ -296,53 +296,53 @@ reverse_quad_sim!(
     copy(quad_s.mats.B), copy(quad_s.mats.C_0), copy(quad_s.mats.C_1),
     copy(quad_s.mats.C_2), copy(quad_s.u0), [copy(n) for n in quad_s.noise],
     copy(quad_s.u0), similar(quad_s.u0),
-    quad_s.prob_sim, quad_s.sol_sim, quad_s.cache_sim,
+    quad_s.sol_sim, quad_s.cache_sim,
     quad_s.dA_0, quad_s.dA_1, quad_s.dA_2, quad_s.dB,
     quad_s.dC_0, quad_s.dC_1, quad_s.dC_2, quad_s.du0, quad_s.dnoise,
-    quad_s.du_f, quad_s.du_f_new, quad_s.dprob_sim, quad_s.dsol_sim, quad_s.dcache_sim)
+    quad_s.du_f, quad_s.du_f_new, quad_s.dsol_sim, quad_s.dcache_sim)
 
 QUAD_ENZYME["simulation"]["reverse"]["small_mutable"] = @benchmarkable reverse_quad_sim!(
     $(copy(quad_s.mats.A_0)), $(copy(quad_s.mats.A_1)), $(copy(quad_s.mats.A_2)),
     $(copy(quad_s.mats.B)), $(copy(quad_s.mats.C_0)), $(copy(quad_s.mats.C_1)),
     $(copy(quad_s.mats.C_2)), $(copy(quad_s.u0)), $([copy(n) for n in quad_s.noise]),
     $(copy(quad_s.u0)), $(similar(quad_s.u0)),
-    $(quad_s.prob_sim), $(quad_s.sol_sim), $(quad_s.cache_sim),
+    $(quad_s.sol_sim), $(quad_s.cache_sim),
     $(quad_s.dA_0), $(quad_s.dA_1), $(quad_s.dA_2), $(quad_s.dB),
     $(quad_s.dC_0), $(quad_s.dC_1), $(quad_s.dC_2), $(quad_s.du0), $(quad_s.dnoise),
-    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dprob_sim), $(quad_s.dsol_sim), $(quad_s.dcache_sim))
+    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dsol_sim), $(quad_s.dcache_sim))
 
 reverse_quad_sim!(
     copy(quad_l.mats.A_0), copy(quad_l.mats.A_1), copy(quad_l.mats.A_2),
     copy(quad_l.mats.B), copy(quad_l.mats.C_0), copy(quad_l.mats.C_1),
     copy(quad_l.mats.C_2), copy(quad_l.u0), [copy(n) for n in quad_l.noise],
     copy(quad_l.u0), similar(quad_l.u0),
-    quad_l.prob_sim, quad_l.sol_sim, quad_l.cache_sim,
+    quad_l.sol_sim, quad_l.cache_sim,
     quad_l.dA_0, quad_l.dA_1, quad_l.dA_2, quad_l.dB,
     quad_l.dC_0, quad_l.dC_1, quad_l.dC_2, quad_l.du0, quad_l.dnoise,
-    quad_l.du_f, quad_l.du_f_new, quad_l.dprob_sim, quad_l.dsol_sim, quad_l.dcache_sim)
+    quad_l.du_f, quad_l.du_f_new, quad_l.dsol_sim, quad_l.dcache_sim)
 
 QUAD_ENZYME["simulation"]["reverse"]["large_mutable"] = @benchmarkable reverse_quad_sim!(
     $(copy(quad_l.mats.A_0)), $(copy(quad_l.mats.A_1)), $(copy(quad_l.mats.A_2)),
     $(copy(quad_l.mats.B)), $(copy(quad_l.mats.C_0)), $(copy(quad_l.mats.C_1)),
     $(copy(quad_l.mats.C_2)), $(copy(quad_l.u0)), $([copy(n) for n in quad_l.noise]),
     $(copy(quad_l.u0)), $(similar(quad_l.u0)),
-    $(quad_l.prob_sim), $(quad_l.sol_sim), $(quad_l.cache_sim),
+    $(quad_l.sol_sim), $(quad_l.cache_sim),
     $(quad_l.dA_0), $(quad_l.dA_1), $(quad_l.dA_2), $(quad_l.dB),
     $(quad_l.dC_0), $(quad_l.dC_1), $(quad_l.dC_2), $(quad_l.du0), $(quad_l.dnoise),
-    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dprob_sim), $(quad_l.dsol_sim), $(quad_l.dcache_sim))
+    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dsol_sim), $(quad_l.dcache_sim))
 
 # --- Forward mode: likelihood ---
 
 function forward_quad_lik!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, y, H,
-        u_f, u_f_new, prob, sol_out, cache,
+        u_f, u_f_new, sol_out, cache,
         dA_0, dA_1, dA_2, dB, dC_0, dC_1, dC_2, du0, dnoise, dy, dH,
-        du_f, du_f_new, dprob, dsol_out, dcache)
-    make_zero!(dprob); make_zero!(dsol_out); make_zero!(dcache)
-    make_zero!(dA_0); make_zero!(dA_1); make_zero!(dA_2); make_zero!(dB)
-    make_zero!(dC_0); make_zero!(dC_1); make_zero!(dC_2); make_zero!(du0)
-    make_zero!(du_f); make_zero!(du_f_new); make_zero!(dH)
-    @inbounds for i in eachindex(dnoise); make_zero!(dnoise[i]); end
-    @inbounds for i in eachindex(dy); make_zero!(dy[i]); end
+        du_f, du_f_new, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA_0 = fill_zero!!(dA_0); dA_1 = fill_zero!!(dA_1); dA_2 = fill_zero!!(dA_2); dB = fill_zero!!(dB)
+    dC_0 = fill_zero!!(dC_0); dC_1 = fill_zero!!(dC_1); dC_2 = fill_zero!!(dC_2); du0 = fill_zero!!(du0)
+    du_f = fill_zero!!(du_f); du_f_new = fill_zero!!(du_f_new); dH = fill_zero!!(dH)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
+    @inbounds for i in eachindex(dy); dy[i] = fill_zero!!(dy[i]); end
     dA_1[1, 1] = 1.0
 
     autodiff(Forward, quad_lik_fwd_inner!,
@@ -351,7 +351,7 @@ function forward_quad_lik!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, y, H,
         Duplicated(C_2, dC_2), Duplicated(u0, du0), Duplicated(noise, dnoise),
         Duplicated(y, dy), Duplicated(H, dH),
         Duplicated(u_f, du_f), Duplicated(u_f_new, du_f_new),
-        Duplicated(prob, dprob), Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return nothing
 end
 
@@ -361,11 +361,11 @@ forward_quad_lik!(
     copy(quad_s.mats.C_2), copy(quad_s.u0), [copy(n) for n in quad_s.noise],
     [copy(y) for y in quad_s.y], copy(quad_s.H),
     copy(quad_s.u0), similar(quad_s.u0),
-    quad_s.prob_lik, quad_s.sol_lik, quad_s.cache_lik,
+    quad_s.sol_lik, quad_s.cache_lik,
     quad_s.dA_0, quad_s.dA_1, quad_s.dA_2, quad_s.dB,
     quad_s.dC_0, quad_s.dC_1, quad_s.dC_2, quad_s.du0, quad_s.dnoise,
     quad_s.dy, quad_s.dH,
-    quad_s.du_f, quad_s.du_f_new, quad_s.dprob_lik, quad_s.dsol_lik, quad_s.dcache_lik)
+    quad_s.du_f, quad_s.du_f_new, quad_s.dsol_lik, quad_s.dcache_lik)
 
 QUAD_ENZYME["likelihood"]["forward"]["small_mutable"] = @benchmarkable forward_quad_lik!(
     $(copy(quad_s.mats.A_0)), $(copy(quad_s.mats.A_1)), $(copy(quad_s.mats.A_2)),
@@ -373,11 +373,11 @@ QUAD_ENZYME["likelihood"]["forward"]["small_mutable"] = @benchmarkable forward_q
     $(copy(quad_s.mats.C_2)), $(copy(quad_s.u0)), $([copy(n) for n in quad_s.noise]),
     $([copy(y) for y in quad_s.y]), $(copy(quad_s.H)),
     $(copy(quad_s.u0)), $(similar(quad_s.u0)),
-    $(quad_s.prob_lik), $(quad_s.sol_lik), $(quad_s.cache_lik),
+    $(quad_s.sol_lik), $(quad_s.cache_lik),
     $(quad_s.dA_0), $(quad_s.dA_1), $(quad_s.dA_2), $(quad_s.dB),
     $(quad_s.dC_0), $(quad_s.dC_1), $(quad_s.dC_2), $(quad_s.du0), $(quad_s.dnoise),
     $(quad_s.dy), $(quad_s.dH),
-    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dprob_lik), $(quad_s.dsol_lik), $(quad_s.dcache_lik))
+    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dsol_lik), $(quad_s.dcache_lik))
 
 forward_quad_lik!(
     copy(quad_l.mats.A_0), copy(quad_l.mats.A_1), copy(quad_l.mats.A_2),
@@ -385,11 +385,11 @@ forward_quad_lik!(
     copy(quad_l.mats.C_2), copy(quad_l.u0), [copy(n) for n in quad_l.noise],
     [copy(y) for y in quad_l.y], copy(quad_l.H),
     copy(quad_l.u0), similar(quad_l.u0),
-    quad_l.prob_lik, quad_l.sol_lik, quad_l.cache_lik,
+    quad_l.sol_lik, quad_l.cache_lik,
     quad_l.dA_0, quad_l.dA_1, quad_l.dA_2, quad_l.dB,
     quad_l.dC_0, quad_l.dC_1, quad_l.dC_2, quad_l.du0, quad_l.dnoise,
     quad_l.dy, quad_l.dH,
-    quad_l.du_f, quad_l.du_f_new, quad_l.dprob_lik, quad_l.dsol_lik, quad_l.dcache_lik)
+    quad_l.du_f, quad_l.du_f_new, quad_l.dsol_lik, quad_l.dcache_lik)
 
 QUAD_ENZYME["likelihood"]["forward"]["large_mutable"] = @benchmarkable forward_quad_lik!(
     $(copy(quad_l.mats.A_0)), $(copy(quad_l.mats.A_1)), $(copy(quad_l.mats.A_2)),
@@ -397,24 +397,24 @@ QUAD_ENZYME["likelihood"]["forward"]["large_mutable"] = @benchmarkable forward_q
     $(copy(quad_l.mats.C_2)), $(copy(quad_l.u0)), $([copy(n) for n in quad_l.noise]),
     $([copy(y) for y in quad_l.y]), $(copy(quad_l.H)),
     $(copy(quad_l.u0)), $(similar(quad_l.u0)),
-    $(quad_l.prob_lik), $(quad_l.sol_lik), $(quad_l.cache_lik),
+    $(quad_l.sol_lik), $(quad_l.cache_lik),
     $(quad_l.dA_0), $(quad_l.dA_1), $(quad_l.dA_2), $(quad_l.dB),
     $(quad_l.dC_0), $(quad_l.dC_1), $(quad_l.dC_2), $(quad_l.du0), $(quad_l.dnoise),
     $(quad_l.dy), $(quad_l.dH),
-    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dprob_lik), $(quad_l.dsol_lik), $(quad_l.dcache_lik))
+    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dsol_lik), $(quad_l.dcache_lik))
 
 # --- Reverse mode: likelihood ---
 
 function reverse_quad_lik!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, y, H,
-        u_f, u_f_new, prob, sol_out, cache,
+        u_f, u_f_new, sol_out, cache,
         dA_0, dA_1, dA_2, dB, dC_0, dC_1, dC_2, du0, dnoise, dy, dH,
-        du_f, du_f_new, dprob, dsol_out, dcache)
-    make_zero!(dprob); make_zero!(dsol_out); make_zero!(dcache)
-    make_zero!(dA_0); make_zero!(dA_1); make_zero!(dA_2); make_zero!(dB)
-    make_zero!(dC_0); make_zero!(dC_1); make_zero!(dC_2); make_zero!(du0)
-    make_zero!(du_f); make_zero!(du_f_new); make_zero!(dH)
-    @inbounds for i in eachindex(dnoise); make_zero!(dnoise[i]); end
-    @inbounds for i in eachindex(dy); make_zero!(dy[i]); end
+        du_f, du_f_new, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA_0 = fill_zero!!(dA_0); dA_1 = fill_zero!!(dA_1); dA_2 = fill_zero!!(dA_2); dB = fill_zero!!(dB)
+    dC_0 = fill_zero!!(dC_0); dC_1 = fill_zero!!(dC_1); dC_2 = fill_zero!!(dC_2); du0 = fill_zero!!(du0)
+    du_f = fill_zero!!(du_f); du_f_new = fill_zero!!(du_f_new); dH = fill_zero!!(dH)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
+    @inbounds for i in eachindex(dy); dy[i] = fill_zero!!(dy[i]); end
 
     autodiff(Reverse, quad_lik_rev_inner!, Active,
         Duplicated(A_0, dA_0), Duplicated(A_1, dA_1), Duplicated(A_2, dA_2),
@@ -422,7 +422,7 @@ function reverse_quad_lik!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, y, H,
         Duplicated(C_2, dC_2), Duplicated(u0, du0), Duplicated(noise, dnoise),
         Duplicated(y, dy), Duplicated(H, dH),
         Duplicated(u_f, du_f), Duplicated(u_f_new, du_f_new),
-        Duplicated(prob, dprob), Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return nothing
 end
 
@@ -432,11 +432,11 @@ reverse_quad_lik!(
     copy(quad_s.mats.C_2), copy(quad_s.u0), [copy(n) for n in quad_s.noise],
     [copy(y) for y in quad_s.y], copy(quad_s.H),
     copy(quad_s.u0), similar(quad_s.u0),
-    quad_s.prob_lik, quad_s.sol_lik, quad_s.cache_lik,
+    quad_s.sol_lik, quad_s.cache_lik,
     quad_s.dA_0, quad_s.dA_1, quad_s.dA_2, quad_s.dB,
     quad_s.dC_0, quad_s.dC_1, quad_s.dC_2, quad_s.du0, quad_s.dnoise,
     quad_s.dy, quad_s.dH,
-    quad_s.du_f, quad_s.du_f_new, quad_s.dprob_lik, quad_s.dsol_lik, quad_s.dcache_lik)
+    quad_s.du_f, quad_s.du_f_new, quad_s.dsol_lik, quad_s.dcache_lik)
 
 QUAD_ENZYME["likelihood"]["reverse"]["small_mutable"] = @benchmarkable reverse_quad_lik!(
     $(copy(quad_s.mats.A_0)), $(copy(quad_s.mats.A_1)), $(copy(quad_s.mats.A_2)),
@@ -444,11 +444,11 @@ QUAD_ENZYME["likelihood"]["reverse"]["small_mutable"] = @benchmarkable reverse_q
     $(copy(quad_s.mats.C_2)), $(copy(quad_s.u0)), $([copy(n) for n in quad_s.noise]),
     $([copy(y) for y in quad_s.y]), $(copy(quad_s.H)),
     $(copy(quad_s.u0)), $(similar(quad_s.u0)),
-    $(quad_s.prob_lik), $(quad_s.sol_lik), $(quad_s.cache_lik),
+    $(quad_s.sol_lik), $(quad_s.cache_lik),
     $(quad_s.dA_0), $(quad_s.dA_1), $(quad_s.dA_2), $(quad_s.dB),
     $(quad_s.dC_0), $(quad_s.dC_1), $(quad_s.dC_2), $(quad_s.du0), $(quad_s.dnoise),
     $(quad_s.dy), $(quad_s.dH),
-    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dprob_lik), $(quad_s.dsol_lik), $(quad_s.dcache_lik))
+    $(quad_s.du_f), $(quad_s.du_f_new), $(quad_s.dsol_lik), $(quad_s.dcache_lik))
 
 reverse_quad_lik!(
     copy(quad_l.mats.A_0), copy(quad_l.mats.A_1), copy(quad_l.mats.A_2),
@@ -456,11 +456,11 @@ reverse_quad_lik!(
     copy(quad_l.mats.C_2), copy(quad_l.u0), [copy(n) for n in quad_l.noise],
     [copy(y) for y in quad_l.y], copy(quad_l.H),
     copy(quad_l.u0), similar(quad_l.u0),
-    quad_l.prob_lik, quad_l.sol_lik, quad_l.cache_lik,
+    quad_l.sol_lik, quad_l.cache_lik,
     quad_l.dA_0, quad_l.dA_1, quad_l.dA_2, quad_l.dB,
     quad_l.dC_0, quad_l.dC_1, quad_l.dC_2, quad_l.du0, quad_l.dnoise,
     quad_l.dy, quad_l.dH,
-    quad_l.du_f, quad_l.du_f_new, quad_l.dprob_lik, quad_l.dsol_lik, quad_l.dcache_lik)
+    quad_l.du_f, quad_l.du_f_new, quad_l.dsol_lik, quad_l.dcache_lik)
 
 QUAD_ENZYME["likelihood"]["reverse"]["large_mutable"] = @benchmarkable reverse_quad_lik!(
     $(copy(quad_l.mats.A_0)), $(copy(quad_l.mats.A_1)), $(copy(quad_l.mats.A_2)),
@@ -468,10 +468,10 @@ QUAD_ENZYME["likelihood"]["reverse"]["large_mutable"] = @benchmarkable reverse_q
     $(copy(quad_l.mats.C_2)), $(copy(quad_l.u0)), $([copy(n) for n in quad_l.noise]),
     $([copy(y) for y in quad_l.y]), $(copy(quad_l.H)),
     $(copy(quad_l.u0)), $(similar(quad_l.u0)),
-    $(quad_l.prob_lik), $(quad_l.sol_lik), $(quad_l.cache_lik),
+    $(quad_l.sol_lik), $(quad_l.cache_lik),
     $(quad_l.dA_0), $(quad_l.dA_1), $(quad_l.dA_2), $(quad_l.dB),
     $(quad_l.dC_0), $(quad_l.dC_1), $(quad_l.dC_2), $(quad_l.du0), $(quad_l.dnoise),
     $(quad_l.dy), $(quad_l.dH),
-    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dprob_lik), $(quad_l.dsol_lik), $(quad_l.dcache_lik))
+    $(quad_l.du_f), $(quad_l.du_f_new), $(quad_l.dsol_lik), $(quad_l.dcache_lik))
 
 QUAD_ENZYME
