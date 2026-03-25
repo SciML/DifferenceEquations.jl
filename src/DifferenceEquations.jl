@@ -15,16 +15,19 @@ using SymbolicIndexingInterface: SymbolicIndexingInterface, SymbolCache, variabl
 include("utilities_bangbang.jl")
 include("utilities.jl")
 include("problems/state_space_problems.jl")
+include("problems/quadratic_state_space_problems.jl")
 include("solutions/state_space_solutions.jl")
 include("solve.jl")
 include("caches.jl")
 include("workspace.jl")
 include("algorithms/linear.jl")
 include("algorithms/generic.jl")
+include("algorithms/quadratic.jl")
 include("precompilation.jl")
 
 # Exports
 export AbstractStateSpaceProblem, LinearStateSpaceProblem, StateSpaceProblem
+export QuadraticStateSpaceProblem, PrunedQuadraticStateSpaceProblem
 export StateSpaceSolution, DirectIteration, KalmanFilter
 export StateSpaceWorkspace
 
