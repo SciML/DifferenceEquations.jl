@@ -1,3 +1,32 @@
+"""
+    StateSpaceSolution
+
+Solution type returned by `solve` for all state-space problems.
+
+# Fields
+- `u`: State trajectory as `Vector{Vector{T}}`.
+- `t`: Time values.
+- `z`: Observation trajectory as `Vector{Vector{T}}`, or `nothing`.
+- `W`: Noise sequence as `Vector{Vector{T}}`, or `nothing` (e.g., for `KalmanFilter`).
+- `P`: Posterior covariances as `Vector{Matrix{T}}` (`KalmanFilter` only), or `nothing`.
+- `logpdf`: Log-likelihood value. Zero when no `observables` are provided.
+- `retcode`: `:Success` or `:Default`.
+- `prob`: The original problem.
+- `alg`: The algorithm used.
+
+# Symbolic Indexing
+Access time series by symbol name:
+```julia
+sol[:x]      # state variable time series (requires `syms`)
+sol[:output] # observation time series (requires `obs_syms`)
+```
+
+# Standard Indexing
+```julia
+sol[i]       # state at time step i (same as sol.u[i])
+sol[end]     # final state
+```
+"""
 struct StateSpaceSolution{
         T, N, uType, uType2, DType, tType, randType, P, A, IType, DE,
         PosteriorType,

@@ -6,6 +6,38 @@
 # x[t+1] = A_0 + A_1 * x[t] + quad(A_2, x[t]) + B * w[t]
 # z[t]   = C_0 + C_1 * x[t] + quad(C_2, x[t])
 
+"""
+    QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, tspan[, p]; kwargs...)
+
+Define a second-order (quadratic) state-space model:
+
+```math
+u_{n+1} = A_0 + A_1 \\, u_n + u_n^\\top A_2 \\, u_n + B \\, w_{n+1}
+```
+
+with optional observation equation
+``z_n = C_0 + C_1 \\, u_n + u_n^\\top C_2 \\, u_n + v_n``.
+
+# Positional Arguments
+- `A_0`: Constant drift vector (length n).
+- `A_1`: Linear transition matrix (n×n).
+- `A_2`: Quadratic transition tensor (n×n×n). Entry `A_2[i,:,:]` gives the matrix
+  for the `i`-th element of the quadratic term.
+- `B`: Noise input matrix (n×k), or `nothing`.
+- `u0`: Initial state vector.
+- `tspan`: Time span as `(t0, t_end)`.
+
+# Keyword Arguments
+- `C_0`, `C_1`, `C_2`: Observation equation coefficients (analogous to `A_0`, `A_1`, `A_2`).
+- `observables_noise`, `observables`, `noise`, `syms`, `obs_syms`: Same as
+  [`LinearStateSpaceProblem`](@ref).
+
+# References
+- Andreasen, Fernandez-Villaverde, and Rubio-Ramirez (2017),
+  "The Pruned State-Space System for Non-Linear DSGE Models: Theory and Empirical Applications."
+
+See also: [`PrunedQuadraticStateSpaceProblem`](@ref), [`LinearStateSpaceProblem`](@ref).
+"""
 @concrete struct QuadraticStateSpaceProblem <: AbstractStateSpaceProblem
     f           # ODEFunction (SciML interface/syms only)
     A_0         # Constant drift vector
@@ -45,6 +77,31 @@ end
 # x[t+1]   = A_0 + A_1 * x[t] + quad(A_2, u_f[t]) + B * w[t]
 # z[t]     = C_0 + C_1 * x[t] + quad(C_2, u_f[t])
 
+"""
+    PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, tspan[, p]; kwargs...)
+
+Define a pruned second-order state-space model. Unlike [`QuadraticStateSpaceProblem`](@ref),
+the quadratic terms operate on a separate linear-part state ``u_f`` rather than the full state:
+
+```math
+u_f^{n+1} = A_1 \\, u_f^n + B \\, w_{n+1}
+```
+```math
+u_{n+1} = A_0 + A_1 \\, u_n + (u_f^n)^\\top A_2 \\, u_f^n + B \\, w_{n+1}
+```
+
+The observation equation similarly uses ``u_f``:
+``z_n = C_0 + C_1 \\, u_n + (u_f^n)^\\top C_2 \\, u_f^n + v_n``.
+
+This pruning approach prevents explosive dynamics in higher-order perturbation solutions.
+Arguments are identical to [`QuadraticStateSpaceProblem`](@ref).
+
+# References
+- Andreasen, Fernandez-Villaverde, and Rubio-Ramirez (2017),
+  "The Pruned State-Space System for Non-Linear DSGE Models: Theory and Empirical Applications."
+
+See also: [`QuadraticStateSpaceProblem`](@ref).
+"""
 @concrete struct PrunedQuadraticStateSpaceProblem <: AbstractStateSpaceProblem
     f           # ODEFunction (SciML interface/syms only)
     A_0         # Constant drift vector
