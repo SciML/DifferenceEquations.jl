@@ -32,3 +32,7 @@ SUITE["linear_simulation"] = include(joinpath(_bdir, "enzyme_linear_simulation.j
 SUITE["quadratic"] = include(joinpath(_bdir, "enzyme_quadratic.jl"))
 SUITE["static_arrays"] = include(joinpath(_bdir, "static_arrays.jl"))
 SUITE["ensemble"] = include(joinpath(_bdir, "ensemble.jl"))
+SUITE["forwarddiff_kalman"] = include(joinpath(_bdir, "forwarddiff_kalman.jl"))
+SUITE["forwarddiff_linear_likelihood"] = include(joinpath(_bdir, "forwarddiff_linear_likelihood.jl"))
+SUITE["forwarddiff_linear_simulation"] = include(joinpath(_bdir, "forwarddiff_linear_simulation.jl"))
+SUITE["gradient_comparison"] = include(joinpath(_bdir, "gradient_comparison.jl"))
