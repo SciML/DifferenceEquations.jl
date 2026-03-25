@@ -6,7 +6,7 @@ DifferenceEquations.jl solves initial value problems for deterministic and stoch
 
   - **Linear, quadratic, and generic state-space models** -- [`LinearStateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref), [`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref) with user-defined callbacks.
   - **Kalman filter** for computing the marginal log-likelihood of linear Gaussian models via [`KalmanFilter`](@ref).
-  - **Differentiable via Enzyme.jl** -- reverse-mode and forward-mode AD through both simulation (`DirectIteration`) and filtering (`KalmanFilter`).
+  - **Differentiable via [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl) and [ForwardDiff.jl](https://github.com/JuliaDiff/ForwardDiff.jl)** -- Enzyme reverse/forward mode for all problem sizes; ForwardDiff as a lightweight alternative for small models (N ≤ 5).
   - **StaticArrays support** for small models where heap allocations dominate runtime.
   - **Workspace API** -- [`StateSpaceWorkspace`](@ref) with `init` / `solve!` for allocation-free repeated solves (useful inside AD and tight loops).
   - **SciML ecosystem integration** -- `EnsembleProblem` for Monte Carlo, plot recipes, `DataFrame` conversion, symbolic indexing, and `remake`.

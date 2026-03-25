@@ -16,6 +16,7 @@ pages = [
     ],
     "Advanced" => [
         "Enzyme AD" => "advanced/enzyme_ad.md",
+        "ForwardDiff AD" => "advanced/forwarddiff_ad.md",
         "StaticArrays" => "advanced/static_arrays.md",
         "Internals" => "advanced/internals.md",
     ],

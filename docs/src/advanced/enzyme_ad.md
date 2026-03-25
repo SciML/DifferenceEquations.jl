@@ -162,3 +162,4 @@ optsol.u  # estimated beta (true value: 0.95)
 - The `Optimization.jl` integration requires an explicit `grad` function because `AutoEnzyme()` cannot directly handle the all-Duplicated requirement. The gradient function calls `Enzyme.autodiff` manually.
 - Avoid calling `GC.gc()` inside functions differentiated by Enzyme -- this can cause segfaults when combined with `BenchmarkTools`.
 - See the [Workspace API](@ref) page for details on `init`, `solve!`, and `StateSpaceWorkspace`.
+- For small models (N ≤ 5), [ForwardDiff AD](@ref) offers a simpler alternative with comparable performance and no `Duplicated` bookkeeping.
