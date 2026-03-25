@@ -53,17 +53,6 @@ function make_gc_kalman(p; seed = 42)
         observables_noise = R, observables = y)
     ws = init(prob, KalmanFilter())
 
-    # BatchDuplicated shadows (BATCH_SIZE copies of each)
-    bd_dAs = ntuple(_ -> make_zero(A), BATCH_SIZE)
-    bd_dBs = ntuple(_ -> make_zero(B), BATCH_SIZE)
-    bd_dCs = ntuple(_ -> make_zero(C), BATCH_SIZE)
-    bd_dmu0s = ntuple(_ -> make_zero(mu_0), BATCH_SIZE)
-    bd_dSig0s = ntuple(_ -> make_zero(Sigma_0), BATCH_SIZE)
-    bd_dRs = ntuple(_ -> make_zero(R), BATCH_SIZE)
-    bd_dys = ntuple(_ -> [make_zero(y[1]) for _ in 1:T], BATCH_SIZE)
-    bd_dsols = ntuple(_ -> make_zero(ws.output), BATCH_SIZE)
-    bd_dcaches = ntuple(_ -> make_zero(ws.cache), BATCH_SIZE)
-
     # Reverse shadows (single copy)
     rv_dA = make_zero(A); rv_dB = make_zero(B); rv_dC = make_zero(C)
     rv_dmu0 = make_zero(mu_0); rv_dSig0 = make_zero(Sigma_0); rv_dR = make_zero(R)
@@ -72,7 +61,6 @@ function make_gc_kalman(p; seed = 42)
 
     return (; A, B, C, R, mu_0, Sigma_0, y,
         sol_out = ws.output, cache = ws.cache,
-        bd_dAs, bd_dBs, bd_dCs, bd_dmu0s, bd_dSig0s, bd_dRs, bd_dys, bd_dsols, bd_dcaches,
         rv_dA, rv_dB, rv_dC, rv_dmu0, rv_dSig0, rv_dR, rv_dy, rv_dsol, rv_dcache)
 end
 
@@ -131,13 +119,13 @@ function bench_enzyme_batched_fwd_kf!(grad_out, A, B, C, mu_0, Sigma_0, R, y,
         end
 
         result = autodiff(Forward, _kf_loglik_gc!,
-            BatchDuplicated(copy(A), dAs),
-            BatchDuplicated(copy(B), dBs),
-            BatchDuplicated(copy(C), dCs),
-            BatchDuplicated(copy(mu_0), dmu0s),
-            BatchDuplicated(copy(Sigma_0), dSig0s),
-            BatchDuplicated(copy(R), dRs),
-            BatchDuplicated([copy(yi) for yi in y], dys),
+            BatchDuplicated(A, dAs),
+            BatchDuplicated(B, dBs),
+            BatchDuplicated(C, dCs),
+            BatchDuplicated(mu_0, dmu0s),
+            BatchDuplicated(Sigma_0, dSig0s),
+            BatchDuplicated(R, dRs),
+            BatchDuplicated(y, dys),
             BatchDuplicated(sol_out, dsols),
             BatchDuplicated(cache, dcaches))
 
@@ -158,9 +146,9 @@ function bench_enzyme_reverse_kf!(A, B, C, mu_0, Sigma_0, R, y,
     @inbounds for i in eachindex(dy); dy[i] = fill_zero!!(dy[i]); end
 
     autodiff(Reverse, _kf_loglik_gc!, Active,
-        Duplicated(copy(A), dA), Duplicated(copy(B), dB), Duplicated(copy(C), dC),
-        Duplicated(copy(mu_0), dmu_0), Duplicated(copy(Sigma_0), dSigma_0),
-        Duplicated(copy(R), dR), Duplicated([copy(yi) for yi in y], dy),
+        Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
+        Duplicated(mu_0, dmu_0), Duplicated(Sigma_0, dSigma_0),
+        Duplicated(R, dR), Duplicated(y, dy),
         Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return vec(dA)
 end
@@ -175,11 +163,14 @@ const gc_kf_l = make_gc_kalman(p_gc_large)
 # Warmup
 bench_forwarddiff_kf!(vec(copy(gc_kf_s.A)), gc_kf_s.B, gc_kf_s.C,
     gc_kf_s.mu_0, gc_kf_s.Sigma_0, gc_kf_s.R, gc_kf_s.y, p_gc_small.N)
-bench_enzyme_batched_fwd_kf!(zeros(p_gc_small.N^2),
-    gc_kf_s.A, gc_kf_s.B, gc_kf_s.C, gc_kf_s.mu_0, gc_kf_s.Sigma_0, gc_kf_s.R, gc_kf_s.y,
-    gc_kf_s.sol_out, gc_kf_s.cache,
-    gc_kf_s.bd_dAs, gc_kf_s.bd_dBs, gc_kf_s.bd_dCs, gc_kf_s.bd_dmu0s, gc_kf_s.bd_dSig0s,
-    gc_kf_s.bd_dRs, gc_kf_s.bd_dys, gc_kf_s.bd_dsols, gc_kf_s.bd_dcaches)
+# BatchDuplicated forward is always slower than ForwardDiff for this codebase:
+# the shadow-copy overhead for all arguments (sol, cache, etc.) dominates.
+# Kept for reference but not benchmarked.
+# bench_enzyme_batched_fwd_kf!(zeros(p_gc_small.N^2),
+#     gc_kf_s.A, gc_kf_s.B, gc_kf_s.C, gc_kf_s.mu_0, gc_kf_s.Sigma_0, gc_kf_s.R, gc_kf_s.y,
+#     gc_kf_s.sol_out, gc_kf_s.cache,
+#     gc_kf_s.bd_dAs, gc_kf_s.bd_dBs, gc_kf_s.bd_dCs, gc_kf_s.bd_dmu0s, gc_kf_s.bd_dSig0s,
+#     gc_kf_s.bd_dRs, gc_kf_s.bd_dys, gc_kf_s.bd_dsols, gc_kf_s.bd_dcaches)
 bench_enzyme_reverse_kf!(gc_kf_s.A, gc_kf_s.B, gc_kf_s.C,
     gc_kf_s.mu_0, gc_kf_s.Sigma_0, gc_kf_s.R, gc_kf_s.y,
     gc_kf_s.sol_out, gc_kf_s.cache,
@@ -188,11 +179,11 @@ bench_enzyme_reverse_kf!(gc_kf_s.A, gc_kf_s.B, gc_kf_s.C,
 
 bench_forwarddiff_kf!(vec(copy(gc_kf_l.A)), gc_kf_l.B, gc_kf_l.C,
     gc_kf_l.mu_0, gc_kf_l.Sigma_0, gc_kf_l.R, gc_kf_l.y, p_gc_large.N)
-bench_enzyme_batched_fwd_kf!(zeros(p_gc_large.N^2),
-    gc_kf_l.A, gc_kf_l.B, gc_kf_l.C, gc_kf_l.mu_0, gc_kf_l.Sigma_0, gc_kf_l.R, gc_kf_l.y,
-    gc_kf_l.sol_out, gc_kf_l.cache,
-    gc_kf_l.bd_dAs, gc_kf_l.bd_dBs, gc_kf_l.bd_dCs, gc_kf_l.bd_dmu0s, gc_kf_l.bd_dSig0s,
-    gc_kf_l.bd_dRs, gc_kf_l.bd_dys, gc_kf_l.bd_dsols, gc_kf_l.bd_dcaches)
+# bench_enzyme_batched_fwd_kf!(zeros(p_gc_large.N^2),
+#     gc_kf_l.A, gc_kf_l.B, gc_kf_l.C, gc_kf_l.mu_0, gc_kf_l.Sigma_0, gc_kf_l.R, gc_kf_l.y,
+#     gc_kf_l.sol_out, gc_kf_l.cache,
+#     gc_kf_l.bd_dAs, gc_kf_l.bd_dBs, gc_kf_l.bd_dCs, gc_kf_l.bd_dmu0s, gc_kf_l.bd_dSig0s,
+#     gc_kf_l.bd_dRs, gc_kf_l.bd_dys, gc_kf_l.bd_dsols, gc_kf_l.bd_dcaches)
 bench_enzyme_reverse_kf!(gc_kf_l.A, gc_kf_l.B, gc_kf_l.C,
     gc_kf_l.mu_0, gc_kf_l.Sigma_0, gc_kf_l.R, gc_kf_l.y,
     gc_kf_l.sol_out, gc_kf_l.cache,
@@ -208,22 +199,22 @@ GRAD_CMP["kalman"]["forwarddiff_large"] = @benchmarkable bench_forwarddiff_kf!(
     $(vec(copy(gc_kf_l.A))), $(gc_kf_l.B), $(gc_kf_l.C),
     $(gc_kf_l.mu_0), $(gc_kf_l.Sigma_0), $(gc_kf_l.R), $(gc_kf_l.y), $(p_gc_large.N))
 
-# --- Kalman Enzyme BatchDuplicated Forward ---
-GRAD_CMP["kalman"]["enzyme_batched_fwd_small"] = @benchmarkable bench_enzyme_batched_fwd_kf!(
-    $(zeros(p_gc_small.N^2)),
-    $(gc_kf_s.A), $(gc_kf_s.B), $(gc_kf_s.C), $(gc_kf_s.mu_0), $(gc_kf_s.Sigma_0),
-    $(gc_kf_s.R), $(gc_kf_s.y), $(gc_kf_s.sol_out), $(gc_kf_s.cache),
-    $(gc_kf_s.bd_dAs), $(gc_kf_s.bd_dBs), $(gc_kf_s.bd_dCs), $(gc_kf_s.bd_dmu0s),
-    $(gc_kf_s.bd_dSig0s), $(gc_kf_s.bd_dRs), $(gc_kf_s.bd_dys),
-    $(gc_kf_s.bd_dsols), $(gc_kf_s.bd_dcaches))
-
-GRAD_CMP["kalman"]["enzyme_batched_fwd_large"] = @benchmarkable bench_enzyme_batched_fwd_kf!(
-    $(zeros(p_gc_large.N^2)),
-    $(gc_kf_l.A), $(gc_kf_l.B), $(gc_kf_l.C), $(gc_kf_l.mu_0), $(gc_kf_l.Sigma_0),
-    $(gc_kf_l.R), $(gc_kf_l.y), $(gc_kf_l.sol_out), $(gc_kf_l.cache),
-    $(gc_kf_l.bd_dAs), $(gc_kf_l.bd_dBs), $(gc_kf_l.bd_dCs), $(gc_kf_l.bd_dmu0s),
-    $(gc_kf_l.bd_dSig0s), $(gc_kf_l.bd_dRs), $(gc_kf_l.bd_dys),
-    $(gc_kf_l.bd_dsols), $(gc_kf_l.bd_dcaches))
+# --- Kalman Enzyme BatchDuplicated Forward (commented out — always slower than ForwardDiff) ---
+# GRAD_CMP["kalman"]["enzyme_batched_fwd_small"] = @benchmarkable bench_enzyme_batched_fwd_kf!(
+#     $(zeros(p_gc_small.N^2)),
+#     $(gc_kf_s.A), $(gc_kf_s.B), $(gc_kf_s.C), $(gc_kf_s.mu_0), $(gc_kf_s.Sigma_0),
+#     $(gc_kf_s.R), $(gc_kf_s.y), $(gc_kf_s.sol_out), $(gc_kf_s.cache),
+#     $(gc_kf_s.bd_dAs), $(gc_kf_s.bd_dBs), $(gc_kf_s.bd_dCs), $(gc_kf_s.bd_dmu0s),
+#     $(gc_kf_s.bd_dSig0s), $(gc_kf_s.bd_dRs), $(gc_kf_s.bd_dys),
+#     $(gc_kf_s.bd_dsols), $(gc_kf_s.bd_dcaches))
+#
+# GRAD_CMP["kalman"]["enzyme_batched_fwd_large"] = @benchmarkable bench_enzyme_batched_fwd_kf!(
+#     $(zeros(p_gc_large.N^2)),
+#     $(gc_kf_l.A), $(gc_kf_l.B), $(gc_kf_l.C), $(gc_kf_l.mu_0), $(gc_kf_l.Sigma_0),
+#     $(gc_kf_l.R), $(gc_kf_l.y), $(gc_kf_l.sol_out), $(gc_kf_l.cache),
+#     $(gc_kf_l.bd_dAs), $(gc_kf_l.bd_dBs), $(gc_kf_l.bd_dCs), $(gc_kf_l.bd_dmu0s),
+#     $(gc_kf_l.bd_dSig0s), $(gc_kf_l.bd_dRs), $(gc_kf_l.bd_dys),
+#     $(gc_kf_l.bd_dsols), $(gc_kf_l.bd_dcaches))
 
 # --- Kalman Enzyme Reverse ---
 GRAD_CMP["kalman"]["enzyme_reverse_small"] = @benchmarkable bench_enzyme_reverse_kf!(
@@ -265,16 +256,6 @@ function make_gc_di(p; seed = 42)
         observables_noise = R, observables = y, noise)
     ws = init(prob, DirectIteration())
 
-    bd_dAs = ntuple(_ -> make_zero(A), BATCH_SIZE)
-    bd_dBs = ntuple(_ -> make_zero(B), BATCH_SIZE)
-    bd_dCs = ntuple(_ -> make_zero(C), BATCH_SIZE)
-    bd_du0s = ntuple(_ -> make_zero(u0), BATCH_SIZE)
-    bd_dHs = ntuple(_ -> make_zero(H), BATCH_SIZE)
-    bd_dnoises = ntuple(_ -> [make_zero(noise[1]) for _ in 1:T], BATCH_SIZE)
-    bd_dys = ntuple(_ -> [make_zero(y[1]) for _ in 1:T], BATCH_SIZE)
-    bd_dsols = ntuple(_ -> make_zero(ws.output), BATCH_SIZE)
-    bd_dcaches = ntuple(_ -> make_zero(ws.cache), BATCH_SIZE)
-
     rv_dA = make_zero(A); rv_dB = make_zero(B); rv_dC = make_zero(C)
     rv_du0 = make_zero(u0); rv_dH = make_zero(H)
     rv_dnoise = [make_zero(noise[1]) for _ in 1:T]
@@ -283,7 +264,6 @@ function make_gc_di(p; seed = 42)
 
     return (; A, B, C, H, R, u0, noise, y,
         sol_out = ws.output, cache = ws.cache,
-        bd_dAs, bd_dBs, bd_dCs, bd_du0s, bd_dHs, bd_dnoises, bd_dys, bd_dsols, bd_dcaches,
         rv_dA, rv_dB, rv_dC, rv_du0, rv_dH, rv_dnoise, rv_dy, rv_dsol, rv_dcache)
 end
 
@@ -340,13 +320,13 @@ function bench_enzyme_batched_fwd_di!(grad_out, A, B, C, u0, noise, y, H,
         end
 
         result = autodiff(Forward, _di_loglik_gc!,
-            BatchDuplicated(copy(A), dAs),
-            BatchDuplicated(copy(B), dBs),
-            BatchDuplicated(copy(C), dCs),
-            BatchDuplicated(copy(u0), du0s),
-            BatchDuplicated([copy(n) for n in noise], dnoises),
-            BatchDuplicated([copy(yi) for yi in y], dys),
-            BatchDuplicated(copy(H), dHs),
+            BatchDuplicated(A, dAs),
+            BatchDuplicated(B, dBs),
+            BatchDuplicated(C, dCs),
+            BatchDuplicated(u0, du0s),
+            BatchDuplicated(noise, dnoises),
+            BatchDuplicated(y, dys),
+            BatchDuplicated(H, dHs),
             BatchDuplicated(sol_out, dsols),
             BatchDuplicated(cache, dcaches))
 
@@ -367,9 +347,9 @@ function bench_enzyme_reverse_di!(A, B, C, u0, noise, y, H,
     @inbounds for i in eachindex(dy); dy[i] = fill_zero!!(dy[i]); end
 
     autodiff(Reverse, _di_loglik_gc!, Active,
-        Duplicated(copy(A), dA), Duplicated(copy(B), dB), Duplicated(copy(C), dC),
-        Duplicated(copy(u0), du0), Duplicated([copy(n) for n in noise], dnoise),
-        Duplicated([copy(yi) for yi in y], dy), Duplicated(copy(H), dH),
+        Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
+        Duplicated(u0, du0), Duplicated(noise, dnoise),
+        Duplicated(y, dy), Duplicated(H, dH),
         Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return vec(dA)
 end
@@ -384,12 +364,12 @@ const gc_di_l = make_gc_di(p_gc_large)
 # Warmup
 bench_forwarddiff_di!(vec(copy(gc_di_s.A)), gc_di_s.B, gc_di_s.C,
     gc_di_s.u0, gc_di_s.noise, gc_di_s.y, gc_di_s.H, p_gc_small.N)
-bench_enzyme_batched_fwd_di!(zeros(p_gc_small.N^2),
-    gc_di_s.A, gc_di_s.B, gc_di_s.C, gc_di_s.u0, gc_di_s.noise, gc_di_s.y, gc_di_s.H,
-    gc_di_s.sol_out, gc_di_s.cache,
-    gc_di_s.bd_dAs, gc_di_s.bd_dBs, gc_di_s.bd_dCs, gc_di_s.bd_du0s,
-    gc_di_s.bd_dnoises, gc_di_s.bd_dys, gc_di_s.bd_dHs,
-    gc_di_s.bd_dsols, gc_di_s.bd_dcaches)
+# bench_enzyme_batched_fwd_di!(zeros(p_gc_small.N^2),
+#     gc_di_s.A, gc_di_s.B, gc_di_s.C, gc_di_s.u0, gc_di_s.noise, gc_di_s.y, gc_di_s.H,
+#     gc_di_s.sol_out, gc_di_s.cache,
+#     gc_di_s.bd_dAs, gc_di_s.bd_dBs, gc_di_s.bd_dCs, gc_di_s.bd_du0s,
+#     gc_di_s.bd_dnoises, gc_di_s.bd_dys, gc_di_s.bd_dHs,
+#     gc_di_s.bd_dsols, gc_di_s.bd_dcaches)
 bench_enzyme_reverse_di!(gc_di_s.A, gc_di_s.B, gc_di_s.C,
     gc_di_s.u0, gc_di_s.noise, gc_di_s.y, gc_di_s.H,
     gc_di_s.sol_out, gc_di_s.cache,
@@ -399,12 +379,12 @@ bench_enzyme_reverse_di!(gc_di_s.A, gc_di_s.B, gc_di_s.C,
 
 bench_forwarddiff_di!(vec(copy(gc_di_l.A)), gc_di_l.B, gc_di_l.C,
     gc_di_l.u0, gc_di_l.noise, gc_di_l.y, gc_di_l.H, p_gc_large.N)
-bench_enzyme_batched_fwd_di!(zeros(p_gc_large.N^2),
-    gc_di_l.A, gc_di_l.B, gc_di_l.C, gc_di_l.u0, gc_di_l.noise, gc_di_l.y, gc_di_l.H,
-    gc_di_l.sol_out, gc_di_l.cache,
-    gc_di_l.bd_dAs, gc_di_l.bd_dBs, gc_di_l.bd_dCs, gc_di_l.bd_du0s,
-    gc_di_l.bd_dnoises, gc_di_l.bd_dys, gc_di_l.bd_dHs,
-    gc_di_l.bd_dsols, gc_di_l.bd_dcaches)
+# bench_enzyme_batched_fwd_di!(zeros(p_gc_large.N^2),
+#     gc_di_l.A, gc_di_l.B, gc_di_l.C, gc_di_l.u0, gc_di_l.noise, gc_di_l.y, gc_di_l.H,
+#     gc_di_l.sol_out, gc_di_l.cache,
+#     gc_di_l.bd_dAs, gc_di_l.bd_dBs, gc_di_l.bd_dCs, gc_di_l.bd_du0s,
+#     gc_di_l.bd_dnoises, gc_di_l.bd_dys, gc_di_l.bd_dHs,
+#     gc_di_l.bd_dsols, gc_di_l.bd_dcaches)
 bench_enzyme_reverse_di!(gc_di_l.A, gc_di_l.B, gc_di_l.C,
     gc_di_l.u0, gc_di_l.noise, gc_di_l.y, gc_di_l.H,
     gc_di_l.sol_out, gc_di_l.cache,
@@ -421,24 +401,24 @@ GRAD_CMP["di_likelihood"]["forwarddiff_large"] = @benchmarkable bench_forwarddif
     $(vec(copy(gc_di_l.A))), $(gc_di_l.B), $(gc_di_l.C),
     $(gc_di_l.u0), $(gc_di_l.noise), $(gc_di_l.y), $(gc_di_l.H), $(p_gc_large.N))
 
-# --- DI Enzyme BatchDuplicated Forward ---
-GRAD_CMP["di_likelihood"]["enzyme_batched_fwd_small"] = @benchmarkable bench_enzyme_batched_fwd_di!(
-    $(zeros(p_gc_small.N^2)),
-    $(gc_di_s.A), $(gc_di_s.B), $(gc_di_s.C), $(gc_di_s.u0),
-    $(gc_di_s.noise), $(gc_di_s.y), $(gc_di_s.H),
-    $(gc_di_s.sol_out), $(gc_di_s.cache),
-    $(gc_di_s.bd_dAs), $(gc_di_s.bd_dBs), $(gc_di_s.bd_dCs), $(gc_di_s.bd_du0s),
-    $(gc_di_s.bd_dnoises), $(gc_di_s.bd_dys), $(gc_di_s.bd_dHs),
-    $(gc_di_s.bd_dsols), $(gc_di_s.bd_dcaches))
-
-GRAD_CMP["di_likelihood"]["enzyme_batched_fwd_large"] = @benchmarkable bench_enzyme_batched_fwd_di!(
-    $(zeros(p_gc_large.N^2)),
-    $(gc_di_l.A), $(gc_di_l.B), $(gc_di_l.C), $(gc_di_l.u0),
-    $(gc_di_l.noise), $(gc_di_l.y), $(gc_di_l.H),
-    $(gc_di_l.sol_out), $(gc_di_l.cache),
-    $(gc_di_l.bd_dAs), $(gc_di_l.bd_dBs), $(gc_di_l.bd_dCs), $(gc_di_l.bd_du0s),
-    $(gc_di_l.bd_dnoises), $(gc_di_l.bd_dys), $(gc_di_l.bd_dHs),
-    $(gc_di_l.bd_dsols), $(gc_di_l.bd_dcaches))
+# --- DI Enzyme BatchDuplicated Forward (commented out — always slower than ForwardDiff) ---
+# GRAD_CMP["di_likelihood"]["enzyme_batched_fwd_small"] = @benchmarkable bench_enzyme_batched_fwd_di!(
+#     $(zeros(p_gc_small.N^2)),
+#     $(gc_di_s.A), $(gc_di_s.B), $(gc_di_s.C), $(gc_di_s.u0),
+#     $(gc_di_s.noise), $(gc_di_s.y), $(gc_di_s.H),
+#     $(gc_di_s.sol_out), $(gc_di_s.cache),
+#     $(gc_di_s.bd_dAs), $(gc_di_s.bd_dBs), $(gc_di_s.bd_dCs), $(gc_di_s.bd_du0s),
+#     $(gc_di_s.bd_dnoises), $(gc_di_s.bd_dys), $(gc_di_s.bd_dHs),
+#     $(gc_di_s.bd_dsols), $(gc_di_s.bd_dcaches))
+#
+# GRAD_CMP["di_likelihood"]["enzyme_batched_fwd_large"] = @benchmarkable bench_enzyme_batched_fwd_di!(
+#     $(zeros(p_gc_large.N^2)),
+#     $(gc_di_l.A), $(gc_di_l.B), $(gc_di_l.C), $(gc_di_l.u0),
+#     $(gc_di_l.noise), $(gc_di_l.y), $(gc_di_l.H),
+#     $(gc_di_l.sol_out), $(gc_di_l.cache),
+#     $(gc_di_l.bd_dAs), $(gc_di_l.bd_dBs), $(gc_di_l.bd_dCs), $(gc_di_l.bd_du0s),
+#     $(gc_di_l.bd_dnoises), $(gc_di_l.bd_dys), $(gc_di_l.bd_dHs),
+#     $(gc_di_l.bd_dsols), $(gc_di_l.bd_dcaches))
 
 # --- DI Enzyme Reverse ---
 GRAD_CMP["di_likelihood"]["enzyme_reverse_small"] = @benchmarkable bench_enzyme_reverse_di!(
