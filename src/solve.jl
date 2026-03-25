@@ -1,7 +1,37 @@
 using DiffEqBase: DEAlgorithm, KeywordArgSilent
 
 abstract type AbstractDifferenceEquationAlgorithm <: DEAlgorithm end
+
+"""
+    DirectIteration()
+
+Forward iteration algorithm for state-space problems. Iterates the state transition
+equation forward in time, computing the state trajectory `u`, observations `z`,
+noise history `W`, and (if `observables` are provided) the joint log-likelihood `logpdf`.
+
+This is the default algorithm for all problem types.
+
+See also: [`KalmanFilter`](@ref).
+"""
 struct DirectIteration <: AbstractDifferenceEquationAlgorithm end
+
+"""
+    KalmanFilter()
+
+Kalman filter algorithm for [`LinearStateSpaceProblem`](@ref). Computes filtered
+state estimates, posterior covariances, and the marginal log-likelihood.
+
+Automatically selected when the problem provides:
+- `u0_prior_mean` and `u0_prior_var` (Gaussian prior),
+- `observables` (observed data),
+- `observables_noise` (observation noise covariance),
+- `noise = nothing` (latent noise is not fixed).
+
+The solution contains filtered means in `sol.u`, posterior covariances in `sol.P`,
+predicted observations in `sol.z`, and the marginal log-likelihood in `sol.logpdf`.
+
+See also: [`DirectIteration`](@ref).
+"""
 struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 
 # The typical algorithm in discrete-time is DirectIteration()

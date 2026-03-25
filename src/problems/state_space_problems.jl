@@ -1,3 +1,11 @@
+"""
+    AbstractStateSpaceProblem <: DEProblem
+
+Abstract supertype for all discrete-time state-space problems in DifferenceEquations.jl.
+
+Subtypes include [`LinearStateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
+[`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref).
+"""
 abstract type AbstractStateSpaceProblem <: DEProblem end
 
 # TODO: Can add in more checks on the algorithm choice
@@ -25,8 +33,43 @@ end
 
 SciMLBase.isinplace(prob::AbstractStateSpaceProblem) = false  # necessary for the get_concrete_u0 overloads
 
-# the {iip} isn't relevant here at this point, but if we remove it then there are failures in the "remake" call above
-# when using the Ensemble unit tests
+"""
+    LinearStateSpaceProblem(A, B, u0, tspan[, p]; kwargs...)
+
+Define a linear time-invariant state-space model:
+
+```math
+u_{n+1} = A \\, u_n + B \\, w_{n+1}
+```
+
+with optional observation equation ``z_n = C \\, u_n + v_n``.
+
+# Positional Arguments
+- `A`: Transition matrix (n×n).
+- `B`: Noise input matrix (n×k), or `nothing` for deterministic dynamics.
+- `u0`: Initial state vector, or a `Distribution` for random initial conditions.
+- `tspan`: Time span as `(t0, t_end)` with integer distance (e.g., `(0, T)`).
+- `p`: Parameters (default: `NullParameters()`).
+
+# Keyword Arguments
+- `C`: Observation matrix (m×n). If `nothing`, no observations are computed.
+- `observables_noise`: Observation noise covariance. A `Vector` is treated as a diagonal.
+- `observables`: Observed data as `Vector{Vector{T}}` for likelihood computation.
+- `noise`: Fixed noise sequence as `Vector{Vector{T}}`. If `nothing`, noise is drawn randomly.
+- `u0_prior_mean`: Prior mean for Kalman filtering.
+- `u0_prior_var`: Prior covariance matrix for Kalman filtering.
+- `syms`: State variable names (e.g., `(:x, :y)`) for symbolic indexing.
+- `obs_syms`: Observation variable names for symbolic indexing.
+
+# Notes
+- Providing `u0_prior_mean`, `u0_prior_var`, `observables`, and `observables_noise`
+  (with `noise = nothing`) triggers automatic selection of [`KalmanFilter`](@ref).
+- The `observables` timing convention: observations correspond to ``z_1, z_2, \\ldots``
+  (starting from the second state), so pass `T` observations for a `tspan` of `(0, T)`.
+
+See also: [`StateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
+[`DirectIteration`](@ref), [`KalmanFilter`](@ref).
+"""
 struct LinearStateSpaceProblem{
         uType, uPriorMeanType, uPriorVarType, tType, P, NP, F, AType,
         BType, CType,
@@ -92,6 +135,34 @@ function LinearStateSpaceProblem(args...; kwargs...)
     return LinearStateSpaceProblem{false}(args...; kwargs...)
 end
 
+"""
+    StateSpaceProblem(transition, observation, u0, tspan[, p]; n_shocks, kwargs...)
+
+Define a generic state-space model with user-provided callback functions:
+
+```math
+u_{n+1} = f(u_n, w_{n+1}, p, t_n), \\quad z_n = g(u_n, p, t_n)
+```
+
+# Positional Arguments
+- `transition`: Callback `f!!(x_next, x, w, p, t) -> x_next`. For mutable arrays, mutate
+  `x_next` in place and return it; for immutable arrays (e.g., `SVector`), return a new value.
+- `observation`: Callback `g!!(y, x, p, t) -> y`, or `nothing` for no observations.
+- `u0`: Initial state vector, or a `Distribution` for random initial conditions.
+- `tspan`: Time span as `(t0, t_end)` with integer distance.
+- `p`: Parameters passed to the callbacks (default: `NullParameters()`).
+
+# Keyword Arguments
+- `n_shocks::Int`: Number of noise dimensions (required).
+- `n_obs::Int`: Number of observation dimensions (default: `0`).
+- `observables_noise`: Observation noise covariance for likelihood computation.
+- `observables`: Observed data as `Vector{Vector{T}}`.
+- `noise`: Fixed noise sequence as `Vector{Vector{T}}`.
+- `syms`: State variable names for symbolic indexing.
+- `obs_syms`: Observation variable names for symbolic indexing.
+
+See also: [`LinearStateSpaceProblem`](@ref), [`DirectIteration`](@ref).
+"""
 struct StateSpaceProblem{
         uType, tType, P, NP, TF, GF, F,
         RType, ObsType, OS, K,
