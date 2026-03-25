@@ -88,13 +88,13 @@ function enzyme_batched_forward_gradient_kf!(grad_out, A, B, C, mu_0, Sigma_0, R
         end
 
         result = autodiff(Forward, _kf_loglik_enzyme!,
-            BatchDuplicated(copy(A), dAs),
-            BatchDuplicated(copy(B), dBs),
-            BatchDuplicated(copy(C), dCs),
-            BatchDuplicated(copy(mu_0), dmu0s),
-            BatchDuplicated(copy(Sigma_0), dSig0s),
-            BatchDuplicated(copy(R), dRs),
-            BatchDuplicated([copy(yi) for yi in y], dys),
+            BatchDuplicated(A, dAs),
+            BatchDuplicated(B, dBs),
+            BatchDuplicated(C, dCs),
+            BatchDuplicated(mu_0, dmu0s),
+            BatchDuplicated(Sigma_0, dSig0s),
+            BatchDuplicated(R, dRs),
+            BatchDuplicated(y, dys),
             BatchDuplicated(sol_out, dsols),
             BatchDuplicated(cache, dcaches))
 
@@ -119,9 +119,9 @@ function enzyme_reverse_gradient_kf!(A, B, C, mu_0, Sigma_0, R, y,
     @inbounds for i in eachindex(dy); dy[i] = fill_zero!!(dy[i]); end
 
     autodiff(Reverse, _kf_loglik_enzyme!, Active,
-        Duplicated(copy(A), dA), Duplicated(copy(B), dB), Duplicated(copy(C), dC),
-        Duplicated(copy(mu_0), dmu_0), Duplicated(copy(Sigma_0), dSigma_0),
-        Duplicated(copy(R), dR), Duplicated([copy(yi) for yi in y], dy),
+        Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
+        Duplicated(mu_0, dmu_0), Duplicated(Sigma_0, dSigma_0),
+        Duplicated(R, dR), Duplicated(y, dy),
         Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
     return vec(dA)
 end
@@ -261,13 +261,13 @@ function enzyme_batched_forward_gradient_di!(grad_out, A, B, C, u0, noise, y, H,
         end
 
         result = autodiff(Forward, _di_loglik_enzyme!,
-            BatchDuplicated(copy(A), dAs),
-            BatchDuplicated(copy(B), dBs),
-            BatchDuplicated(copy(C), dCs),
-            BatchDuplicated(copy(u0), du0s),
-            BatchDuplicated([copy(n) for n in noise], dnoises),
-            BatchDuplicated([copy(yi) for yi in y], dys),
-            BatchDuplicated(copy(H), dHs),
+            BatchDuplicated(A, dAs),
+            BatchDuplicated(B, dBs),
+            BatchDuplicated(C, dCs),
+            BatchDuplicated(u0, du0s),
+            BatchDuplicated(noise, dnoises),
+            BatchDuplicated(y, dys),
+            BatchDuplicated(H, dHs),
             BatchDuplicated(sol_out, dsols),
             BatchDuplicated(cache, dcaches))
 
@@ -313,11 +313,11 @@ end
     dsol_rv = make_zero(sol_out_rv); dcache_rv = make_zero(cache_rv)
 
     autodiff(Reverse, _di_loglik_enzyme!, Active,
-        Duplicated(copy(A_di_gc), dA_rv), Duplicated(copy(B_di_gc), dB_rv),
-        Duplicated(copy(C_di_gc), dC_rv), Duplicated(copy(u0_di_gc), du0_rv),
-        Duplicated([copy(n) for n in noise_di_gc], dnoise_rv),
-        Duplicated([copy(yi) for yi in y_di_gc], dy_rv),
-        Duplicated(copy(H_di_gc), dH_rv),
+        Duplicated(A_di_gc, dA_rv), Duplicated(B_di_gc, dB_rv),
+        Duplicated(C_di_gc, dC_rv), Duplicated(u0_di_gc, du0_rv),
+        Duplicated(noise_di_gc, dnoise_rv),
+        Duplicated(y_di_gc, dy_rv),
+        Duplicated(H_di_gc, dH_rv),
         Duplicated(sol_out_rv, dsol_rv), Duplicated(cache_rv, dcache_rv))
     grad_enzyme_rev = vec(dA_rv)
 
