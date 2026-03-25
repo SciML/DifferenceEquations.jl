@@ -16,11 +16,13 @@ include("explicit_imports.jl")
 include("linear_direct_iteration.jl")
 include("kalman.jl")
 include("direct_iteration.jl")
+include("quadratic_direct_iteration.jl")
 include("static_arrays.jl")
 include("cache_reuse.jl")
 include("sciml_interfaces.jl")
 include("sensitivity_interface.jl")
 include("linear_direct_iteration_enzyme.jl")
+include("quadratic_direct_iteration_enzyme.jl")
 include("kalman_enzyme.jl")
 
 if get(ENV, "GROUP", "") == "JET"

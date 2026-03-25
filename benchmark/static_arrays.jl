@@ -140,57 +140,9 @@ const ws_km5 = init(LinearStateSpaceProblem(Matrix(A_kf_5), Matrix(B_kf_5), Vect
     observables_noise = Matrix(R_kf_5), observables = [Vector(y) for y in y_kf_5]), KalmanFilter())
 SA_BENCH["kalman"]["mutable_5x5"] = @benchmarkable bench_solve!($ws_km5)
 
-# --- Quadratic StateSpaceProblem (bang-bang, Ref-based state) ---
+# --- Quadratic PrunedQuadraticStateSpaceProblem (pruned, using new types) ---
 
 SA_BENCH["quadratic"] = BenchmarkGroup()
-
-using DifferenceEquations: copyto!!
-
-# Bang-bang quadratic callbacks — work for both mutable and static arrays.
-# Mutable state u_f stored in Ref so it persists across callback invocations.
-function quad_f_bb!!(x_next, x, w, p, t)
-    (; A_0, A_1, A_2, B, u_f_ref, u_f_new_ref) = p
-    u_f = u_f_ref[]
-    u_f_new = u_f_new_ref[]
-    n_x = length(x)
-    u_f_new = mul!!(u_f_new, A_1, u_f)
-    u_f_new = muladd!!(u_f_new, B, w)
-    x_next = copyto!!(x_next, A_0)
-    x_next = mul!!(x_next, A_1, x, 1.0, 1.0)
-    if ismutable(x_next)
-        @inbounds for i in 1:n_x
-            x_next[i] += dot(u_f, view(A_2, i, :, :), u_f)
-        end
-    else
-        x_next = x_next + typeof(x_next)(ntuple(i -> dot(u_f, view(A_2, i, :, :), u_f), n_x))
-    end
-    x_next = muladd!!(x_next, B, w)
-    u_f_ref[] = u_f_new
-    return x_next
-end
-
-function quad_g_bb!!(y, x, p, t)
-    (; C_0, C_1, C_2, u_f_ref) = p
-    u_f = u_f_ref[]
-    n_obs = length(C_0)
-    y = copyto!!(y, C_0)
-    y = mul!!(y, C_1, x, 1.0, 1.0)
-    if ismutable(y)
-        @inbounds for i in 1:n_obs
-            y[i] += dot(u_f, view(C_2, i, :, :), u_f)
-        end
-    else
-        y = y + typeof(y)(ntuple(i -> dot(u_f, view(C_2, i, :, :), u_f), n_obs))
-    end
-    return y
-end
-
-# Reset u_f state before each solve (quadratic state is NOT in the solver cache)
-function bench_quad_solve!(ws)
-    ws.prob.p.u_f_ref[] = zero(ws.prob.p.u_f_ref[])
-    solve!(ws)
-    return nothing
-end
 
 # N=2, K=1, M=2, T=10
 Random.seed!(42)
@@ -198,27 +150,28 @@ const A_2_q = 0.01 * randn(2, 2, 2)
 const C_2_q = 0.01 * randn(2, 2, 2)
 const noise_q = [randn() for _ in 1:10]
 
-const A_1_qs = @SMatrix [0.3 0.1; -0.1 0.3]
-const A_0_qs = @SVector [0.001, -0.001]
-const B_qs = @SMatrix [0.1; 0.0;;]
-const C_0_qs = @SVector [0.001, -0.001]
-const C_1_qs = @SMatrix [1.0 0.0; 0.0 1.0]
-const u0_qs = @SVector zeros(2)
+const As1 = @SMatrix [0.3 0.1; -0.1 0.3]
+const As0 = @SVector [0.001, -0.001]
+const Bs = @SMatrix [0.1; 0.0;;]
+const Cs0 = @SVector [0.001, -0.001]
+const Cs1 = @SMatrix [1.0 0.0; 0.0 1.0]
+const u0s = @SVector zeros(2)
+const noise_s = [SVector{1}(n) for n in noise_q]
 
-const p_qs = (; A_0 = A_0_qs, A_1 = A_1_qs, A_2 = A_2_q, B = B_qs,
-    C_0 = C_0_qs, C_1 = C_1_qs, C_2 = C_2_q,
-    u_f_ref = Ref(copy(u0_qs)), u_f_new_ref = Ref(similar(u0_qs)))
-const ws_qs = init(StateSpaceProblem(quad_f_bb!!, quad_g_bb!!, u0_qs, (0, 10), p_qs;
-    n_shocks = 1, n_obs = 2, noise = [SVector{1}(n) for n in noise_q]), DirectIteration())
-SA_BENCH["quadratic"]["static_2x2"] = @benchmarkable bench_quad_solve!($ws_qs)
+# Static 2x2 (pruned quadratic)
+const prob_qs = PrunedQuadraticStateSpaceProblem(As0, As1, A_2_q, Bs, u0s, (0, 10);
+    C_0 = Cs0, C_1 = Cs1, C_2 = C_2_q, noise = noise_s)
+const ws_qs = init(prob_qs, DirectIteration())
+SA_BENCH["quadratic"]["static_2x2"] = @benchmarkable bench_solve!($ws_qs)
 
-const u0_qm = zeros(2)
-const p_qm = (; A_0 = Vector(A_0_qs), A_1 = Matrix(A_1_qs), A_2 = copy(A_2_q), B = Matrix(B_qs),
-    C_0 = Vector(C_0_qs), C_1 = Matrix(C_1_qs), C_2 = copy(C_2_q),
-    u_f_ref = Ref(copy(u0_qm)), u_f_new_ref = Ref(similar(u0_qm)))
-const ws_qm = init(StateSpaceProblem(quad_f_bb!!, quad_g_bb!!, u0_qm, (0, 10), p_qm;
-    n_shocks = 1, n_obs = 2, noise = [[n] for n in noise_q]), DirectIteration())
-SA_BENCH["quadratic"]["mutable_2x2"] = @benchmarkable bench_quad_solve!($ws_qm)
+# Mutable 2x2 (pruned quadratic)
+const prob_qm = PrunedQuadraticStateSpaceProblem(
+    Vector(As0), Matrix(As1), copy(A_2_q), Matrix(Bs),
+    Vector(u0s), (0, 10);
+    C_0 = Vector(Cs0), C_1 = Matrix(Cs1), C_2 = copy(C_2_q),
+    noise = [Vector(n) for n in noise_s])
+const ws_qm = init(prob_qm, DirectIteration())
+SA_BENCH["quadratic"]["mutable_2x2"] = @benchmarkable bench_solve!($ws_qm)
 
 # =============================================================================
 # AD benchmarks for Linear 2x2 (static and mutable)
@@ -329,5 +282,135 @@ SA_BENCH["linear"]["reverse"]["mutable_2x2"] = @benchmarkable reverse_sa!(
     $A_m2, $B_m2, $C_m2, $u0_m2, $noise_m2,
     $(ws_lm2.output), $(ws_lm2.cache),
     $dA_m2, $dB_m2, $dC_m2, $du0_m2, $dnoise_m2, $dsol_m2, $dcache_m2)
+
+# =============================================================================
+# AD benchmarks for Quadratic 2x2 (static and mutable) — PrunedQuadraticStateSpaceProblem
+# =============================================================================
+
+SA_BENCH["quadratic"]["forward"] = BenchmarkGroup()
+SA_BENCH["quadratic"]["reverse"] = BenchmarkGroup()
+
+# --- Inner wrappers: construct prob inside (correct Enzyme pattern) ---
+
+function quad_fwd_sa!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol_out, cache)
+    prob = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
+    solve!(ws)
+    return (sol_out.u[end], sol_out.z[end])
+end
+
+function quad_rev_sa!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol_out, cache)::Float64
+    prob = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
+    return sum(solve!(ws).u[end])
+end
+
+# --- Outer bench functions: zero shadows, call autodiff ---
+
+function forward_quad_sa!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol_out, cache,
+        dA_0, dA_1, dA_2, dB, dC_0, dC_1, dC_2, du0, dnoise, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA_0 = fill_zero!!(dA_0); dA_1 = fill_zero!!(dA_1); make_zero!(dA_2)
+    dB = fill_zero!!(dB); dC_0 = fill_zero!!(dC_0); dC_1 = fill_zero!!(dC_1)
+    make_zero!(dC_2); du0 = fill_zero!!(du0)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
+    if ismutable(dA_1); dA_1[1,1] = 1.0; else; dA_1 = setindex(dA_1, 1.0, 1, 1); end
+
+    autodiff(Forward, quad_fwd_sa!,
+        Duplicated(A_0, dA_0), Duplicated(A_1, dA_1), Duplicated(A_2, dA_2),
+        Duplicated(B, dB), Duplicated(C_0, dC_0), Duplicated(C_1, dC_1),
+        Duplicated(C_2, dC_2), Duplicated(u0, du0), Duplicated(noise, dnoise),
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+    return nothing
+end
+
+function reverse_quad_sa!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol_out, cache,
+        dA_0, dA_1, dA_2, dB, dC_0, dC_1, dC_2, du0, dnoise, dsol_out, dcache)
+    make_zero!(dsol_out); make_zero!(dcache)
+    dA_0 = fill_zero!!(dA_0); dA_1 = fill_zero!!(dA_1); make_zero!(dA_2)
+    dB = fill_zero!!(dB); dC_0 = fill_zero!!(dC_0); dC_1 = fill_zero!!(dC_1)
+    make_zero!(dC_2); du0 = fill_zero!!(du0)
+    @inbounds for i in eachindex(dnoise); dnoise[i] = fill_zero!!(dnoise[i]); end
+
+    autodiff(Reverse, quad_rev_sa!, Active,
+        Duplicated(A_0, dA_0), Duplicated(A_1, dA_1), Duplicated(A_2, dA_2),
+        Duplicated(B, dB), Duplicated(C_0, dC_0), Duplicated(C_1, dC_1),
+        Duplicated(C_2, dC_2), Duplicated(u0, du0), Duplicated(noise, dnoise),
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+    return nothing
+end
+
+# --- Static quadratic AD shadows ---
+
+const dAs0 = make_zero(As0); const dAs1 = make_zero(As1)
+const dA_2_qs = make_zero(A_2_q); const dBs = make_zero(Bs)
+const dCs0 = make_zero(Cs0); const dCs1 = make_zero(Cs1)
+const dC_2_qs = make_zero(C_2_q); const du0s = make_zero(u0s)
+const dnoise_qs = [make_zero(noise_s[1]) for _ in 1:10]
+const dsol_qs = make_zero(ws_qs.output); const dcache_qs = make_zero(ws_qs.cache)
+
+# --- Mutable quadratic AD shadows ---
+
+const A_0_qm_ad = Vector(As0); const A_1_qm_ad = Matrix(As1)
+const A_2_qm_ad = copy(A_2_q); const B_qm_ad = Matrix(Bs)
+const C_0_qm_ad = Vector(Cs0); const C_1_qm_ad = Matrix(Cs1)
+const C_2_qm_ad = copy(C_2_q); const u0_qm_ad = Vector(u0s)
+const noise_qm_ad = [Vector(n) for n in noise_s]
+const dA_0_qm = make_zero(A_0_qm_ad); const dA_1_qm = make_zero(A_1_qm_ad)
+const dA_2_qm = make_zero(A_2_qm_ad); const dB_qm_ad = make_zero(B_qm_ad)
+const dC_0_qm = make_zero(C_0_qm_ad); const dC_1_qm = make_zero(C_1_qm_ad)
+const dC_2_qm = make_zero(C_2_qm_ad); const du0_qm_ad = make_zero(u0_qm_ad)
+const dnoise_qm_ad = [make_zero(noise_qm_ad[1]) for _ in 1:10]
+const dsol_qm = make_zero(ws_qm.output); const dcache_qm = make_zero(ws_qm.cache)
+
+# --- Quadratic warmups ---
+
+forward_quad_sa!(As0, As1, A_2_q, Bs, Cs0, Cs1, C_2_q,
+    u0s, noise_s, ws_qs.output, ws_qs.cache,
+    dAs0, dAs1, dA_2_qs, dBs, dCs0, dCs1, dC_2_qs,
+    du0s, dnoise_qs, dsol_qs, dcache_qs)
+
+forward_quad_sa!(A_0_qm_ad, A_1_qm_ad, A_2_qm_ad, B_qm_ad, C_0_qm_ad, C_1_qm_ad, C_2_qm_ad,
+    u0_qm_ad, noise_qm_ad, ws_qm.output, ws_qm.cache,
+    dA_0_qm, dA_1_qm, dA_2_qm, dB_qm_ad, dC_0_qm, dC_1_qm, dC_2_qm,
+    du0_qm_ad, dnoise_qm_ad, dsol_qm, dcache_qm)
+
+reverse_quad_sa!(As0, As1, A_2_q, Bs, Cs0, Cs1, C_2_q,
+    u0s, noise_s, ws_qs.output, ws_qs.cache,
+    dAs0, dAs1, dA_2_qs, dBs, dCs0, dCs1, dC_2_qs,
+    du0s, dnoise_qs, dsol_qs, dcache_qs)
+
+reverse_quad_sa!(A_0_qm_ad, A_1_qm_ad, A_2_qm_ad, B_qm_ad, C_0_qm_ad, C_1_qm_ad, C_2_qm_ad,
+    u0_qm_ad, noise_qm_ad, ws_qm.output, ws_qm.cache,
+    dA_0_qm, dA_1_qm, dA_2_qm, dB_qm_ad, dC_0_qm, dC_1_qm, dC_2_qm,
+    du0_qm_ad, dnoise_qm_ad, dsol_qm, dcache_qm)
+
+# --- Quadratic benchmarkables ---
+
+SA_BENCH["quadratic"]["forward"]["static_2x2"] = @benchmarkable forward_quad_sa!(
+    $As0, $As1, $A_2_q, $Bs, $Cs0, $Cs1, $C_2_q,
+    $u0s, $noise_s, $(ws_qs.output), $(ws_qs.cache),
+    $dAs0, $dAs1, $dA_2_qs, $dBs, $dCs0, $dCs1, $dC_2_qs,
+    $du0s, $dnoise_qs, $dsol_qs, $dcache_qs)
+
+SA_BENCH["quadratic"]["forward"]["mutable_2x2"] = @benchmarkable forward_quad_sa!(
+    $A_0_qm_ad, $A_1_qm_ad, $A_2_qm_ad, $B_qm_ad, $C_0_qm_ad, $C_1_qm_ad, $C_2_qm_ad,
+    $u0_qm_ad, $noise_qm_ad, $(ws_qm.output), $(ws_qm.cache),
+    $dA_0_qm, $dA_1_qm, $dA_2_qm, $dB_qm_ad, $dC_0_qm, $dC_1_qm, $dC_2_qm,
+    $du0_qm_ad, $dnoise_qm_ad, $dsol_qm, $dcache_qm)
+
+SA_BENCH["quadratic"]["reverse"]["static_2x2"] = @benchmarkable reverse_quad_sa!(
+    $As0, $As1, $A_2_q, $Bs, $Cs0, $Cs1, $C_2_q,
+    $u0s, $noise_s, $(ws_qs.output), $(ws_qs.cache),
+    $dAs0, $dAs1, $dA_2_qs, $dBs, $dCs0, $dCs1, $dC_2_qs,
+    $du0s, $dnoise_qs, $dsol_qs, $dcache_qs)
+
+SA_BENCH["quadratic"]["reverse"]["mutable_2x2"] = @benchmarkable reverse_quad_sa!(
+    $A_0_qm_ad, $A_1_qm_ad, $A_2_qm_ad, $B_qm_ad, $C_0_qm_ad, $C_1_qm_ad, $C_2_qm_ad,
+    $u0_qm_ad, $noise_qm_ad, $(ws_qm.output), $(ws_qm.cache),
+    $dA_0_qm, $dA_1_qm, $dA_2_qm, $dB_qm_ad, $dC_0_qm, $dC_1_qm, $dC_2_qm,
+    $du0_qm_ad, $dnoise_qm_ad, $dsol_qm, $dcache_qm)
 
 SA_BENCH

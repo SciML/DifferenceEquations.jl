@@ -47,6 +47,17 @@ function alloc_sol(prob::StateSpaceProblem, ::DirectIteration, T)
     )
 end
 
+# --- Quadratic solution output (same structure as linear) ---
+
+function alloc_sol(prob::AnyQuadraticProblem, ::DirectIteration, T)
+    (; u0, C_0) = prob
+    M = isnothing(C_0) ? 0 : length(C_0)
+    return (;
+        u = [alloc_like(u0) for _ in 1:T],
+        z = isnothing(C_0) ? nothing : [alloc_like(u0, M) for _ in 1:T],
+    )
+end
+
 # =============================================================================
 # Scratch cache allocation (temporary workspace buffers only)
 # =============================================================================
@@ -72,6 +83,39 @@ end
 
 _alloc_noise(B, T) = [Vector{eltype(B)}(undef, size(B, 2)) for _ in 1:(T - 1)]
 _alloc_noise(::Nothing, T) = nothing
+
+# --- Shared base cache for DirectIteration (noise + loglik workspace) ---
+
+function _alloc_di_base_cache(B, u0, M, T, has_obs_noise)
+    T_obs = T - 1
+    return (;
+        noise = _alloc_noise(B, T),
+        R = has_obs_noise ? alloc_like(u0, M, M) : nothing,
+        R_chol = has_obs_noise ? alloc_like(u0, M, M) : nothing,
+        innovation = has_obs_noise ? [alloc_like(u0, M) for _ in 1:T_obs] : nothing,
+        innovation_solved = has_obs_noise ? [alloc_like(u0, M) for _ in 1:T_obs] : nothing,
+    )
+end
+
+# --- Unpruned quadratic cache (same as linear) ---
+
+function alloc_cache(prob::QuadraticStateSpaceProblem, ::DirectIteration, T)
+    (; B, C_0, u0) = prob
+    M = isnothing(C_0) ? 0 : length(C_0)
+    has_obs_noise = !isnothing(prob.observables_noise)
+    return _alloc_di_base_cache(B, u0, M, T, has_obs_noise)
+end
+
+# --- Pruned quadratic cache (base + u_f buffer) ---
+
+function alloc_cache(prob::PrunedQuadraticStateSpaceProblem, ::DirectIteration, T)
+    (; B, C_0, u0) = prob
+    M = isnothing(C_0) ? 0 : length(C_0)
+    has_obs_noise = !isnothing(prob.observables_noise)
+    base = _alloc_di_base_cache(B, u0, M, T, has_obs_noise)
+    u_f = [alloc_like(u0) for _ in 1:T]
+    return (; base..., u_f)
+end
 
 """
     alloc_cache(prob::LinearStateSpaceProblem, ::KalmanFilter, T)
@@ -145,6 +189,12 @@ function zero_cache!!(cache, ::DirectIteration)
         @inbounds for t in eachindex(cache.innovation)
             cache.innovation[t] = fill_zero!!(cache.innovation[t])
             cache.innovation_solved[t] = fill_zero!!(cache.innovation_solved[t])
+        end
+    end
+    # Pruned quadratic u_f buffer (present only for PrunedQuadraticStateSpaceProblem)
+    if hasproperty(cache, :u_f)
+        @inbounds for t in eachindex(cache.u_f)
+            cache.u_f[t] = fill_zero!!(cache.u_f[t])
         end
     end
     return cache
