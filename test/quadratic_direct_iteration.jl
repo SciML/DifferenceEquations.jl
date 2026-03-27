@@ -57,7 +57,7 @@ end
     prob = QuadraticStateSpaceProblem(
         A_0_sm, A_1_sm, A_2_sm, B_sm, u0_sm, (0, T_q);
         C_0 = C_0_sm, C_1 = C_1_sm, C_2 = C_2_sm,
-        noise = noise_sm, observables = obs_sm, observables_noise = D_sm)
+        noise = noise_sm, observables = obs_sm, observables_noise = Diagonal(D_sm))
     sol = solve(prob)
     @test isfinite(sol.logpdf)
     @test sol.logpdf != 0.0
@@ -121,7 +121,7 @@ end
     prob = PrunedQuadraticStateSpaceProblem(
         A_0_sm, A_1_sm, A_2_sm, B_sm, u0_sm, (0, T_q);
         C_0 = C_0_sm, C_1 = C_1_sm, C_2 = C_2_sm,
-        noise = noise_sm, observables = obs_pruned_sm, observables_noise = D_sm)
+        noise = noise_sm, observables = obs_pruned_sm, observables_noise = Diagonal(D_sm))
     sol = solve(prob)
     @test isfinite(sol.logpdf)
     @test sol.logpdf != 0.0
@@ -185,7 +185,7 @@ noise_2_rbc_short = noise_2_rbc[1:T_rbc]
         A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
         (0, length(observables_2_rbc_short));
         C_0 = C_0_rbc, C_1 = C_1_rbc, C_2 = C_2_rbc,
-        observables_noise = D_2_rbc, noise = noise_2_rbc_short,
+        observables_noise = Diagonal(D_2_rbc), noise = noise_2_rbc_short,
         observables = observables_2_rbc_short)
     sol = solve(prob)
     @test sol.logpdf ≈ -690.81094364573
@@ -196,7 +196,7 @@ end
         A_0_rbc, A_1_rbc, A_2_rbc, B_2_rbc, u0_2_rbc,
         (0, length(observables_2_rbc_short));
         C_0 = C_0_rbc, C_1 = C_1_rbc, C_2 = C_2_rbc,
-        observables_noise = D_2_rbc, noise = noise_2_rbc_short,
+        observables_noise = Diagonal(D_2_rbc), noise = noise_2_rbc_short,
         observables = observables_2_rbc_short)
     sol_direct = solve(prob)
     ws = init(prob, DirectIteration())
@@ -214,7 +214,7 @@ end
     prob = QuadraticStateSpaceProblem(
         A_0_sm, A_1_sm, A_2_sm, B_sm, u0_sm, (0, T_q);
         C_0 = C_0_sm, C_1 = C_1_sm, C_2 = C_2_sm,
-        noise = noise_sm, observables = obs_sm, observables_noise = D_sm)
+        noise = noise_sm, observables = obs_sm, observables_noise = Diagonal(D_sm))
     ws = init(prob, DirectIteration())
     sol1 = solve!(ws)
     sol2 = solve!(ws)
@@ -227,7 +227,7 @@ end
     prob = PrunedQuadraticStateSpaceProblem(
         A_0_sm, A_1_sm, A_2_sm, B_sm, u0_sm, (0, T_q);
         C_0 = C_0_sm, C_1 = C_1_sm, C_2 = C_2_sm,
-        noise = noise_sm, observables = obs_pruned_sm, observables_noise = D_sm)
+        noise = noise_sm, observables = obs_pruned_sm, observables_noise = Diagonal(D_sm))
     ws = init(prob, DirectIteration())
     sol1 = solve!(ws)
     sol2 = solve!(ws)

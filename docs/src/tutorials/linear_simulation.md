@@ -27,11 +27,11 @@ using DifferenceEquations, LinearAlgebra, Distributions, Random, Plots, DiffEqBa
 A = [0.95 6.2; 0.0 0.2]
 B = [0.0; 0.01;;]
 C = [0.09 0.67; 1.00 0.00]
-D = [0.1, 0.1]
+D = Diagonal([0.1, 0.1])
 u0 = zeros(2)
 T = 10
 
-prob = LinearStateSpaceProblem(A, B, u0, (0, T); C, observables_noise = D, syms = [:a, :b])
+prob = LinearStateSpaceProblem(A, B, u0, (0, T); C, observables_noise = D, syms = (:a, :b))
 sol = solve(prob)
 ```
 
@@ -56,7 +56,7 @@ sol.u  # full state trajectory, Vector{Vector}
 Access a specific time step:
 
 ```@example linear_sim
-sol[2]  # state at the second time step (same as sol.u[2])
+sol[2]  # state at t=1 (second entry; sol[1] is the initial condition u₀)
 ```
 
 Or a specific element of the last state:
@@ -88,7 +88,7 @@ If `obs_syms` are also provided, observation variables can be accessed similarly
 
 ```@example linear_sim
 prob_obs = LinearStateSpaceProblem(A, B, u0, (0, T); C, observables_noise = D,
-    syms = [:a, :b], obs_syms = (:output, :consumption))
+    syms = (:a, :b), obs_syms = (:output, :consumption))
 sol_obs = solve(prob_obs)
 sol_obs[:output]  # time series for observation :output
 ```
@@ -103,7 +103,7 @@ joint likelihood computations.
 noise = sol.W  # extract realized noise (Vector{Vector})
 u0_new = [0.1, 0.0]
 prob_fixed = LinearStateSpaceProblem(A, B, u0_new, (0, T); C, observables_noise = D,
-    syms = [:a, :b], noise)
+    syms = (:a, :b), noise)
 sol_fixed = solve(prob_fixed)
 plot(sol_fixed)
 ```
@@ -117,7 +117,7 @@ where only the first entry is nonzero.
 ```@example linear_sim
 function irf(A, B, C, T = 20)
     noise = [[i == 1 ? 1.0 : 0.0] for i in 1:T]
-    problem = LinearStateSpaceProblem(A, B, zeros(2), (0, T); C, noise, syms = [:a, :b])
+    problem = LinearStateSpaceProblem(A, B, zeros(2), (0, T); C, noise, syms = (:a, :b))
     return solve(problem)
 end
 plot(irf(A, B, C))
@@ -129,7 +129,7 @@ When the model has no process noise, pass `B = nothing`. The solver will skip
 noise generation entirely. No `sol.W` is produced.
 
 ```@example linear_sim
-prob_det = LinearStateSpaceProblem(A, nothing, [1.0, 0.5], (0, T); C, syms = [:a, :b])
+prob_det = LinearStateSpaceProblem(A, nothing, [1.0, 0.5], (0, T); C, syms = (:a, :b))
 sol_det = solve(prob_det)
 sol_det.W === nothing  # no noise generated
 ```
@@ -144,7 +144,7 @@ When you only need the state trajectory and don't require observations,
 omit `C` (or pass `C = nothing`). No `sol.z` is produced.
 
 ```@example linear_sim
-prob_no_obs = LinearStateSpaceProblem(A, B, u0, (0, T); syms = [:a, :b])
+prob_no_obs = LinearStateSpaceProblem(A, B, u0, (0, T); syms = (:a, :b))
 sol_no_obs = solve(prob_no_obs)
 sol_no_obs.z === nothing  # no observations
 ```

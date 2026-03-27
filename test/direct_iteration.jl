@@ -98,7 +98,7 @@ end
 
     sol_linear = solve(LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
-        observables_noise = D_rbc, noise = nse, observables = obs
+        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
     ))
 
     linear_f!! = (x_next, x, w, p, t) -> begin
@@ -115,7 +115,7 @@ end
     sol_generic = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = nse, observables = obs
+        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
     ))
 
     @test sol_linear.u ≈ sol_generic.u
@@ -210,13 +210,13 @@ end
 
     sol_obs_noise = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0, (0, T), p;
-        n_shocks = 1, n_obs = 2, observables_noise = D_rbc
+        n_shocks = 1, n_obs = 2, observables_noise = Diagonal(D_rbc)
     ))
 
     # Tiny observation noise → nearly deterministic
     sol_tiny = solve(StateSpaceProblem(
         linear_f!!, linear_g!!, u0, (0, T), p;
-        n_shocks = 1, n_obs = 2, observables_noise = [1.0e-16, 1.0e-16]
+        n_shocks = 1, n_obs = 2, observables_noise = Diagonal([1.0e-16, 1.0e-16])
     ))
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) < 1.0e-7
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) > 0.0
@@ -252,7 +252,7 @@ observables_2_rbc = [observables_2_rbc_matrix[:, t] for t in 1:size(observables_
     prob = StateSpaceProblem(
         f!!, g!!, u0_2_rbc, (0, length(observables_2_rbc));
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_2_rbc, observables = observables_2_rbc
+        observables_noise = Diagonal(D_2_rbc), observables = observables_2_rbc
     )
     sol = solve(prob)
     @test sol.logpdf isa Number
@@ -291,7 +291,7 @@ end
     )
     sol_obs_noise = solve(StateSpaceProblem(
         f_on!!, g_on!!, u0, (0, T);
-        n_shocks = 1, n_obs = 2, observables_noise = D_2_rbc
+        n_shocks = 1, n_obs = 2, observables_noise = Diagonal(D_2_rbc)
     ))
 
     f_ti!!, g_ti!! = make_quadratic_callbacks(
@@ -299,7 +299,7 @@ end
     )
     sol_tiny = solve(StateSpaceProblem(
         f_ti!!, g_ti!!, u0, (0, T);
-        n_shocks = 1, n_obs = 2, observables_noise = [1.0e-16, 1.0e-16]
+        n_shocks = 1, n_obs = 2, observables_noise = Diagonal([1.0e-16, 1.0e-16])
     ))
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) < 1.0e-7
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) > 0.0
@@ -315,7 +315,7 @@ function quadratic_joint_likelihood(
     problem = StateSpaceProblem(
         f!!, g!!, u0, (0, length(observables));
         n_shocks = size(B, 2), n_obs = length(C_0),
-        observables_noise = D, noise, observables,
+        observables_noise = Diagonal(D), noise, observables,
         kwargs...
     )
     return solve(problem).logpdf
@@ -336,7 +336,7 @@ noise_2_rbc_short = noise_2_rbc[1:T_rbc]
     prob = StateSpaceProblem(
         f!!, g!!, u0_2_rbc, (0, length(observables_2_rbc_short));
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_2_rbc, noise = noise_2_rbc_short,
+        observables_noise = Diagonal(D_2_rbc), noise = noise_2_rbc_short,
         observables = observables_2_rbc_short
     )
     DiffEqBase.get_concrete_problem(prob, false)
@@ -391,7 +391,7 @@ end
 
     sol_direct = solve(LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
-        observables_noise = D_rbc, noise = nse, observables = obs
+        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
     ))
 
     linear_f!! = (x_next, x, w, p, t) -> begin
@@ -408,7 +408,7 @@ end
     prob_gen = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = nse, observables = obs
+        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
     )
     ws = init(prob_gen, DirectIteration())
     sol_ws = solve!(ws)
@@ -424,7 +424,7 @@ end
     prob = StateSpaceProblem(
         f!!, g!!, u0_2_rbc, (0, length(observables_2_rbc_short));
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_2_rbc, noise = noise_2_rbc_short,
+        observables_noise = Diagonal(D_2_rbc), noise = noise_2_rbc_short,
         observables = observables_2_rbc_short
     )
     sol_direct = solve(prob)
@@ -435,7 +435,7 @@ end
     prob2 = StateSpaceProblem(
         f!!2, g!!2, u0_2_rbc, (0, length(observables_2_rbc_short));
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_2_rbc, noise = noise_2_rbc_short,
+        observables_noise = Diagonal(D_2_rbc), noise = noise_2_rbc_short,
         observables = observables_2_rbc_short
     )
     ws = init(prob2, DirectIteration())
@@ -512,7 +512,7 @@ end
     prob_gen = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = nse, observables = obs
+        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
     )
     ws = init(prob_gen, DirectIteration())
     sol1 = solve!(ws)

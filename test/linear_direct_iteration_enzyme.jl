@@ -126,6 +126,68 @@ end
 # DI rectangular H reverse: skipped due to marginal cache gradient FD mismatch.
 # Forward test validates correctness above.
 
+# --- Non-diagonal R via vech parameterization ---
+
+function make_di_prob_vech(A, B, C, u0, noise, y, r_v, n_obs)
+    R = make_posdef_from_vech(r_v, n_obs)
+    return LinearStateSpaceProblem(
+        A, B, u0, (0, length(y));
+        C, observables_noise = R, observables = y, noise)
+end
+
+function di_solve_vech!(A, B, C, u0, noise, y, r_v, n_obs, sol, cache)
+    prob = make_di_prob_vech(A, B, C, u0, noise, y, r_v, n_obs)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
+    solve!(ws)
+    return (sol.u, sol.z)
+end
+
+function di_loglik_vech(A, B, C, u0, noise, y, r_v, n_obs, sol, cache)::Float64
+    prob = make_di_prob_vech(A, B, C, u0, noise, y, r_v, n_obs)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
+    return solve!(ws).logpdf
+end
+
+@testset "EnzymeTestUtils - DirectIteration non-diagonal R forward (vech)" begin
+    A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
+    C_s = [1.0 0.0; 0.0 1.0]
+    u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
+    y_s = [[0.5, 0.3], [0.2, 0.1]]
+    R_offdiag = [0.02 0.005; 0.005 0.01]
+    r_v = make_vech_for(R_offdiag)
+    # Allocate sol/cache using the full matrix R
+    sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s,
+        [sqrt(0.02) 0.0; 0.0 sqrt(0.01)])
+
+    test_forward(di_solve_vech!, Const,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
+        ([copy(n) for n in noise_s], Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (copy(r_v), Duplicated), (2, Const),
+        (sol, Duplicated), (cache, Duplicated))
+end
+
+@testset "EnzymeTestUtils - DirectIteration non-diagonal R reverse (vech)" begin
+    A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
+    C_s = [1.0 0.0; 0.0 1.0]
+    u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
+    y_s = [[0.5, 0.3], [0.2, 0.1]]
+    R_offdiag = [0.02 0.005; 0.005 0.01]
+    r_v = make_vech_for(R_offdiag)
+    sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s,
+        [sqrt(0.02) 0.0; 0.0 sqrt(0.01)])
+
+    # Same cache gradient FD mismatch as other DI reverse tests
+    @test_broken test_reverse(di_loglik_vech, Active,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
+        ([copy(n) for n in noise_s], Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (copy(r_v), Duplicated), (2, Const),
+        (sol, Duplicated), (cache, Duplicated)) === nothing
+end
+
 # --- Regression test ---
 
 @testset "DirectIteration loglik - regression test" begin

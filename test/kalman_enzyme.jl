@@ -164,6 +164,46 @@ end
         (N_r, Const), (M_r, Const))
 end
 
+# --- Non-diagonal R via vech (genuinely off-diagonal) ---
+
+@testset "EnzymeTestUtils - Kalman non-diagonal R forward (vech)" begin
+    A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
+    C_s = [1.0 0.0; 0.0 1.0]
+    R_offdiag = [0.02 0.005; 0.005 0.01]
+    r_v = make_vech_for(R_offdiag)
+    mu_0_s = zeros(2); Sigma_0_s = Matrix{Float64}(I, 2, 2)
+    sigma_0_v = make_vech_for(Sigma_0_s)
+    y_s = [[0.5, 0.3], [0.2, 0.1]]
+    sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_offdiag, mu_0_s, Sigma_0_s, y_s)
+
+    test_forward(kalman_solve_vech!, Const,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
+        (copy(sigma_0_v), Duplicated), (copy(r_v), Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (sol, Duplicated), (cache, Duplicated),
+        (2, Const), (2, Const))
+end
+
+@testset "EnzymeTestUtils - Kalman non-diagonal R reverse (vech)" begin
+    A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
+    C_s = [1.0 0.0; 0.0 1.0]
+    R_offdiag = [0.02 0.005; 0.005 0.01]
+    r_v = make_vech_for(R_offdiag)
+    mu_0_s = zeros(2); Sigma_0_s = Matrix{Float64}(I, 2, 2)
+    sigma_0_v = make_vech_for(Sigma_0_s)
+    y_s = [[0.5, 0.3], [0.2, 0.1]]
+    sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_offdiag, mu_0_s, Sigma_0_s, y_s)
+
+    test_reverse(kalman_loglik_vech, Active,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
+        (copy(sigma_0_v), Duplicated), (copy(r_v), Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (sol, Duplicated), (cache, Duplicated),
+        (2, Const), (2, Const))
+end
+
 # --- Regression test ---
 
 @testset "Kalman loglik - regression test" begin

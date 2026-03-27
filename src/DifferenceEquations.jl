@@ -1,6 +1,5 @@
 module DifferenceEquations
 
-# using ChainRulesCore: ChainRulesCore, NoTangent, Tangent, ZeroTangent  # AD disabled — will restore with Enzyme
 using CommonSolve: CommonSolve, solve, init, solve!
 using ConcreteStructs: @concrete
 using DiffEqBase: DiffEqBase, DEProblem, get_concrete_u0, get_concrete_p, isconcreteu0,
@@ -8,7 +7,7 @@ using DiffEqBase: DiffEqBase, DEProblem, get_concrete_u0, get_concrete_p, isconc
 using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
     cholesky!, dot, ldiv!, mul!, transpose!
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
-    ODEFunction, remake, ConstantInterpolation, build_solution
+    ODEFunction, remake, ConstantInterpolation, build_solution, ReturnCode
 using StaticArrays: StaticArrays, SVector, SMatrix, ismutable
 using SymbolicIndexingInterface: SymbolicIndexingInterface, SymbolCache, variable_index
 

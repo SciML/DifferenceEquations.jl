@@ -27,7 +27,7 @@ using Test
         u0 = [1.0, 0.5]
         tspan = (0, 10)
         observables = randn(1, 10)
-        observables_noise = [0.1]
+        observables_noise = Diagonal([0.1])
         u0_prior_mean = [0.0, 0.0]
         u0_prior_var = [1.0 0.0; 0.0 1.0]
 

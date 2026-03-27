@@ -13,8 +13,8 @@ StateSpaceSolution
 | `z` | `Vector{Vector{T}}` or `nothing` | Observations |
 | `W` | `Vector{Vector{T}}` or `nothing` | Noise sequence (DirectIteration only) |
 | `P` | `Vector{Matrix{T}}` or `nothing` | Posterior covariances (KalmanFilter only) |
-| `logpdf` | `Float64` | Log-likelihood (0.0 if no observables) |
-| `retcode` | `Symbol` | `:Success` or `:Default` |
+| `logpdf` | `Real` | Log-likelihood (0.0 if no observables; may be a `Dual` number under ForwardDiff) |
+| `retcode` | `ReturnCode.T` | `ReturnCode.Success` (errors are thrown as exceptions, not encoded in the return code) |
 | `prob` | Problem | Original problem |
 | `alg` | Algorithm | Algorithm used |
 
@@ -23,7 +23,7 @@ StateSpaceSolution
 If `syms` or `obs_syms` were provided when constructing the problem, the solution supports symbolic indexing:
 
 ```julia
-prob = LinearStateSpaceProblem(A, B, u0, (0, 10); C, syms=[:x, :y], obs_syms=[:obs1, :obs2])
+prob = LinearStateSpaceProblem(A, B, u0, (0, 10); C, syms=(:x, :y), obs_syms=(:obs1, :obs2))
 sol = solve(prob)
 
 # Access state variables by name
@@ -54,7 +54,7 @@ A = [0.95 6.2; 0.0 0.2]
 B = [0.0; 0.01;;]
 C = [0.09 0.67; 1.00 0.00]
 prob = LinearStateSpaceProblem(A, B, zeros(2), (0, 5); C,
-    syms = [:capital, :productivity], obs_syms = (:output, :investment))
+    syms = (:capital, :productivity), obs_syms = (:output, :investment))
 sol = solve(prob)
 DataFrame(sol)
 ```

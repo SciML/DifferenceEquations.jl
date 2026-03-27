@@ -34,7 +34,7 @@ end
 @testset "init/solve! matches solve for DirectIteration" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
-        C = C_rbc, observables_noise = D_rbc, noise = noise_rbc,
+        C = C_rbc, observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc
     )
     sol_direct = solve(prob)
@@ -50,7 +50,7 @@ end
 @testset "init/solve! matches solve for KalmanFilter" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
-        C = C_rbc, observables_noise = D_rbc, observables = observables_rbc,
+        C = C_rbc, observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         u0_prior_mean = u0_rbc,
         u0_prior_var = diagm(ones(length(u0_rbc)))
     )
@@ -68,7 +68,7 @@ end
 @testset "repeated solve! gives consistent results" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
-        C = C_rbc, observables_noise = D_rbc, noise = noise_rbc,
+        C = C_rbc, observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc
     )
 
@@ -84,7 +84,7 @@ end
 @testset "repeated solve! for KalmanFilter" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
-        C = C_rbc, observables_noise = D_rbc, observables = observables_rbc,
+        C = C_rbc, observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         u0_prior_mean = u0_rbc,
         u0_prior_var = diagm(ones(length(u0_rbc)))
     )
@@ -106,7 +106,7 @@ end
     prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc, observables = observables_rbc
     )
 
     sol_direct = solve(prob)
@@ -124,7 +124,7 @@ end
     prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc, observables = observables_rbc
     )
 
     ws = init(prob, DirectIteration())

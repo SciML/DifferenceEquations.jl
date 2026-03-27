@@ -61,7 +61,7 @@ When the system is linear, the shocks are Gaussian, and a Gaussian prior is prov
 
 !!! note
 
-    Boundary value problems and difference-algebraic equations are not in scope. See [DifferentiableStateSpaceModels.jl](https://github.com/HighDimensionalEconLab/DifferentiableStateSpaceModels.jl) for perturbation solutions and DSGEs.
+    Boundary value problems and difference-algebraic equations are not in scope.
 
 ## Contributing
 

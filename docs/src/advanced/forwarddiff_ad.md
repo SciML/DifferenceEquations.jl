@@ -174,9 +174,9 @@ end
 
 obs_s = [SVector{M}(o) for o in obs]
 grad_static = ForwardDiff.gradient(
-    a -> kf_loglik_static(a, SMatrix{N,1}(B), SMatrix{M,N}(C),
+    a -> kf_loglik_static(a, SMatrix{N,K}(B), SMatrix{M,N}(C),
         SVector{N}(mu0), SMatrix{N,N}(Sigma0), SMatrix{M,M}(R),
-        obs_s, Val(N), Val(M), Val(1)),
+        obs_s, Val(N), Val(M), Val(K)),
     collect(vec(Matrix(A))))
 ```
 
@@ -184,10 +184,14 @@ grad_static = ForwardDiff.gradient(
 
     ForwardDiff with StaticArrays does not improve AD performance for this package. The overhead of constructing `SMatrix{N,N,Dual{...}}` temporaries outweighs the benefit. StaticArrays are most useful for the primal solve (no AD) of small models.
 
+## Quadratic and Generic Models
+
+ForwardDiff works with all problem types: [`QuadraticStateSpaceProblem`](@ref), [`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref). The same pattern applies — promote all arrays to the `Dual` element type inside the gradient function and call `solve(prob, DirectIteration())`.
+
 ## Important Notes
 
 - **Type promotion is required.** All arrays flowing into the problem must have the same element type. Use `promote_type` across all inputs (as in `kf_loglik` above) or the `_promote` helper to convert `Float64` arrays to the `Dual` type.
 - **Fresh allocation each call.** ForwardDiff creates new caches with `Dual` element types via `solve()`. This is unavoidable (unlike Enzyme, which reuses `Float64` caches with separate shadow arrays).
 - **Chunk size.** `ForwardDiff.gradient` defaults to a chunk size of ~10, processing 10 partial derivatives per forward pass. For parameter count > 10, it runs multiple passes. This makes ForwardDiff cost scale linearly with the number of parameters being differentiated.
-- **Observations stay `Float64`.** The `observables` (data) are not differentiated and can remain `Vector{Vector{Float64}}`. The `copyto!` operation in the solver handles the promotion automatically.
+- **Observations stay `Float64`.** The `observables` (data) are not differentiated and can remain `Vector{Vector{Float64}}`. The solver's internal buffers are allocated with the `Dual` element type, so when `Float64` observations are copied in, the dual partials are zero — which is correct since observations are data, not parameters being differentiated.
 - **DirectIteration noise sensitivity.** When differentiating `DirectIteration` w.r.t. the noise sequence, the parameter dimension is `K × T` (shocks × periods). Even for small state-space models, long time series make ForwardDiff expensive and Enzyme reverse the better choice.

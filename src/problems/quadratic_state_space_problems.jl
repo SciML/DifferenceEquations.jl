@@ -66,7 +66,8 @@ function QuadraticStateSpaceProblem(
         (u, p, t) -> error("not implemented");
         sys = SymbolCache(syms))
     _tspan = promote_tspan(tspan)
-    @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
+    _dt = _tspan[2] - _tspan[1]
+    isinteger(_dt) || throw(ArgumentError("tspan must have integer distance, got $_dt"))
     return QuadraticStateSpaceProblem(
         f, A_0, A_1, A_2, B, C_0, C_1, C_2,
         observables_noise, observables, u0, _tspan, p, noise, obs_syms, kwargs)
@@ -130,7 +131,8 @@ function PrunedQuadraticStateSpaceProblem(
         (u, p, t) -> error("not implemented");
         sys = SymbolCache(syms))
     _tspan = promote_tspan(tspan)
-    @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
+    _dt = _tspan[2] - _tspan[1]
+    isinteger(_dt) || throw(ArgumentError("tspan must have integer distance, got $_dt"))
     return PrunedQuadraticStateSpaceProblem(
         f, A_0, A_1, A_2, B, C_0, C_1, C_2,
         observables_noise, observables, u0, _tspan, p, noise, obs_syms, kwargs)

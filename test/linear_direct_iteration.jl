@@ -37,7 +37,7 @@ noise_rbc_5 = [noise_rbc_matrix[:, t] for t in 1:T_rbc]
 function joint_likelihood_1(A, B, C, u0, noise, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(
         A, B, u0, (0, length(observables)); C,
-        observables_noise = D,
+        observables_noise = Diagonal(D),
         noise, observables, kwargs...
     )
     return solve(problem).logpdf
@@ -49,7 +49,7 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc, observables = observables_rbc,
+        observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         syms = [:a, :b]
     )
 
@@ -94,7 +94,7 @@ end
     sol = solve(
         LinearStateSpaceProblem(
             A_rbc, B_rbc, u0_rbc, (0, 5); C = C_rbc,
-            observables_noise = D_rbc
+            observables_noise = Diagonal(D_rbc)
         )
     )
     @test sol.u ≈
@@ -132,7 +132,7 @@ end
 
     prob_obs_noise = LinearStateSpaceProblem(
         A_rbc, B_no_noise, u0, (0, T); C = C_rbc,
-        syms = [:a, :b], observables_noise = D_rbc
+        syms = [:a, :b], observables_noise = Diagonal(D_rbc)
     )
     sol_obs_noise = solve(prob_obs_noise)
     @inferred solve(prob_obs_noise)
@@ -142,7 +142,7 @@ end
             A_rbc, B_no_noise, u0, (0, T);
             C = C_rbc,
             syms = [:a, :b],
-            observables_noise = [1.0e-16, 1.0e-16]
+            observables_noise = Diagonal([1.0e-16, 1.0e-16])
         )
     )
     @test maximum(maximum.(sol_tiny_obs_noise.z - sol_no_noise.z)) < 1.0e-7
@@ -203,12 +203,12 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc_5));
         C = C_rbc,
-        observables_noise = D_rbc, noise = noise_rbc_5,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc_5,
         observables = observables_rbc_5
     )
     @inferred LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc_5));
-        C = C_rbc, observables_noise = D_rbc,
+        C = C_rbc, observables_noise = Diagonal(D_rbc),
         noise = noise_rbc_5,
         observables = observables_rbc_5
     )
@@ -278,7 +278,7 @@ end
     function z_sum(A, B, C, u0, noise, observables, D; kwargs...)
         problem = LinearStateSpaceProblem(
             A, B, u0, (0, length(observables)); C,
-            observables_noise = D,
+            observables_noise = Diagonal(D),
             noise, observables, kwargs...
         )
         sol = solve(problem)
@@ -292,7 +292,7 @@ end
     function u_sum(A, B, C, u0, noise, observables, D; kwargs...)
         problem = LinearStateSpaceProblem(
             A, B, u0, (0, length(observables)); C,
-            observables_noise = D,
+            observables_noise = Diagonal(D),
             noise, observables, kwargs...
         )
         sol = solve(problem)
@@ -384,7 +384,7 @@ end
     Random.seed!(1234)
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, 5); C = C_rbc,
-        observables_noise = D_rbc
+        observables_noise = Diagonal(D_rbc)
     )
     Random.seed!(1234)
     sol_direct = solve(prob)
@@ -399,7 +399,7 @@ end
 @testset "solve!() matches solve() — joint likelihood (noise + obs + obs_noise)" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc_5));
-        C = C_rbc, observables_noise = D_rbc,
+        C = C_rbc, observables_noise = Diagonal(D_rbc),
         noise = noise_rbc_5, observables = observables_rbc_5
     )
     sol_direct = solve(prob)
@@ -450,7 +450,7 @@ end
 @testset "solve!() repeated — idempotent results" begin
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc_5));
-        C = C_rbc, observables_noise = D_rbc,
+        C = C_rbc, observables_noise = Diagonal(D_rbc),
         noise = noise_rbc_5, observables = observables_rbc_5
     )
     ws = init(prob, DirectIteration())

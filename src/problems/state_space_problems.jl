@@ -53,7 +53,7 @@ with optional observation equation ``z_n = C \\, u_n + v_n``.
 
 # Keyword Arguments
 - `C`: Observation matrix (m×n). If `nothing`, no observations are computed.
-- `observables_noise`: Observation noise covariance. A `Vector` is treated as a diagonal.
+- `observables_noise`: Observation noise covariance matrix (`AbstractMatrix`, e.g. `Diagonal(d)` or `Symmetric(H * H')`).
 - `observables`: Observed data as `Vector{Vector{T}}` for likelihood computation.
 - `noise`: Fixed noise sequence as `Vector{Vector{T}}`. If `nothing`, noise is drawn randomly.
 - `u0_prior_mean`: Prior mean for Kalman filtering.
@@ -109,11 +109,10 @@ struct LinearStateSpaceProblem{
             )
         end
         _tspan = promote_tspan(tspan)
-        # _observables = promote_vv(observables)
         _observables = observables
 
-        # Require integer distances between time periods for now.  Later could check with dt != 1
-        @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
+        _dt = _tspan[2] - _tspan[1]
+        isinteger(_dt) || throw(ArgumentError("tspan must have integer distance, got $_dt"))
 
         return new{
             typeof(u0), typeof(u0_prior_mean), typeof(u0_prior_var), typeof(_tspan),
@@ -155,7 +154,7 @@ u_{n+1} = f(u_n, w_{n+1}, p, t_n), \\quad z_n = g(u_n, p, t_n)
 # Keyword Arguments
 - `n_shocks::Int`: Number of noise dimensions (required).
 - `n_obs::Int`: Number of observation dimensions (default: `0`).
-- `observables_noise`: Observation noise covariance for likelihood computation.
+- `observables_noise`: Observation noise covariance matrix (`AbstractMatrix`, e.g. `Diagonal(d)` or `Symmetric(H * H')`).
 - `observables`: Observed data as `Vector{Vector{T}}`.
 - `noise`: Fixed noise sequence as `Vector{Vector{T}}`.
 - `syms`: State variable names for symbolic indexing.
@@ -201,8 +200,8 @@ struct StateSpaceProblem{
         _tspan = promote_tspan(tspan)
         _observables = observables
 
-        # Require integer distances between time periods for now.
-        @assert round(_tspan[2] - _tspan[1]) - (_tspan[2] - _tspan[1]) ≈ 0.0
+        _dt = _tspan[2] - _tspan[1]
+        isinteger(_dt) || throw(ArgumentError("tspan must have integer distance, got $_dt"))
 
         return new{
             typeof(u0), typeof(_tspan), typeof(p), typeof(noise),

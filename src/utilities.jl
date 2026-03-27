@@ -30,7 +30,7 @@ Copy concrete noise into preallocated cache noise buffers.
 """
 function copy_noise_to_cache!(cache_noise, noise)
     @inbounds for t in eachindex(cache_noise)
-        assign!!(cache_noise[t], noise[t])
+        cache_noise[t] = assign!!(cache_noise[t], noise[t])
     end
     return cache_noise
 end
@@ -80,10 +80,12 @@ end
 # Observation noise covariance
 # =============================================================================
 
-# Covariance matrix for Kalman filter and loglik computation
+# Covariance matrix for Kalman filter and loglik computation.
+# observables_noise must be an AbstractMatrix (e.g., Diagonal(d), Symmetric(H*H'), or Matrix).
 make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
 function make_observables_covariance_matrix(observables_noise::AbstractVector)
-    return Diagonal(observables_noise)
+    return error("observables_noise must be an AbstractMatrix (e.g., Diagonal(d)). " *
+                 "Got a Vector. Use Diagonal(d) to construct a diagonal covariance matrix.")
 end
 
 # =============================================================================
@@ -104,36 +106,4 @@ function _add_observation_noise!(z, F_chol)
         end
     end
     return nothing
-end
-
-# =============================================================================
-# Legacy helpers (kept for backward compatibility during transition)
-# =============================================================================
-
-# Conditional matrix-vector multiply-add
-Base.@propagate_inbounds @inline function maybe_muladd!(x, B, noise, t)
-    return mul!(x, B, view(noise, :, t), 1, 1)
-end
-maybe_muladd!(x, B::Nothing, noise, t) = nothing
-
-Base.@propagate_inbounds @inline maybe_muladd!(x, A, B) = mul!(x, A, B, 1, 1)
-maybe_muladd!(x, A::Nothing, B) = nothing
-
-Base.@propagate_inbounds @inline maybe_mul!(x, t, A, y, s) = mul!(x[t], A, y[s])
-maybe_mul!(x::Nothing, t, A, y, s) = nothing
-
-# Only allocate if observation equation
-allocate_z(prob, C, u0, T) = [zeros(size(C, 1)) for _ in 1:T]
-allocate_z(prob, C::Nothing, u0, T) = nothing
-
-# =============================================================================
-# Quadratic form helpers (legacy, kept for reference)
-# =============================================================================
-
-# y += quad(A, x) using vector of matrices
-function quad_muladd!(y, A, x)
-    @inbounds for j in 1:size(A, 1)
-        @views y[j] += dot(x, A[j], x)
-    end
-    return y
 end
