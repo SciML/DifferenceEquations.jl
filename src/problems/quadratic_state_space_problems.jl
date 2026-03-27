@@ -61,16 +61,19 @@ function QuadraticStateSpaceProblem(
         A_0, A_1, A_2, B, u0, tspan, p = NullParameters();
         C_0 = nothing, C_1 = nothing, C_2 = nothing,
         observables_noise = nothing, observables = nothing,
-        noise = nothing, syms = nothing, obs_syms = nothing, kwargs...)
+        noise = nothing, syms = nothing, obs_syms = nothing, kwargs...
+    )
     f = ODEFunction{false}(
         (u, p, t) -> error("not implemented");
-        sys = SymbolCache(syms))
+        sys = SymbolCache(syms)
+    )
     _tspan = promote_tspan(tspan)
     _dt = _tspan[2] - _tspan[1]
     isinteger(_dt) || throw(ArgumentError("tspan must have integer distance, got $_dt"))
     return QuadraticStateSpaceProblem(
         f, A_0, A_1, A_2, B, C_0, C_1, C_2,
-        observables_noise, observables, u0, _tspan, p, noise, obs_syms, kwargs)
+        observables_noise, observables, u0, _tspan, p, noise, obs_syms, kwargs
+    )
 end
 
 # --- Pruned quadratic ---
@@ -126,16 +129,19 @@ function PrunedQuadraticStateSpaceProblem(
         A_0, A_1, A_2, B, u0, tspan, p = NullParameters();
         C_0 = nothing, C_1 = nothing, C_2 = nothing,
         observables_noise = nothing, observables = nothing,
-        noise = nothing, syms = nothing, obs_syms = nothing, kwargs...)
+        noise = nothing, syms = nothing, obs_syms = nothing, kwargs...
+    )
     f = ODEFunction{false}(
         (u, p, t) -> error("not implemented");
-        sys = SymbolCache(syms))
+        sys = SymbolCache(syms)
+    )
     _tspan = promote_tspan(tspan)
     _dt = _tspan[2] - _tspan[1]
     isinteger(_dt) || throw(ArgumentError("tspan must have integer distance, got $_dt"))
     return PrunedQuadraticStateSpaceProblem(
         f, A_0, A_1, A_2, B, C_0, C_1, C_2,
-        observables_noise, observables, u0, _tspan, p, noise, obs_syms, kwargs)
+        observables_noise, observables, u0, _tspan, p, noise, obs_syms, kwargs
+    )
 end
 
 # Union for shared dispatch (cache allocation, noise matrix, etc.)
