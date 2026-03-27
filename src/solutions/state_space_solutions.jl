@@ -10,7 +10,7 @@ Solution type returned by `solve` for all state-space problems.
 - `W`: Noise sequence as `Vector{Vector{T}}`, or `nothing` (e.g., for `KalmanFilter`).
 - `P`: Posterior covariances as `Vector{Matrix{T}}` (`KalmanFilter` only), or `nothing`.
 - `logpdf`: Log-likelihood value. Zero when no `observables` are provided.
-- `retcode`: `:Success` or `:Default`.
+- `retcode`: `ReturnCode.Success`. Errors are thrown as exceptions, not encoded in the return code.
 - `prob`: The original problem.
 - `alg`: The algorithm used.
 
@@ -43,7 +43,7 @@ struct StateSpaceSolution{
     dense::Bool
     tslocation::Int
     stats::DE
-    retcode::Symbol
+    retcode::SciMLBase.ReturnCode.T
     P::PosteriorType
     logpdf::logpdfType
     z::zType
@@ -56,7 +56,7 @@ function SciMLBase.build_solution(
         dense = false,
         dense_errors = dense, calculate_error = true,
         interp = ConstantInterpolation(t, u),
-        retcode = :Default,
+        retcode = ReturnCode.Default,
         stats = nothing, z = nothing, kwargs...
     )
     T = eltype(eltype(u))
@@ -77,11 +77,7 @@ function SciMLBase.build_solution(
     return sol
 end
 
-# Just using ConstantInterpolation for now.  Worth specializing?
-# (sol::StateSpaceSolution)(t, ::Type{deriv} = Val{0}; idxs = nothing, continuity = :left) where {deriv} = _interpolate(sol, t, idxs)
-# _interpolate(sol::StateSpaceSolution, t::Integer, idxs::Nothing) = sol.u[t]
-# _interpolate(sol::StateSpaceSolution, t::Number, idxs::Nothing) = sol.u[Integer(round(t))]
-# _interpolate(sol::StateSpaceSolution, t::Integer, idxs) = sol.u[t][idxs]
+# TODO: Worth specializing interpolation beyond ConstantInterpolation?
 
 """Return observation symbols from the problem, or nothing."""
 obs_syms(sol::StateSpaceSolution) = sol.prob.obs_syms

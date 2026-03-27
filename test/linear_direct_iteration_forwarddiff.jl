@@ -74,6 +74,48 @@ end
 end
 
 # =============================================================================
+# Non-diagonal R — ForwardDiff gradient tests
+# =============================================================================
+
+const H_di_fd_offdiag = [0.1 0.05; 0.02 0.08]
+
+function di_loglik_fd_offdiag(A, B, C, u0, noise, y, H)
+    T_el = promote_type(eltype(A), eltype(B), eltype(C), eltype(u0), eltype(H))
+    H_d = promote_array(T_el, H)
+    R = H_d * H_d'
+    prob = LinearStateSpaceProblem(
+        promote_array(T_el, A), promote_array(T_el, B),
+        promote_array(T_el, u0), (0, length(y));
+        C = promote_array(T_el, C),
+        observables_noise = R,
+        observables = y, noise = noise)
+    sol = solve(prob, DirectIteration())
+    return sol.logpdf
+end
+
+@testset "ForwardDiff - DirectIteration loglik non-diagonal R (mutable)" begin
+    @testset "primal sanity" begin
+        loglik_val = di_loglik_fd_offdiag(A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
+            noise_di_fd, y_di_fd, H_di_fd_offdiag)
+        @test isfinite(loglik_val)
+    end
+
+    @testset "gradient w.r.t. H (off-diagonal)" begin
+        f = h_vec -> di_loglik_fd_offdiag(A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
+            noise_di_fd, y_di_fd, reshape(h_vec, M_di_fd, M_di_fd))
+        x0 = vec(copy(H_di_fd_offdiag))
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+    end
+
+    @testset "gradient w.r.t. A (with off-diagonal R)" begin
+        f = a_vec -> di_loglik_fd_offdiag(reshape(a_vec, N_di_fd, N_di_fd),
+            B_di_fd, C_di_fd, u0_di_fd, noise_di_fd, y_di_fd, H_di_fd_offdiag)
+        x0 = vec(copy(A_di_fd))
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+    end
+end
+
+# =============================================================================
 # StaticArrays — ForwardDiff gradient tests
 # =============================================================================
 

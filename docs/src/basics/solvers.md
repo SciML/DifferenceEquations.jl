@@ -20,6 +20,11 @@ When no algorithm is specified, `solve(prob)` selects the algorithm based on the
   - `u0_prior_var` is an `AbstractMatrix` (prior covariance is specified)
   - `noise` is `nothing` (noise is not fixed)
   - `observables` is an `AbstractVector` (observed data is provided)
-  - `observables_noise` is provided (observation noise covariance is specified)
+  - `observables_noise` is an `AbstractMatrix` (observation noise covariance is specified)
+  - `A`, `B`, and `C` are all `AbstractMatrix` (not `nothing`)
 
   The Kalman filter computes the filtered state estimates and the marginal log-likelihood of the observations, integrating over the unknown noise sequence.
+
+!!! warning
+
+    If any of these conditions are not met, `DirectIteration` is silently selected instead. For example, forgetting to pass `C` or `u0_prior_var` will produce a `DirectIteration` solve with `logpdf = 0.0` rather than the expected Kalman filter result.

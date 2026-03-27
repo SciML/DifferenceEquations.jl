@@ -30,3 +30,11 @@ For larger models or models where dimensions vary at runtime, use standard `Arra
 The package internally uses "bang-bang" operators (e.g., `mul!!`, `copyto!!`, `assign!!`) that handle both mutable and immutable arrays transparently. When you pass `SMatrix` and `SVector` types, these operators return new immutable values rather than mutating in place. When you pass standard `Matrix` and `Vector` types, they mutate in place and return the result. This means you do not need to change any solver code to switch between static and dynamic arrays -- simply change the array types in your problem definition.
 
 See [Internals](@ref) for the full list of bang-bang operators and their behavior.
+
+## Supported Problem Types
+
+StaticArrays work with all problem types: [`LinearStateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref), [`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref).
+
+## AD Performance Note
+
+ForwardDiff with StaticArrays does not improve AD performance for this package. The overhead of constructing `SMatrix{N,N,Dual{...}}` temporaries outweighs the benefit. StaticArrays are most useful for the primal solve (no AD) of small models. See [ForwardDiff AD](@ref) for details.

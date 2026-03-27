@@ -13,9 +13,9 @@ u_{n+1} = A\, u_n + B\, w_{n+1}, \qquad z_n = C\, u_n + v_n
 Define the model primitives, create a problem, and solve:
 
 ```@example getting_started
-using DifferenceEquations, LinearAlgebra, Random, DiffEqBase
+using DifferenceEquations, LinearAlgebra, Random
 A = [0.95 6.2; 0.0 0.2]
-B = [0.0; 0.01;;]
+B = [0.0; 0.01;;]  # 2×1 Matrix (Julia's ;; creates a column matrix)
 C = [0.09 0.67; 1.00 0.00]
 u0 = zeros(2)
 T = 10
@@ -27,7 +27,7 @@ sol.u[end]
 
 ## Computing Likelihood
 
-To compute log-likelihoods, provide `observables` (a `Vector{Vector}` of length `T`) and `observables_noise` (a diagonal covariance as a `Vector`, or a full covariance matrix).
+To compute log-likelihoods, provide `observables` (a `Vector{Vector}` of length `T`) and `observables_noise` (the observation noise covariance matrix — e.g., `Diagonal(d)` for diagonal noise or `Symmetric(H * H')` for a general covariance).
 
 !!! note "Timing convention"
 
@@ -37,7 +37,7 @@ First, simulate some data to use as observables:
 
 ```@example getting_started
 Random.seed!(123)
-D = [0.1, 0.1]  # diagonal observation noise
+D = Diagonal([0.1, 0.1])  # diagonal observation noise covariance matrix
 prob_sim = LinearStateSpaceProblem(A, B, u0, (0, T); C, observables_noise = D)
 sol_sim = solve(prob_sim)
 
@@ -76,7 +76,7 @@ Convert the state trajectory to a `DataFrame` for analysis. Column names come fr
 ```@example getting_started
 using DataFrames
 prob_df = LinearStateSpaceProblem(A, B, u0, (0, T); C,
-    syms = [:capital, :productivity])
+    syms = (:capital, :productivity))
 sol_df = solve(prob_df)
 DataFrame(sol_df)
 ```

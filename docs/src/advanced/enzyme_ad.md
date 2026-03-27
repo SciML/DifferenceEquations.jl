@@ -19,14 +19,13 @@ Every Enzyme example in this package follows the same recipe:
 The joint likelihood conditions on a fixed noise sequence and accumulates the observation log-likelihood along the trajectory via [`DirectIteration`](@ref).
 
 ```@example enzyme
-using DifferenceEquations, LinearAlgebra, Enzyme, Random, DiffEqBase
-using DifferenceEquations: StateSpaceWorkspace
+using DifferenceEquations, LinearAlgebra, Enzyme, Random
 
 N, K, M = 2, 1, 2
 A = [0.8 0.1; -0.1 0.7]
 B = [0.1; 0.0;;]
 C = [1.0 0.0; 0.0 1.0]
-D = [0.01, 0.01]
+D = Diagonal([0.01, 0.01])  # diagonal covariance; use Symmetric(H * H') for non-diagonal
 u0 = zeros(N)
 
 Random.seed!(42)
@@ -109,7 +108,7 @@ Random.seed!(42)
 T_opt = 200
 B_opt = [0.0; 0.001;;]
 C_opt = [0.09 0.67; 1.00 0.00]
-D_opt = [0.01, 0.01]
+D_opt = Diagonal([0.01, 0.01])
 prob_data = LinearStateSpaceProblem([0.95 6.2; 0.0 0.2], B_opt, zeros(2), (0, T_opt);
     C = C_opt, observables_noise = D_opt)
 sol_data = solve(prob_data)
@@ -155,9 +154,13 @@ optsol = solve(optprob, LBFGS())
 optsol.u  # estimated beta (true value: 0.95)
 ```
 
+## Quadratic and Generic Models
+
+The same all-`Duplicated` pattern works for [`QuadraticStateSpaceProblem`](@ref), [`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref). Replace the constructor and add the extra arguments (`A_0`, `A_1`, `A_2`, `C_0`, `C_1`, `C_2` for quadratic; callback functions for generic) as separate `Duplicated` parameters. See the [Quadratic Models](@ref) tutorial for an Enzyme example with quadratic problems.
+
 ## Important Notes
 
-- All arguments to the likelihood function that flow into `LinearStateSpaceProblem` must be `Duplicated`, not `Const`. This is because Enzyme tracks activity at the struct level.
+- All arguments to the likelihood function that flow into the problem struct must be `Duplicated`, not `Const`. This is because Enzyme tracks activity at the struct level.
 - Shadow copies for `sol` and `cache` buffers must be zero-initialized using `Enzyme.make_zero(deepcopy(...))`. Using plain `deepcopy` produces `NaN` gradients.
 - The `Optimization.jl` integration requires an explicit `grad` function because `AutoEnzyme()` cannot directly handle the all-Duplicated requirement. The gradient function calls `Enzyme.autodiff` manually.
 - Avoid calling `GC.gc()` inside functions differentiated by Enzyme -- this can cause segfaults when combined with `BenchmarkTools`.

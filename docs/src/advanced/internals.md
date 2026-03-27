@@ -9,7 +9,7 @@ The solving pipeline follows these stages:
 1. **Problem construction**: The user creates a problem (e.g., `LinearStateSpaceProblem`) that encodes the model dynamics, parameters, and data.
 2. **Algorithm dispatch**: `solve(prob)` or `solve(prob, alg)` selects the algorithm. If no algorithm is provided, the default is chosen based on the problem type and its fields.
 3. **Workspace allocation**: `init(prob, alg)` allocates the solution output via `alloc_sol` and scratch workspace via `alloc_cache`, then wraps them in a `StateSpaceWorkspace`.
-4. **Solve**: `solve!(ws)` zeros the buffers via `zero_sol!!` and `zero_cache!!`, then runs the algorithm to fill in the solution.
+4. **Solve**: `solve!(ws)` runs the algorithm, which fully overwrites all solution and cache arrays during the time loop.
 5. **Solution**: A `StateSpaceSolution` is returned containing the state trajectory, observations, noise, log-likelihood, and other results.
 
 ## Bang-Bang Operators
@@ -39,10 +39,7 @@ Each combination of problem type and algorithm defines two allocation functions:
 - **`alloc_sol(prob, alg, T)`**: Allocates the output structure that will hold the solution (state trajectory, observations, noise, covariances, etc.). Returns a named tuple or struct of pre-allocated arrays.
 - **`alloc_cache(prob, alg, T)`**: Allocates scratch workspace needed during the solve (temporary vectors, matrices for intermediate computations, etc.). Returns a named tuple or struct of pre-allocated buffers.
 
-Before each `solve!` call, the workspace is reset using:
-
-- **`zero_sol!!(sol)`**: Zeros all fields in the solution output. This is important for Enzyme compatibility, where accumulated gradients must be cleared between calls.
-- **`zero_cache!!(cache)`**: Zeros all fields in the scratch workspace.
+The solver loop fully overwrites all solution and cache arrays on each call, so no explicit zeroing step is needed between calls. For Enzyme AD, shadow copies should be zero-initialized via `Enzyme.make_zero(deepcopy(...))` at creation time (see [Enzyme AD](@ref)).
 
 ## Adding a New Problem Type
 

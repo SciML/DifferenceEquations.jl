@@ -28,7 +28,7 @@ noise_rbc = [noise_rbc_matrix[:, t] for t in 1:T]
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc, noise = noise_rbc,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
     sol = solve(prob)
@@ -41,7 +41,7 @@ end
         A_rbc, B_rbc,
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
         (0, length(observables_rbc)); C = C_rbc,
-        observables_noise = D_rbc, noise = noise_rbc,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
     sol2 = solve(
@@ -58,7 +58,7 @@ end
         A_rbc, B_rbc,
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
         (0, length(observables_rbc)); C = C_rbc,
-        observables_noise = D_rbc, noise = noise_rbc,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
     sol = solve(prob)
@@ -71,7 +71,7 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc, noise = noise_rbc,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc,
         syms = (:capital, :productivity),
         obs_syms = (:output, :consumption)
@@ -109,7 +109,7 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc, observables = observables_rbc,
+        observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         syms = (:a, :b)
     )
     sol = solve(prob)
@@ -121,7 +121,7 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc, observables = observables_rbc,
+        observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         syms = (:a, :b)
     )
     sol2 = solve(
@@ -152,7 +152,7 @@ p_rbc = (; A = A_rbc, B = B_rbc, C = C_rbc)
     prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc, observables = observables_rbc
     )
 
     # remake with new u0
@@ -176,7 +176,7 @@ end
     prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = noise_rbc,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
     sol = solve(prob)
@@ -189,7 +189,7 @@ end
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
         (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = noise_rbc,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
     sol2 = solve(
@@ -207,7 +207,7 @@ end
         MvNormal(u0_rbc, diagm(ones(length(u0_rbc)))),
         (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, noise = noise_rbc,
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc,
         observables = observables_rbc, syms = (:a, :b)
     )
     sol = solve(prob)
@@ -222,7 +222,7 @@ end
         n_shocks = 1, n_obs = 2,
         syms = (:capital, :productivity),
         obs_syms = (:output, :consumption),
-        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc, observables = observables_rbc
     )
     sol = solve(prob)
 
@@ -250,7 +250,7 @@ end
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
         syms = (:capital, :productivity),
-        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc, observables = observables_rbc
     )
     sol = solve(prob)
     @test sol[:capital] ≈ [sol.u[t][1] for t in eachindex(sol.u)]
@@ -262,7 +262,7 @@ end
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
         obs_syms = (:output, :consumption),
-        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc, observables = observables_rbc
     )
     sol = solve(prob)
     @test sol[:output] ≈ [sol.z[t][1] for t in eachindex(sol.z)]
@@ -287,7 +287,7 @@ end
         n_shocks = 1, n_obs = 2,
         syms = (:capital, :productivity),
         obs_syms = (:output, :consumption),
-        observables_noise = D_rbc, noise = noise_rbc, observables = observables_rbc
+        observables_noise = Diagonal(D_rbc), noise = noise_rbc, observables = observables_rbc
     )
     prob2 = remake(prob; u0 = [0.1, 0.2])
     sol2 = solve(prob2)
@@ -308,7 +308,7 @@ end
     prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, observables = observables_rbc,
+        observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         syms = (:a, :b)
     )
     sol = solve(prob)
@@ -319,7 +319,7 @@ end
     prob = StateSpaceProblem(
         linear_f!!, linear_g!!, u0_rbc, (0, T), p_rbc;
         n_shocks = 1, n_obs = 2,
-        observables_noise = D_rbc, observables = observables_rbc,
+        observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         syms = (:a, :b)
     )
     sol2 = solve(

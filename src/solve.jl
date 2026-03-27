@@ -43,8 +43,7 @@ function default_alg(
         prob::LinearStateSpaceProblem{
             uType, uPriorMeanType, uPriorVarType,
             tType, P, NP, F, AType, BType, CType,
-            RType, ObsType,
-            K,
+            RType, ObsType, OS, K,
         }
     ) where {
         uType,
@@ -61,13 +60,10 @@ function default_alg(
         CType <:
         AbstractMatrix,
         RType <:
-        Union{
-            AbstractVector,
-            AbstractMatrix,
-        },
+        AbstractMatrix,
         ObsType <:
         AbstractVector,
-        K,
+        OS, K,
     }
     return KalmanFilter()
 end

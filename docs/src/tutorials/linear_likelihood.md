@@ -3,25 +3,29 @@
 DifferenceEquations.jl supports two approaches to computing the log-likelihood of
 observed data:
 
-- **Marginal likelihood** via the [`KalmanFilter`](@ref), which integrates out the
-  latent noise analytically. This requires Gaussian assumptions but avoids
-  conditioning on specific noise realizations.
-- **Joint likelihood** via [`DirectIteration`](@ref), which conditions on a fixed
-  noise sequence and accumulates the observation log-likelihood along the trajectory.
+- **Marginal likelihood** via the [`KalmanFilter`](@ref): the probability of the
+  observed data conditioned on the core model parameters (``A, B, C``, etc.) and the
+  initial condition prior, with the latent noise sequence analytically integrated out.
+  This is the standard approach for maximum likelihood estimation (MLE) of structural
+  parameters.
+- **Joint likelihood** via [`DirectIteration`](@ref): the probability of the observed
+  data AND a specific noise realization, conditioned on the core parameters and initial
+  conditions. Requires fixing the noise sequence. Useful in Bayesian methods where the
+  noise is sampled as part of inference (e.g., particle MCMC, HMC on latent variables).
 
-Both approaches are fully differentiable with Enzyme.jl.
+Both approaches are fully differentiable with Enzyme.jl and ForwardDiff.jl.
 
 ## Simulating Observations
 
 First, let us simulate a model with observation noise to produce synthetic data.
 
 ```@example linear_lik
-using DifferenceEquations, LinearAlgebra, Distributions, Random, DiffEqBase
+using DifferenceEquations, LinearAlgebra, Distributions, Random
 
 A = [0.95 6.2; 0.0 0.2]
 B = [0.0; 0.01;;]
 C = [0.09 0.67; 1.00 0.00]
-D = [0.1, 0.1]
+D = Diagonal([0.1, 0.1])
 u0 = zeros(2)
 T = 80
 
@@ -97,7 +101,7 @@ function generate_model(beta)
     A = [beta 6.2; 0.0 0.2]
     B = [0.0; 0.001;;]
     C = [0.09 0.67; 1.00 0.00]
-    D = [0.01, 0.01]
+    D = Diagonal([0.01, 0.01])
     return (; A, B, C, D)
 end
 

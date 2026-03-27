@@ -68,17 +68,10 @@ end
 Allocate scratch workspace for DirectIteration (noise buffers, loglik workspace).
 """
 function alloc_cache(prob::LinearStateSpaceProblem, ::DirectIteration, T)
-    (; A, B, C, u0) = prob
+    (; B, C, u0) = prob
     M = isnothing(C) ? 0 : size(C, 1)
-    T_obs = T - 1
     has_obs_noise = !isnothing(prob.observables_noise)
-    return (;
-        noise = _alloc_noise(B, T),
-        R = has_obs_noise ? alloc_like(u0, M, M) : nothing,
-        R_chol = has_obs_noise ? alloc_like(u0, M, M) : nothing,
-        innovation = has_obs_noise ? [alloc_like(u0, M) for _ in 1:T_obs] : nothing,
-        innovation_solved = has_obs_noise ? [alloc_like(u0, M) for _ in 1:T_obs] : nothing,
-    )
+    return _alloc_di_base_cache(B, u0, M, T, has_obs_noise)
 end
 
 _alloc_noise(B, T) = [Vector{eltype(B)}(undef, size(B, 2)) for _ in 1:(T - 1)]
@@ -168,78 +161,3 @@ function alloc_cache(prob::StateSpaceProblem, ::DirectIteration, T)
     )
 end
 
-# =============================================================================
-# Cache zeroing for Enzyme AD
-# =============================================================================
-
-"""
-    zero_cache!!(cache)
-
-Zero all scratch buffers for Enzyme AD compatibility.
-"""
-function zero_cache!!(cache, ::DirectIteration)
-    if !isnothing(cache.noise)
-        @inbounds for t in eachindex(cache.noise)
-            cache.noise[t] = fill_zero!!(cache.noise[t])
-        end
-    end
-    if !isnothing(cache.R)
-        fill_zero!!(cache.R)
-        fill_zero!!(cache.R_chol)
-        @inbounds for t in eachindex(cache.innovation)
-            cache.innovation[t] = fill_zero!!(cache.innovation[t])
-            cache.innovation_solved[t] = fill_zero!!(cache.innovation_solved[t])
-        end
-    end
-    # Pruned quadratic u_f buffer (present only for PrunedQuadraticStateSpaceProblem)
-    if hasproperty(cache, :u_f)
-        @inbounds for t in eachindex(cache.u_f)
-            cache.u_f[t] = fill_zero!!(cache.u_f[t])
-        end
-    end
-    return cache
-end
-
-function zero_cache!!(cache, ::KalmanFilter)
-    T_obs = length(cache.mu_pred)
-    @inbounds for t in 1:T_obs
-        cache.mu_pred[t] = fill_zero!!(cache.mu_pred[t])
-        cache.sigma_pred[t] = fill_zero!!(cache.sigma_pred[t])
-        cache.A_sigma[t] = fill_zero!!(cache.A_sigma[t])
-        cache.sigma_Gt[t] = fill_zero!!(cache.sigma_Gt[t])
-        cache.innovation[t] = fill_zero!!(cache.innovation[t])
-        cache.innovation_cov[t] = fill_zero!!(cache.innovation_cov[t])
-        cache.S_chol[t] = fill_zero!!(cache.S_chol[t])
-        cache.innovation_solved[t] = fill_zero!!(cache.innovation_solved[t])
-        cache.gain_rhs[t] = fill_zero!!(cache.gain_rhs[t])
-        cache.gain[t] = fill_zero!!(cache.gain[t])
-        cache.gainG[t] = fill_zero!!(cache.gainG[t])
-        cache.KgSigma[t] = fill_zero!!(cache.KgSigma[t])
-        cache.mu_update[t] = fill_zero!!(cache.mu_update[t])
-    end
-    fill_zero!!(cache.B_prod)
-    fill_zero!!(cache.B_t)
-    return cache
-end
-
-"""
-    zero_sol!!(sol)
-
-Zero all solution output arrays for Enzyme AD compatibility.
-"""
-function zero_sol!!(sol)
-    @inbounds for t in eachindex(sol.u)
-        sol.u[t] = fill_zero!!(sol.u[t])
-    end
-    if !isnothing(sol.z)
-        @inbounds for t in eachindex(sol.z)
-            sol.z[t] = fill_zero!!(sol.z[t])
-        end
-    end
-    if hasproperty(sol, :P)
-        @inbounds for t in eachindex(sol.P)
-            sol.P[t] = fill_zero!!(sol.P[t])
-        end
-    end
-    return sol
-end

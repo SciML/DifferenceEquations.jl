@@ -122,7 +122,7 @@ end
 function kalman_likelihood(A, B, C, u0, observables, D; kwargs...)
     problem = LinearStateSpaceProblem(
         A, B, u0, (0, length(observables)); C,
-        observables_noise = D,
+        observables_noise = Diagonal(D),
         u0_prior_mean = u0,
         u0_prior_var = diagm(ones(length(u0))),
         noise = nothing, observables, kwargs...
@@ -249,12 +249,12 @@ u0_FVGQ = zeros(size(A_FVGQ, 1))
     )
     sol = solve_kalman(
         A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
-        observables_kalman, D_kalman
+        observables_kalman, Diagonal(D_kalman)
     )
     @inferred solve_kalman(
         A_kalman, B_kalman, C_kalman, u0_mean_kalman, u0_var_kalman,
         observables_kalman,
-        D_kalman
+        Diagonal(D_kalman)
     )
     @test sol.logpdf ≈ loglik
     @test sol.logpdf ≈ 329.7550738722514
@@ -303,14 +303,14 @@ end
     prob = LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc, observables = observables_rbc,
+        observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         u0_prior_mean = u0_rbc,
         u0_prior_var = diagm(ones(length(u0_rbc)))
     )
     @inferred LinearStateSpaceProblem(
         A_rbc, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc,
+        observables_noise = Diagonal(D_rbc),
         observables = observables_rbc,
         u0_prior_mean = u0_rbc,
         u0_prior_var = diagm(ones(length(u0_rbc)))
@@ -346,7 +346,7 @@ end
     prob = LinearStateSpaceProblem(
         A, B_rbc, u0_rbc, (0, length(observables_rbc));
         C = C_rbc,
-        observables_noise = D_rbc, observables = observables_rbc,
+        observables_noise = Diagonal(D_rbc), observables = observables_rbc,
         u0_prior_mean = u0_rbc, u0_prior_var
     )
     @test_throws Exception solve(prob)
@@ -361,7 +361,7 @@ end
     )
     prob = LinearStateSpaceProblem(
         A_kalman, B_kalman, u0_mean_kalman, (0, length(observables_kalman));
-        C = C_kalman, observables_noise = D_kalman,
+        C = C_kalman, observables_noise = Diagonal(D_kalman),
         u0_prior_mean = u0_mean_kalman, u0_prior_var = u0_var_kalman,
         noise = nothing, observables = observables_kalman
     )
@@ -419,7 +419,7 @@ end
 @testset "solve!() repeated — idempotent Kalman results" begin
     prob = LinearStateSpaceProblem(
         A_kalman, B_kalman, u0_mean_kalman, (0, length(observables_kalman));
-        C = C_kalman, observables_noise = D_kalman,
+        C = C_kalman, observables_noise = Diagonal(D_kalman),
         u0_prior_mean = u0_mean_kalman, u0_prior_var = u0_var_kalman,
         noise = nothing, observables = observables_kalman
     )

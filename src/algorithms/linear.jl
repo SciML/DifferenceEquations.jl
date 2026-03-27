@@ -62,10 +62,13 @@ function _solve_direct_iteration!(prob, alg, sol, cache, B, T;
 
     # Validate dimensions
     if !isnothing(noise_concrete)
-        @assert length(noise_concrete) == T - 1
-        @assert length(noise_concrete[1]) == size(B, 2)
+        length(noise_concrete) == T - 1 ||
+            throw(ArgumentError("noise length $(length(noise_concrete)) must equal T-1 = $(T-1)"))
+        length(noise_concrete[1]) == size(B, 2) ||
+            throw(ArgumentError("noise dimension $(length(noise_concrete[1])) must equal number of shocks $(size(B, 2))"))
     end
-    @assert maybe_check_size(prob.observables, 2, T - 1)
+    maybe_check_size(prob.observables, 2, T - 1) ||
+        throw(ArgumentError("observables length must equal T-1 = $(T-1)"))
 
     (; u, z) = sol
     noise = _cache_noise(cache)
@@ -141,11 +144,10 @@ function _solve_direct_iteration!(prob, alg, sol, cache, B, T;
 
     t_values = prob.tspan[1]:prob.tspan[2]
 
-    ObsType = typeof(prob.observables)
     return build_solution(
         prob, alg, t_values, u; W = noise_concrete,
         logpdf = loglik, z,
-        retcode = :Success
+        retcode = ReturnCode.Success
     )
 end
 
@@ -167,7 +169,8 @@ function _solve!(
         perturb_diagonal = 0.0, kwargs...
     )
     T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    @assert length(prob.observables) == T - 1
+    length(prob.observables) == T - 1 ||
+        throw(ArgumentError("observables length $(length(prob.observables)) must equal T-1 = $(T-1)"))
 
     (; A, B, C, u0_prior_mean, u0_prior_var) = prob
     R = make_observables_covariance_matrix(prob.observables_noise)
@@ -288,7 +291,7 @@ function _solve!(
     t_values = prob.tspan[1]:prob.tspan[2]
     return build_solution(
         prob, alg, t_values, sol.u; P = sol.P, W = nothing, logpdf = loglik,
-        z = sol.z, retcode = :Success
+        z = sol.z, retcode = ReturnCode.Success
     )
 end
 

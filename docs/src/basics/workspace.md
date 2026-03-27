@@ -29,13 +29,24 @@ sol.u[end]
 
 ## Cache Reuse
 
-Calling `solve!(ws)` again on the same workspace reuses all previously allocated buffers. The internal state is automatically zeroed before each solve, so there is no need to manually reset anything between calls. This makes the workspace pattern ideal for tight loops:
+Calling `solve!(ws)` again on the same workspace reuses all previously allocated buffers. The solver fully overwrites all output arrays on each call, so no manual reset is needed between calls. This makes the workspace pattern ideal for tight loops:
 
 ```julia
 ws = init(prob, DirectIteration())
 for i in 1:1000
     sol = solve!(ws)
     # process sol...
+end
+```
+
+You can also change the problem between calls for parameter sweeps using `remake`:
+
+```julia
+ws = init(prob, DirectIteration())
+for a11 in [0.9, 0.95, 1.0]
+    ws.prob = remake(ws.prob; A = [a11 6.2; 0.0 0.2])
+    sol = solve!(ws)
+    # process sol.logpdf...
 end
 ```
 

@@ -15,12 +15,17 @@ The `tspan` `(0, T)` produces `T+1` states: ``u_0, u_1, \ldots, u_T``. Observati
 
 ## What does `observables_noise` represent?
 
-The `observables_noise` keyword specifies the **variance** (not standard deviation) of observation noise. A `Vector` is treated as the diagonal of the covariance matrix. A `Matrix` is the full covariance.
+The `observables_noise` keyword specifies the observation noise **covariance matrix** (entries are variances and covariances, not standard deviations). It must be an `AbstractMatrix` — use `Diagonal([σ₁², σ₂², …])` for diagonal noise or a full `Matrix`/`Symmetric(H * H')` for correlated noise.
 
 Its behavior depends on context:
 
 - **During simulation** (when `observables` is not provided): used to generate synthetic measurement noise added to the clean observations `sol.z`.
 - **During likelihood computation** (when `observables` is provided): used as the observation noise covariance in the log-likelihood calculation.
+
+## How do I differentiate with respect to only some parameters?
+
+- **Enzyme**: All arguments to the likelihood function must be marked `Duplicated` (see [Enzyme AD](@ref)). However, you only need to *read* the shadow of the parameter you care about — the other shadows are computed but can be discarded. There is no performance cost to ignoring unused shadows.
+- **ForwardDiff**: Only the parameter passed through `ForwardDiff.gradient`'s vector argument is differentiated. Other parameters are captured as constants in the closure, so no derivatives are computed for them.
 
 ## How do I choose between QuadraticStateSpaceProblem and PrunedQuadraticStateSpaceProblem?
 

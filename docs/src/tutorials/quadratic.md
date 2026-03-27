@@ -20,12 +20,14 @@ Applications."
 
 ## Simulating a Quadratic Model
 
-We define the quadratic coefficients. The tensors `A_2` and `C_2` are 3-dimensional
-arrays where `A_2[i, :, :]` gives the matrix for the `i`-th element of the
-quadratic form.
+We define the quadratic coefficients. The tensors `A_2` and `C_2` are 3-dimensional arrays where `A_2[i, :, :]` gives
+the matrix for the `i`-th element of the quadratic form. For a 2-state model,
+`A_2` is a `2×2×2` array: the quadratic contribution to state `i` is
+``u^\top A_2[i,:,:]\, u``. For example, `A_2[1,:,:]` is the 2×2 matrix whose
+quadratic form gives the nonlinear correction to the first state element.
 
 ```@example quad
-using DifferenceEquations, LinearAlgebra, Random, Plots, DiffEqBase
+using DifferenceEquations, LinearAlgebra, Random, Plots
 
 A_0 = [-7.824904812740593e-5, 0.0]
 A_1 = [0.95 6.2; 0.0 0.2]
@@ -34,13 +36,13 @@ B = [0.0; 0.01;;]
 C_0 = [7.8e-5, 0.0]
 C_1 = [0.09 0.67; 1.00 0.00]
 C_2 = cat([-0.00019 0.0026; 0.0 0.0], [0.0026 0.313; 0.0 0.0]; dims = 3)
-D = [0.01, 0.01]
+D = Diagonal([0.01, 0.01])
 u0 = zeros(2)
 T = 30
 
 Random.seed!(42)
 prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
-    C_0, C_1, C_2, observables_noise = D, syms = [:a, :b])
+    C_0, C_1, C_2, observables_noise = D, syms = (:a, :b))
 sol = solve(prob)
 ```
 
@@ -59,10 +61,10 @@ plot(sol)
 Ensemble simulations follow the same SciML interface:
 
 ```@example quad
-using Distributions
+using DiffEqBase
 
 prob_ens = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
-    C_0, C_1, C_2, observables_noise = D, syms = [:a, :b])
+    C_0, C_1, C_2, observables_noise = D, syms = (:a, :b))
 ensemble_sol = solve(EnsembleProblem(prob_ens), DirectIteration(), EnsembleThreads();
     trajectories = 50)
 summ = EnsembleSummary(ensemble_sol)
@@ -105,7 +107,7 @@ unpruned version:
 ```@example quad
 Random.seed!(42)
 prob_pruned = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
-    C_0, C_1, C_2, observables_noise = D, syms = [:a, :b])
+    C_0, C_1, C_2, observables_noise = D, syms = (:a, :b))
 sol_pruned = solve(prob_pruned)
 ```
 
@@ -156,18 +158,30 @@ using the workspace-based `init`/`solve!` pattern.
 ```julia
 using Enzyme
 
-function quad_joint_loglik(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, obs, D)
+function quad_joint_loglik(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, obs, D,
+        sol, cache)::Float64
     prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(obs));
         C_0, C_1, C_2, observables_noise = D, observables = obs, noise)
-    ws = init(prob, DirectIteration())
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     return solve!(ws).logpdf
 end
 
-# Compute gradient with respect to A_1
+# Pre-allocate workspace
+prob0 = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(obs_pruned));
+    C_0, C_1, C_2, observables_noise = D, observables = obs_pruned, noise = noise_pruned)
+ws0 = init(prob0, DirectIteration())
+
+# Compute gradient with respect to A_1 (all arguments Duplicated)
 dA_1 = zero(A_1)
 Enzyme.autodiff(Reverse, quad_joint_loglik,
-    Const(A_0), Duplicated(A_1, dA_1), Const(A_2),
-    Const(B), Const(C_0), Const(C_1), Const(C_2),
-    Const(u0), Const(noise_pruned), Const(obs_pruned), Const(D))
+    Duplicated(copy(A_0), zero(A_0)), Duplicated(copy(A_1), dA_1),
+    Duplicated(copy(A_2), zero(A_2)), Duplicated(copy(B), zero(B)),
+    Duplicated(copy(C_0), zero(C_0)), Duplicated(copy(C_1), zero(C_1)),
+    Duplicated(copy(C_2), zero(C_2)), Duplicated(copy(u0), zero(u0)),
+    Duplicated(deepcopy(noise_pruned), [zeros(size(B, 2)) for _ in noise_pruned]),
+    Duplicated(deepcopy(obs_pruned), [zeros(length(C_0)) for _ in obs_pruned]),
+    Duplicated(copy(D), zero(D)),
+    Duplicated(deepcopy(ws0.output), Enzyme.make_zero(deepcopy(ws0.output))),
+    Duplicated(deepcopy(ws0.cache), Enzyme.make_zero(deepcopy(ws0.cache))))
 dA_1  # gradient of logpdf with respect to A_1
 ```

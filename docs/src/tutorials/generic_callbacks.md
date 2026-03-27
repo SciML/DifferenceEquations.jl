@@ -33,7 +33,7 @@ We can reproduce the behavior of [`LinearStateSpaceProblem`](@ref) using generic
 callbacks. This verifies the interface and demonstrates the pattern.
 
 ```@example generic
-using DifferenceEquations, LinearAlgebra, DiffEqBase, Random
+using DifferenceEquations, LinearAlgebra, Random
 
 A = [0.95 6.2; 0.0 0.2]
 B = [0.0; 0.01;;]
@@ -128,7 +128,7 @@ from the original problem.
 Pass `syms` for state variable names and `obs_syms` for observation names.
 
 ```@example generic
-D = [0.1, 0.1]
+D = Diagonal([0.1, 0.1])
 noise = sol.W  # reuse noise from earlier
 
 prob_sym = StateSpaceProblem(linear_f!!, linear_g!!, u0, (0, T), p;

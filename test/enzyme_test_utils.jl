@@ -53,7 +53,10 @@ Computes L = unvech(v, n), then returns L * L' as a plain Matrix
 """
 function make_posdef_from_vech(v, n)
     L = unvech(v, n)
-    return Matrix(L * L')
+    # Use Matrix(L) * Matrix(L') to avoid LowerTriangular BLAS dispatch
+    # which Enzyme cannot differentiate (trmm! has no derivative rule).
+    L_mat = Matrix(L)
+    return L_mat * L_mat'
 end
 
 """
