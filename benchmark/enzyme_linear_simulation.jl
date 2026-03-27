@@ -130,7 +130,7 @@ SIM_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_sim_bench!(
     $(copy(sim_s.u0)), $([copy(n) for n in sim_s.noise]),
     $(sim_s.sol_out), $(sim_s.cache),
     $(sim_s.dA), $(sim_s.dB), $(sim_s.dC), $(sim_s.du0), $(sim_s.dnoise),
-    $(sim_s.dsol_out), $(sim_s.dcache))
+    $(sim_s.dsol_out), $(sim_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 forward_sim_bench!(
@@ -145,7 +145,7 @@ SIM_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_sim_bench!(
     $(copy(sim_l.u0)), $([copy(n) for n in sim_l.noise]),
     $(sim_l.sol_out), $(sim_l.cache),
     $(sim_l.dA), $(sim_l.dB), $(sim_l.dC), $(sim_l.du0), $(sim_l.dnoise),
-    $(sim_l.dsol_out), $(sim_l.dcache))
+    $(sim_l.dsol_out), $(sim_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Reverse mode AD — all Duplicated, scalar sum(u[end]) output
@@ -182,7 +182,7 @@ SIM_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_sim_bench!(
     $(copy(sim_s.u0)), $([copy(n) for n in sim_s.noise]),
     $(sim_s.sol_out), $(sim_s.cache),
     $(sim_s.dA), $(sim_s.dB), $(sim_s.dC), $(sim_s.du0), $(sim_s.dnoise),
-    $(sim_s.dsol_out), $(sim_s.dcache))
+    $(sim_s.dsol_out), $(sim_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 reverse_sim_bench!(
@@ -197,7 +197,7 @@ SIM_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_sim_bench!(
     $(copy(sim_l.u0)), $([copy(n) for n in sim_l.noise]),
     $(sim_l.sol_out), $(sim_l.cache),
     $(sim_l.dA), $(sim_l.dB), $(sim_l.dC), $(sim_l.du0), $(sim_l.dnoise),
-    $(sim_l.dsol_out), $(sim_l.dcache))
+    $(sim_l.dsol_out), $(sim_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # --- Edge cases: no noise, no observation equation (raw primal only) ---
 

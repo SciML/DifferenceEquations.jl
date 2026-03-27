@@ -266,22 +266,22 @@ reverse_sa!(A_m2, B_m2, C_m2, u0_m2, noise_m2,
 SA_BENCH["linear"]["forward"]["static_2x2"] = @benchmarkable forward_sa!(
     $A_sa_2, $B_sa_2, $C_sa_2, $u0_sa_2, $noise_sa_2,
     $(ws_ls2.output), $(ws_ls2.cache),
-    $dA_s2, $dB_s2, $dC_s2, $du0_s2, $dnoise_s2, $dsol_s2, $dcache_s2)
+    $dA_s2, $dB_s2, $dC_s2, $du0_s2, $dnoise_s2, $dsol_s2, $dcache_s2) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 SA_BENCH["linear"]["forward"]["mutable_2x2"] = @benchmarkable forward_sa!(
     $A_m2, $B_m2, $C_m2, $u0_m2, $noise_m2,
     $(ws_lm2.output), $(ws_lm2.cache),
-    $dA_m2, $dB_m2, $dC_m2, $du0_m2, $dnoise_m2, $dsol_m2, $dcache_m2)
+    $dA_m2, $dB_m2, $dC_m2, $du0_m2, $dnoise_m2, $dsol_m2, $dcache_m2) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 SA_BENCH["linear"]["reverse"]["static_2x2"] = @benchmarkable reverse_sa!(
     $A_sa_2, $B_sa_2, $C_sa_2, $u0_sa_2, $noise_sa_2,
     $(ws_ls2.output), $(ws_ls2.cache),
-    $dA_s2, $dB_s2, $dC_s2, $du0_s2, $dnoise_s2, $dsol_s2, $dcache_s2)
+    $dA_s2, $dB_s2, $dC_s2, $du0_s2, $dnoise_s2, $dsol_s2, $dcache_s2) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 SA_BENCH["linear"]["reverse"]["mutable_2x2"] = @benchmarkable reverse_sa!(
     $A_m2, $B_m2, $C_m2, $u0_m2, $noise_m2,
     $(ws_lm2.output), $(ws_lm2.cache),
-    $dA_m2, $dB_m2, $dC_m2, $du0_m2, $dnoise_m2, $dsol_m2, $dcache_m2)
+    $dA_m2, $dB_m2, $dC_m2, $du0_m2, $dnoise_m2, $dsol_m2, $dcache_m2) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # AD benchmarks for Quadratic 2x2 (static and mutable) — PrunedQuadraticStateSpaceProblem
@@ -393,24 +393,24 @@ SA_BENCH["quadratic"]["forward"]["static_2x2"] = @benchmarkable forward_quad_sa!
     $As0, $As1, $A_2_q, $Bs, $Cs0, $Cs1, $C_2_q,
     $u0s, $noise_s, $(ws_qs.output), $(ws_qs.cache),
     $dAs0, $dAs1, $dA_2_qs, $dBs, $dCs0, $dCs1, $dC_2_qs,
-    $du0s, $dnoise_qs, $dsol_qs, $dcache_qs)
+    $du0s, $dnoise_qs, $dsol_qs, $dcache_qs) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 SA_BENCH["quadratic"]["forward"]["mutable_2x2"] = @benchmarkable forward_quad_sa!(
     $A_0_qm_ad, $A_1_qm_ad, $A_2_qm_ad, $B_qm_ad, $C_0_qm_ad, $C_1_qm_ad, $C_2_qm_ad,
     $u0_qm_ad, $noise_qm_ad, $(ws_qm.output), $(ws_qm.cache),
     $dA_0_qm, $dA_1_qm, $dA_2_qm, $dB_qm_ad, $dC_0_qm, $dC_1_qm, $dC_2_qm,
-    $du0_qm_ad, $dnoise_qm_ad, $dsol_qm, $dcache_qm)
+    $du0_qm_ad, $dnoise_qm_ad, $dsol_qm, $dcache_qm) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 SA_BENCH["quadratic"]["reverse"]["static_2x2"] = @benchmarkable reverse_quad_sa!(
     $As0, $As1, $A_2_q, $Bs, $Cs0, $Cs1, $C_2_q,
     $u0s, $noise_s, $(ws_qs.output), $(ws_qs.cache),
     $dAs0, $dAs1, $dA_2_qs, $dBs, $dCs0, $dCs1, $dC_2_qs,
-    $du0s, $dnoise_qs, $dsol_qs, $dcache_qs)
+    $du0s, $dnoise_qs, $dsol_qs, $dcache_qs) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 SA_BENCH["quadratic"]["reverse"]["mutable_2x2"] = @benchmarkable reverse_quad_sa!(
     $A_0_qm_ad, $A_1_qm_ad, $A_2_qm_ad, $B_qm_ad, $C_0_qm_ad, $C_1_qm_ad, $C_2_qm_ad,
     $u0_qm_ad, $noise_qm_ad, $(ws_qm.output), $(ws_qm.cache),
     $dA_0_qm, $dA_1_qm, $dA_2_qm, $dB_qm_ad, $dC_0_qm, $dC_1_qm, $dC_2_qm,
-    $du0_qm_ad, $dnoise_qm_ad, $dsol_qm, $dcache_qm)
+    $du0_qm_ad, $dnoise_qm_ad, $dsol_qm, $dcache_qm) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 SA_BENCH

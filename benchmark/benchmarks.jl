@@ -20,7 +20,10 @@ BenchmarkTools.DEFAULT_PARAMETERS.seconds = 5.0
 BenchmarkTools.DEFAULT_PARAMETERS.evals = 1
 
 # Enzyme reverse-mode AD corrupts GC metadata under repeated invocation, causing segfaults.
-# GC disabled globally; seconds/evals reduced to keep memory within bounds across 6 groups.
+# GC disabled globally to prevent GC from running during Enzyme AD.
+# Between benchmark samples, Enzyme @benchmarkable calls use a `teardown` to briefly
+# re-enable GC, collect, and disable again — safe because Enzyme is not running at that point.
+# This prevents OOM from leaked memory accumulating across samples.
 # Upstream: https://github.com/EnzymeAD/Enzyme.jl/issues/2355
 GC.enable(false)
 

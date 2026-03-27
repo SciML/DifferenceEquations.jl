@@ -217,7 +217,7 @@ QUAD_ENZYME["unpruned"]["forward"]["small_mutable"] = @benchmarkable forward_qua
     $(quad_us.sol), $(quad_us.cache),
     $(quad_us.dA_0), $(quad_us.dA_1), $(quad_us.dA_2), $(quad_us.dB),
     $(quad_us.dC_0), $(quad_us.dC_1), $(quad_us.dC_2), $(quad_us.du0), $(quad_us.dnoise),
-    $(quad_us.dsol), $(quad_us.dcache))
+    $(quad_us.dsol), $(quad_us.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 forward_quad!(
@@ -236,7 +236,7 @@ QUAD_ENZYME["unpruned"]["forward"]["large_mutable"] = @benchmarkable forward_qua
     $(quad_ul.sol), $(quad_ul.cache),
     $(quad_ul.dA_0), $(quad_ul.dA_1), $(quad_ul.dA_2), $(quad_ul.dB),
     $(quad_ul.dC_0), $(quad_ul.dC_1), $(quad_ul.dC_2), $(quad_ul.du0), $(quad_ul.dnoise),
-    $(quad_ul.dsol), $(quad_ul.dcache))
+    $(quad_ul.dsol), $(quad_ul.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Reverse mode AD — unpruned
@@ -259,7 +259,7 @@ QUAD_ENZYME["unpruned"]["reverse"]["small_mutable"] = @benchmarkable reverse_qua
     $(quad_us.sol), $(quad_us.cache),
     $(quad_us.dA_0), $(quad_us.dA_1), $(quad_us.dA_2), $(quad_us.dB),
     $(quad_us.dC_0), $(quad_us.dC_1), $(quad_us.dC_2), $(quad_us.du0), $(quad_us.dnoise),
-    $(quad_us.dsol), $(quad_us.dcache))
+    $(quad_us.dsol), $(quad_us.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 reverse_quad!(
@@ -278,7 +278,7 @@ QUAD_ENZYME["unpruned"]["reverse"]["large_mutable"] = @benchmarkable reverse_qua
     $(quad_ul.sol), $(quad_ul.cache),
     $(quad_ul.dA_0), $(quad_ul.dA_1), $(quad_ul.dA_2), $(quad_ul.dB),
     $(quad_ul.dC_0), $(quad_ul.dC_1), $(quad_ul.dC_2), $(quad_ul.du0), $(quad_ul.dnoise),
-    $(quad_ul.dsol), $(quad_ul.dcache))
+    $(quad_ul.dsol), $(quad_ul.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Forward mode AD — pruned
@@ -301,7 +301,7 @@ QUAD_ENZYME["pruned"]["forward"]["small_mutable"] = @benchmarkable forward_prune
     $(quad_ps.sol), $(quad_ps.cache),
     $(quad_ps.dA_0), $(quad_ps.dA_1), $(quad_ps.dA_2), $(quad_ps.dB),
     $(quad_ps.dC_0), $(quad_ps.dC_1), $(quad_ps.dC_2), $(quad_ps.du0), $(quad_ps.dnoise),
-    $(quad_ps.dsol), $(quad_ps.dcache))
+    $(quad_ps.dsol), $(quad_ps.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 forward_pruned_quad!(
@@ -320,7 +320,7 @@ QUAD_ENZYME["pruned"]["forward"]["large_mutable"] = @benchmarkable forward_prune
     $(quad_pl.sol), $(quad_pl.cache),
     $(quad_pl.dA_0), $(quad_pl.dA_1), $(quad_pl.dA_2), $(quad_pl.dB),
     $(quad_pl.dC_0), $(quad_pl.dC_1), $(quad_pl.dC_2), $(quad_pl.du0), $(quad_pl.dnoise),
-    $(quad_pl.dsol), $(quad_pl.dcache))
+    $(quad_pl.dsol), $(quad_pl.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Reverse mode AD — pruned
@@ -343,7 +343,7 @@ QUAD_ENZYME["pruned"]["reverse"]["small_mutable"] = @benchmarkable reverse_prune
     $(quad_ps.sol), $(quad_ps.cache),
     $(quad_ps.dA_0), $(quad_ps.dA_1), $(quad_ps.dA_2), $(quad_ps.dB),
     $(quad_ps.dC_0), $(quad_ps.dC_1), $(quad_ps.dC_2), $(quad_ps.du0), $(quad_ps.dnoise),
-    $(quad_ps.dsol), $(quad_ps.dcache))
+    $(quad_ps.dsol), $(quad_ps.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 reverse_pruned_quad!(
@@ -362,6 +362,6 @@ QUAD_ENZYME["pruned"]["reverse"]["large_mutable"] = @benchmarkable reverse_prune
     $(quad_pl.sol), $(quad_pl.cache),
     $(quad_pl.dA_0), $(quad_pl.dA_1), $(quad_pl.dA_2), $(quad_pl.dB),
     $(quad_pl.dC_0), $(quad_pl.dC_1), $(quad_pl.dC_2), $(quad_pl.du0), $(quad_pl.dnoise),
-    $(quad_pl.dsol), $(quad_pl.dcache))
+    $(quad_pl.dsol), $(quad_pl.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 QUAD_ENZYME

@@ -147,7 +147,7 @@ DI_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_di_bench!(
     $(copy(di_s.u0)), $([copy(n) for n in di_s.noise]), $([copy(yi) for yi in di_s.y]),
     $(copy(di_s.H)), $(di_s.sol_out), $(di_s.cache),
     $(di_s.dA), $(di_s.dB), $(di_s.dC), $(di_s.du0), $(di_s.dnoise), $(di_s.dy), $(di_s.dH),
-    $(di_s.dsol_out), $(di_s.dcache))
+    $(di_s.dsol_out), $(di_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 forward_di_bench!(
@@ -162,7 +162,7 @@ DI_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_di_bench!(
     $(copy(di_l.u0)), $([copy(n) for n in di_l.noise]), $([copy(yi) for yi in di_l.y]),
     $(copy(di_l.H)), $(di_l.sol_out), $(di_l.cache),
     $(di_l.dA), $(di_l.dB), $(di_l.dC), $(di_l.du0), $(di_l.dnoise), $(di_l.dy), $(di_l.dH),
-    $(di_l.dsol_out), $(di_l.dcache))
+    $(di_l.dsol_out), $(di_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Reverse mode AD — all Duplicated, scalar logpdf output
@@ -203,7 +203,7 @@ DI_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_di_bench!(
     $(copy(di_s.u0)), $([copy(n) for n in di_s.noise]), $([copy(yi) for yi in di_s.y]),
     $(copy(di_s.H)), $(di_s.sol_out), $(di_s.cache),
     $(di_s.dA), $(di_s.dB), $(di_s.dC), $(di_s.du0), $(di_s.dnoise), $(di_s.dy), $(di_s.dH),
-    $(di_s.dsol_out), $(di_s.dcache))
+    $(di_s.dsol_out), $(di_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 reverse_di_bench!(
@@ -218,6 +218,6 @@ DI_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_di_bench!(
     $(copy(di_l.u0)), $([copy(n) for n in di_l.noise]), $([copy(yi) for yi in di_l.y]),
     $(copy(di_l.H)), $(di_l.sol_out), $(di_l.cache),
     $(di_l.dA), $(di_l.dB), $(di_l.dC), $(di_l.du0), $(di_l.dnoise), $(di_l.dy), $(di_l.dH),
-    $(di_l.dsol_out), $(di_l.dcache))
+    $(di_l.dsol_out), $(di_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 DI_ENZYME
