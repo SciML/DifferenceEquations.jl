@@ -223,7 +223,7 @@ GRAD_CMP["kalman"]["enzyme_reverse_small"] = @benchmarkable bench_enzyme_reverse
     $(gc_kf_s.sol_out), $(gc_kf_s.cache),
     $(gc_kf_s.rv_dA), $(gc_kf_s.rv_dB), $(gc_kf_s.rv_dC), $(gc_kf_s.rv_dmu0),
     $(gc_kf_s.rv_dSig0), $(gc_kf_s.rv_dR), $(gc_kf_s.rv_dy),
-    $(gc_kf_s.rv_dsol), $(gc_kf_s.rv_dcache))
+    $(gc_kf_s.rv_dsol), $(gc_kf_s.rv_dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 GRAD_CMP["kalman"]["enzyme_reverse_large"] = @benchmarkable bench_enzyme_reverse_kf!(
     $(gc_kf_l.A), $(gc_kf_l.B), $(gc_kf_l.C),
@@ -231,7 +231,7 @@ GRAD_CMP["kalman"]["enzyme_reverse_large"] = @benchmarkable bench_enzyme_reverse
     $(gc_kf_l.sol_out), $(gc_kf_l.cache),
     $(gc_kf_l.rv_dA), $(gc_kf_l.rv_dB), $(gc_kf_l.rv_dC), $(gc_kf_l.rv_dmu0),
     $(gc_kf_l.rv_dSig0), $(gc_kf_l.rv_dR), $(gc_kf_l.rv_dy),
-    $(gc_kf_l.rv_dsol), $(gc_kf_l.rv_dcache))
+    $(gc_kf_l.rv_dsol), $(gc_kf_l.rv_dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # DirectIteration likelihood setup
@@ -427,7 +427,7 @@ GRAD_CMP["di_likelihood"]["enzyme_reverse_small"] = @benchmarkable bench_enzyme_
     $(gc_di_s.sol_out), $(gc_di_s.cache),
     $(gc_di_s.rv_dA), $(gc_di_s.rv_dB), $(gc_di_s.rv_dC), $(gc_di_s.rv_du0),
     $(gc_di_s.rv_dnoise), $(gc_di_s.rv_dy), $(gc_di_s.rv_dH),
-    $(gc_di_s.rv_dsol), $(gc_di_s.rv_dcache))
+    $(gc_di_s.rv_dsol), $(gc_di_s.rv_dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 GRAD_CMP["di_likelihood"]["enzyme_reverse_large"] = @benchmarkable bench_enzyme_reverse_di!(
     $(gc_di_l.A), $(gc_di_l.B), $(gc_di_l.C),
@@ -435,6 +435,6 @@ GRAD_CMP["di_likelihood"]["enzyme_reverse_large"] = @benchmarkable bench_enzyme_
     $(gc_di_l.sol_out), $(gc_di_l.cache),
     $(gc_di_l.rv_dA), $(gc_di_l.rv_dB), $(gc_di_l.rv_dC), $(gc_di_l.rv_du0),
     $(gc_di_l.rv_dnoise), $(gc_di_l.rv_dy), $(gc_di_l.rv_dH),
-    $(gc_di_l.rv_dsol), $(gc_di_l.rv_dcache))
+    $(gc_di_l.rv_dsol), $(gc_di_l.rv_dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 GRAD_CMP

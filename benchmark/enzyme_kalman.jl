@@ -149,7 +149,7 @@ KALMAN_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_kalman_bench!
     $(copy(kf_s.mu_0)), $(copy(kf_s.Sigma_0)), $(copy(kf_s.R)),
     $([copy(yi) for yi in kf_s.y]), $(kf_s.sol_out), $(kf_s.cache),
     $(kf_s.dA), $(kf_s.dB), $(kf_s.dC), $(kf_s.dmu_0), $(kf_s.dSigma_0), $(kf_s.dR),
-    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache))
+    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 forward_kalman_bench!(
@@ -164,7 +164,7 @@ KALMAN_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_kalman_bench!
     $(copy(kf_l.mu_0)), $(copy(kf_l.Sigma_0)), $(copy(kf_l.R)),
     $([copy(yi) for yi in kf_l.y]), $(kf_l.sol_out), $(kf_l.cache),
     $(kf_l.dA), $(kf_l.dB), $(kf_l.dC), $(kf_l.dmu_0), $(kf_l.dSigma_0), $(kf_l.dR),
-    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache))
+    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Reverse mode AD — all Duplicated, scalar logpdf output
@@ -202,7 +202,7 @@ KALMAN_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_kalman_bench!
     $(copy(kf_s.mu_0)), $(copy(kf_s.Sigma_0)), $(copy(kf_s.R)),
     $([copy(yi) for yi in kf_s.y]), $(kf_s.sol_out), $(kf_s.cache),
     $(kf_s.dA), $(kf_s.dB), $(kf_s.dC), $(kf_s.dmu_0), $(kf_s.dSigma_0), $(kf_s.dR),
-    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache))
+    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 reverse_kalman_bench!(
@@ -217,6 +217,6 @@ KALMAN_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_kalman_bench!
     $(copy(kf_l.mu_0)), $(copy(kf_l.Sigma_0)), $(copy(kf_l.R)),
     $([copy(yi) for yi in kf_l.y]), $(kf_l.sol_out), $(kf_l.cache),
     $(kf_l.dA), $(kf_l.dB), $(kf_l.dC), $(kf_l.dmu_0), $(kf_l.dSigma_0), $(kf_l.dR),
-    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache))
+    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 KALMAN_ENZYME
