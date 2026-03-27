@@ -28,9 +28,11 @@ const y_gc = [[0.5, 0.3], [0.2, 0.1], [0.8, 0.4]]
 
 # Enzyme workspace (pre-allocated Float64)
 function _make_gc_workspace()
-    prob = LinearStateSpaceProblem(A_gc, B_gc, zeros(N_gc), (0, T_gc); C = C_gc,
+    prob = LinearStateSpaceProblem(
+        A_gc, B_gc, zeros(N_gc), (0, T_gc); C = C_gc,
         u0_prior_mean = mu_0_gc, u0_prior_var = Sigma_0_gc,
-        observables_noise = R_gc, observables = y_gc)
+        observables_noise = R_gc, observables = y_gc
+    )
     ws = init(prob, KalmanFilter())
     return ws.output, ws.cache
 end
@@ -49,7 +51,8 @@ function _kf_loglik_fd(A_vec)
         u0_prior_mean = promote_array(T_el, mu_0_gc),
         u0_prior_var = promote_array(T_el, Sigma_0_gc),
         observables_noise = promote_array(T_el, R_gc),
-        observables = y_gc)
+        observables = y_gc
+    )
     sol = solve(prob, KalmanFilter())
     return sol.logpdf
 end
@@ -59,16 +62,20 @@ end
 # =============================================================================
 
 function _kf_loglik_enzyme!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache)
-    prob = LinearStateSpaceProblem(A, B, zeros(eltype(A), size(A, 1)), (0, length(y)); C,
+    prob = LinearStateSpaceProblem(
+        A, B, zeros(eltype(A), size(A, 1)), (0, length(y)); C,
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
-        observables_noise = R, observables = y)
+        observables_noise = R, observables = y
+    )
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol_out, cache)
     return solve!(ws).logpdf
 end
 
-function enzyme_batched_forward_gradient_kf!(grad_out, A, B, C, mu_0, Sigma_0, R, y,
+function enzyme_batched_forward_gradient_kf!(
+        grad_out, A, B, C, mu_0, Sigma_0, R, y,
         sol_out, cache, chunk_size,
-        dAs, dBs, dCs, dmu0s, dSig0s, dRs, dys, dsols, dcaches)
+        dAs, dBs, dCs, dmu0s, dSig0s, dRs, dys, dsols, dcaches
+    )
     N_params = length(vec(A))
     for chunk_start in 1:chunk_size:N_params
         chunk_end = min(chunk_start + chunk_size - 1, N_params)
@@ -78,7 +85,9 @@ function enzyme_batched_forward_gradient_kf!(grad_out, A, B, C, mu_0, Sigma_0, R
         for k in 1:chunk_size
             fill_zero!!(dAs[k]); fill_zero!!(dBs[k]); fill_zero!!(dCs[k])
             fill_zero!!(dmu0s[k]); fill_zero!!(dSig0s[k]); fill_zero!!(dRs[k])
-            for t in eachindex(dys[k]); dys[k][t] = fill_zero!!(dys[k][t]); end
+            for t in eachindex(dys[k])
+                dys[k][t] = fill_zero!!(dys[k][t])
+            end
             make_zero!(dsols[k]); make_zero!(dcaches[k])
         end
 
@@ -87,7 +96,8 @@ function enzyme_batched_forward_gradient_kf!(grad_out, A, B, C, mu_0, Sigma_0, R
             dAs[k][chunk_start + k - 1] = 1.0
         end
 
-        result = autodiff(Forward, _kf_loglik_enzyme!,
+        result = autodiff(
+            Forward, _kf_loglik_enzyme!,
             BatchDuplicated(A, dAs),
             BatchDuplicated(B, dBs),
             BatchDuplicated(C, dCs),
@@ -96,7 +106,8 @@ function enzyme_batched_forward_gradient_kf!(grad_out, A, B, C, mu_0, Sigma_0, R
             BatchDuplicated(R, dRs),
             BatchDuplicated(y, dys),
             BatchDuplicated(sol_out, dsols),
-            BatchDuplicated(cache, dcaches))
+            BatchDuplicated(cache, dcaches)
+        )
 
         # Result is ((d1, d2, ...),) for scalar return
         derivs = values(result[1])
@@ -111,18 +122,24 @@ end
 # 3. Enzyme Reverse — full gradient, extract dA
 # =============================================================================
 
-function enzyme_reverse_gradient_kf!(A, B, C, mu_0, Sigma_0, R, y,
-        sol_out, cache, dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache)
+function enzyme_reverse_gradient_kf!(
+        A, B, C, mu_0, Sigma_0, R, y,
+        sol_out, cache, dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache
+    )
     make_zero!(dsol_out); make_zero!(dcache)
     fill_zero!!(dA); fill_zero!!(dB); fill_zero!!(dC)
     fill_zero!!(dmu_0); fill_zero!!(dSigma_0); fill_zero!!(dR)
-    @inbounds for i in eachindex(dy); dy[i] = fill_zero!!(dy[i]); end
+    @inbounds for i in eachindex(dy)
+        dy[i] = fill_zero!!(dy[i])
+    end
 
-    autodiff(Reverse, _kf_loglik_enzyme!, Active,
+    autodiff(
+        Reverse, _kf_loglik_enzyme!, Active,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(mu_0, dmu_0), Duplicated(Sigma_0, dSigma_0),
         Duplicated(R, dR), Duplicated(y, dy),
-        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache)
+    )
     return vec(dA)
 end
 
@@ -153,10 +170,12 @@ end
     dcaches = ntuple(_ -> make_zero(cache_bf), CHUNK_gc)
 
     grad_enzyme_fwd = zeros(N_params)
-    enzyme_batched_forward_gradient_kf!(grad_enzyme_fwd,
+    enzyme_batched_forward_gradient_kf!(
+        grad_enzyme_fwd,
         A_gc, B_gc, C_gc, mu_0_gc, Sigma_0_gc, R_gc, y_gc,
         sol_out_bf, cache_bf, CHUNK_gc,
-        dAs, dBs, dCs, dmu0s, dSig0s, dRs, dys, dsols, dcaches)
+        dAs, dBs, dCs, dmu0s, dSig0s, dRs, dys, dsols, dcaches
+    )
 
     # Enzyme Reverse
     sol_out_rv, cache_rv = _make_gc_workspace()
@@ -168,7 +187,8 @@ end
     grad_enzyme_rev = enzyme_reverse_gradient_kf!(
         A_gc, B_gc, C_gc, mu_0_gc, Sigma_0_gc, R_gc, y_gc,
         sol_out_rv, cache_rv, dA_rv, dB_rv, dC_rv, dmu0_rv, dSig0_rv, dR_rv,
-        dy_rv, dsol_rv, dcache_rv)
+        dy_rv, dsol_rv, dcache_rv
+    )
 
     @testset "all methods finite" begin
         @test all(isfinite, grad_fin)
@@ -178,23 +198,23 @@ end
     end
 
     @testset "ForwardDiff matches finite differences" begin
-        @test grad_fd ≈ grad_fin rtol = 1e-4
+        @test grad_fd ≈ grad_fin rtol = 1.0e-4
     end
 
     @testset "Enzyme BatchDuplicated forward matches finite differences" begin
-        @test grad_enzyme_fwd ≈ grad_fin rtol = 1e-4
+        @test grad_enzyme_fwd ≈ grad_fin rtol = 1.0e-4
     end
 
     @testset "Enzyme reverse matches finite differences" begin
-        @test grad_enzyme_rev ≈ grad_fin rtol = 1e-4
+        @test grad_enzyme_rev ≈ grad_fin rtol = 1.0e-4
     end
 
     @testset "ForwardDiff matches Enzyme reverse (high precision)" begin
-        @test grad_fd ≈ grad_enzyme_rev rtol = 1e-10
+        @test grad_fd ≈ grad_enzyme_rev rtol = 1.0e-10
     end
 
     @testset "Enzyme BatchDuplicated forward matches Enzyme reverse (high precision)" begin
-        @test grad_enzyme_fwd ≈ grad_enzyme_rev rtol = 1e-10
+        @test grad_enzyme_fwd ≈ grad_enzyme_rev rtol = 1.0e-10
     end
 end
 
@@ -212,8 +232,10 @@ const y_di_gc = [[0.5, 0.3], [0.2, 0.1], [0.8, 0.4]]
 
 function _make_di_gc_workspace()
     R = H_di_gc * H_di_gc'
-    prob = LinearStateSpaceProblem(A_di_gc, B_di_gc, u0_di_gc, (0, T_gc);
-        C = C_di_gc, observables_noise = R, observables = y_di_gc, noise = noise_di_gc)
+    prob = LinearStateSpaceProblem(
+        A_di_gc, B_di_gc, u0_di_gc, (0, T_gc);
+        C = C_di_gc, observables_noise = R, observables = y_di_gc, noise = noise_di_gc
+    )
     ws = init(prob, DirectIteration())
     return ws.output, ws.cache
 end
@@ -228,22 +250,27 @@ function _di_loglik_fd_gc(A_vec)
         promote_array(T_el, u0_di_gc), (0, T_gc);
         C = promote_array(T_el, C_di_gc),
         observables_noise = R,
-        observables = y_di_gc, noise = noise_di_gc)
+        observables = y_di_gc, noise = noise_di_gc
+    )
     sol = solve(prob, DirectIteration())
     return sol.logpdf
 end
 
 function _di_loglik_enzyme!(A, B, C, u0, noise, y, H, sol_out, cache)
     R = H * H'
-    prob = LinearStateSpaceProblem(A, B, u0, (0, length(y));
-        C, observables_noise = R, observables = y, noise)
+    prob = LinearStateSpaceProblem(
+        A, B, u0, (0, length(y));
+        C, observables_noise = R, observables = y, noise
+    )
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol_out, cache)
     return solve!(ws).logpdf
 end
 
-function enzyme_batched_forward_gradient_di!(grad_out, A, B, C, u0, noise, y, H,
+function enzyme_batched_forward_gradient_di!(
+        grad_out, A, B, C, u0, noise, y, H,
         sol_out, cache, chunk_size,
-        dAs, dBs, dCs, du0s, dnoises, dys, dHs, dsols, dcaches)
+        dAs, dBs, dCs, du0s, dnoises, dys, dHs, dsols, dcaches
+    )
     N_params = length(vec(A))
     for chunk_start in 1:chunk_size:N_params
         chunk_end = min(chunk_start + chunk_size - 1, N_params)
@@ -252,15 +279,20 @@ function enzyme_batched_forward_gradient_di!(grad_out, A, B, C, u0, noise, y, H,
         for k in 1:chunk_size
             fill_zero!!(dAs[k]); fill_zero!!(dBs[k]); fill_zero!!(dCs[k])
             fill_zero!!(du0s[k]); fill_zero!!(dHs[k])
-            for t in eachindex(dnoises[k]); dnoises[k][t] = fill_zero!!(dnoises[k][t]); end
-            for t in eachindex(dys[k]); dys[k][t] = fill_zero!!(dys[k][t]); end
+            for t in eachindex(dnoises[k])
+                dnoises[k][t] = fill_zero!!(dnoises[k][t])
+            end
+            for t in eachindex(dys[k])
+                dys[k][t] = fill_zero!!(dys[k][t])
+            end
             make_zero!(dsols[k]); make_zero!(dcaches[k])
         end
         for k in 1:actual
             dAs[k][chunk_start + k - 1] = 1.0
         end
 
-        result = autodiff(Forward, _di_loglik_enzyme!,
+        result = autodiff(
+            Forward, _di_loglik_enzyme!,
             BatchDuplicated(A, dAs),
             BatchDuplicated(B, dBs),
             BatchDuplicated(C, dCs),
@@ -269,7 +301,8 @@ function enzyme_batched_forward_gradient_di!(grad_out, A, B, C, u0, noise, y, H,
             BatchDuplicated(y, dys),
             BatchDuplicated(H, dHs),
             BatchDuplicated(sol_out, dsols),
-            BatchDuplicated(cache, dcaches))
+            BatchDuplicated(cache, dcaches)
+        )
 
         derivs = values(result[1])
         for k in 1:actual
@@ -299,10 +332,12 @@ end
     dcaches = ntuple(_ -> make_zero(cache_bf), CHUNK_gc)
 
     grad_enzyme_fwd = zeros(N_params)
-    enzyme_batched_forward_gradient_di!(grad_enzyme_fwd,
+    enzyme_batched_forward_gradient_di!(
+        grad_enzyme_fwd,
         A_di_gc, B_di_gc, C_di_gc, u0_di_gc, noise_di_gc, y_di_gc, H_di_gc,
         sol_out_bf, cache_bf, CHUNK_gc,
-        dAs, dBs, dCs, du0s, dnoises, dys, dHs, dsols, dcaches)
+        dAs, dBs, dCs, du0s, dnoises, dys, dHs, dsols, dcaches
+    )
 
     # Enzyme Reverse
     sol_out_rv, cache_rv = _make_di_gc_workspace()
@@ -312,13 +347,15 @@ end
     dy_rv = [make_zero(y_di_gc[1]) for _ in 1:T_gc]
     dsol_rv = make_zero(sol_out_rv); dcache_rv = make_zero(cache_rv)
 
-    autodiff(Reverse, _di_loglik_enzyme!, Active,
+    autodiff(
+        Reverse, _di_loglik_enzyme!, Active,
         Duplicated(A_di_gc, dA_rv), Duplicated(B_di_gc, dB_rv),
         Duplicated(C_di_gc, dC_rv), Duplicated(u0_di_gc, du0_rv),
         Duplicated(noise_di_gc, dnoise_rv),
         Duplicated(y_di_gc, dy_rv),
         Duplicated(H_di_gc, dH_rv),
-        Duplicated(sol_out_rv, dsol_rv), Duplicated(cache_rv, dcache_rv))
+        Duplicated(sol_out_rv, dsol_rv), Duplicated(cache_rv, dcache_rv)
+    )
     grad_enzyme_rev = vec(dA_rv)
 
     @testset "all methods finite" begin
@@ -329,19 +366,19 @@ end
     end
 
     @testset "ForwardDiff matches finite differences" begin
-        @test grad_fd ≈ grad_fin rtol = 1e-4
+        @test grad_fd ≈ grad_fin rtol = 1.0e-4
     end
 
     @testset "Enzyme BatchDuplicated forward matches finite differences" begin
-        @test grad_enzyme_fwd ≈ grad_fin rtol = 1e-4
+        @test grad_enzyme_fwd ≈ grad_fin rtol = 1.0e-4
     end
 
     @testset "Enzyme reverse matches finite differences" begin
-        @test grad_enzyme_rev ≈ grad_fin rtol = 1e-4
+        @test grad_enzyme_rev ≈ grad_fin rtol = 1.0e-4
     end
 
     @testset "all AD methods agree (high precision)" begin
-        @test grad_fd ≈ grad_enzyme_rev rtol = 1e-10
-        @test grad_enzyme_fwd ≈ grad_enzyme_rev rtol = 1e-10
+        @test grad_fd ≈ grad_enzyme_rev rtol = 1.0e-10
+        @test grad_enzyme_fwd ≈ grad_enzyme_rev rtol = 1.0e-10
     end
 end

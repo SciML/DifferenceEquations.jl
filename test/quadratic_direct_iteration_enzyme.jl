@@ -25,15 +25,19 @@ const noise_qe = [0.1 * randn(K_qe) for _ in 1:T_qe]
 # =============================================================================
 
 function make_quad_sol_cache(A_0, A_1, A_2, B, u0, noise; C_0, C_1, C_2)
-    prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
-        C_0, C_1, C_2, noise)
+    prob = QuadraticStateSpaceProblem(
+        A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise
+    )
     ws = init(prob, DirectIteration())
     return ws.output, ws.cache
 end
 
 function make_pruned_sol_cache(A_0, A_1, A_2, B, u0, noise; C_0, C_1, C_2)
-    prob = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
-        C_0, C_1, C_2, noise)
+    prob = PrunedQuadraticStateSpaceProblem(
+        A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise
+    )
     ws = init(prob, DirectIteration())
     return ws.output, ws.cache
 end
@@ -43,16 +47,20 @@ end
 # =============================================================================
 
 function quad_solve!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol, cache)
-    prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
-        C_0, C_1, C_2, noise)
+    prob = QuadraticStateSpaceProblem(
+        A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise
+    )
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     solve!(ws)
     return (sol.u, sol.z)
 end
 
 function quad_scalar!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol, cache)::Float64
-    prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
-        C_0, C_1, C_2, noise)
+    prob = QuadraticStateSpaceProblem(
+        A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise
+    )
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     return sum(solve!(ws).u[end])
 end
@@ -62,16 +70,20 @@ end
 # =============================================================================
 
 function pruned_solve!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol, cache)
-    prob = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
-        C_0, C_1, C_2, noise)
+    prob = PrunedQuadraticStateSpaceProblem(
+        A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise
+    )
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     solve!(ws)
     return (sol.u, sol.z)
 end
 
 function pruned_scalar!(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, sol, cache)::Float64
-    prob = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(noise));
-        C_0, C_1, C_2, noise)
+    prob = PrunedQuadraticStateSpaceProblem(
+        A_0, A_1, A_2, B, u0, (0, length(noise));
+        C_0, C_1, C_2, noise
+    )
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     return sum(solve!(ws).u[end])
 end
@@ -83,31 +95,37 @@ end
 @testset "Unpruned quadratic solve! sanity" begin
     sol, cache = make_quad_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
-        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
+        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe
+    )
     val = quad_scalar!(
         A_0_qe, A_1_qe, A_2_qe, B_qe, C_0_qe, C_1_qe, C_2_qe,
-        u0_qe, noise_qe, sol, cache)
+        u0_qe, noise_qe, sol, cache
+    )
     @test isfinite(val)
 
     val2 = quad_scalar!(
         A_0_qe, A_1_qe, A_2_qe, B_qe, C_0_qe, C_1_qe, C_2_qe,
-        u0_qe, noise_qe, sol, cache)
-    @test val ≈ val2 rtol = 1e-12
+        u0_qe, noise_qe, sol, cache
+    )
+    @test val ≈ val2 rtol = 1.0e-12
 end
 
 @testset "Pruned quadratic solve! sanity" begin
     sol, cache = make_pruned_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
-        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
+        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe
+    )
     val = pruned_scalar!(
         A_0_qe, A_1_qe, A_2_qe, B_qe, C_0_qe, C_1_qe, C_2_qe,
-        u0_qe, noise_qe, sol, cache)
+        u0_qe, noise_qe, sol, cache
+    )
     @test isfinite(val)
 
     val2 = pruned_scalar!(
         A_0_qe, A_1_qe, A_2_qe, B_qe, C_0_qe, C_1_qe, C_2_qe,
-        u0_qe, noise_qe, sol, cache)
-    @test val ≈ val2 rtol = 1e-12
+        u0_qe, noise_qe, sol, cache
+    )
+    @test val ≈ val2 rtol = 1.0e-12
 end
 
 # =============================================================================
@@ -117,15 +135,18 @@ end
 @testset "EnzymeTestUtils - Unpruned quadratic forward (all Duplicated)" begin
     sol, cache = make_quad_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
-        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
+        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe
+    )
 
-    test_forward(quad_solve!, Const,
+    test_forward(
+        quad_solve!, Const,
         (copy(A_0_qe), Duplicated), (copy(A_1_qe), Duplicated),
         (copy(A_2_qe), Duplicated), (copy(B_qe), Duplicated),
         (copy(C_0_qe), Duplicated), (copy(C_1_qe), Duplicated),
         (copy(C_2_qe), Duplicated), (copy(u0_qe), Duplicated),
         ([copy(n) for n in noise_qe], Duplicated),
-        (sol, Duplicated), (cache, Duplicated))
+        (sol, Duplicated), (cache, Duplicated)
+    )
 end
 
 # =============================================================================
@@ -135,10 +156,12 @@ end
 @testset "Unpruned quadratic reverse — manual gradient check" begin
     sol, cache = make_quad_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
-        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
+        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe
+    )
 
     dA_1 = zero(A_1_qe)
-    autodiff(Reverse, quad_scalar!, Active,
+    autodiff(
+        Reverse, quad_scalar!, Active,
         Duplicated(copy(A_0_qe), zero(A_0_qe)),
         Duplicated(copy(A_1_qe), dA_1),
         Duplicated(copy(A_2_qe), zero(A_2_qe)),
@@ -149,13 +172,17 @@ end
         Duplicated(copy(u0_qe), zero(u0_qe)),
         Duplicated(deepcopy(noise_qe), [zeros(size(B_qe, 2)) for _ in noise_qe]),
         Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
-        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache))))
+        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache)))
+    )
 
     fd_dA_1 = fdm_gradient(
-        a -> quad_scalar!(A_0_qe, reshape(a, size(A_1_qe)), A_2_qe, B_qe,
-            C_0_qe, C_1_qe, C_2_qe, u0_qe, noise_qe, sol, cache),
-        vec(copy(A_1_qe)))
-    @test vec(dA_1) ≈ fd_dA_1 rtol = 1e-4
+        a -> quad_scalar!(
+            A_0_qe, reshape(a, size(A_1_qe)), A_2_qe, B_qe,
+            C_0_qe, C_1_qe, C_2_qe, u0_qe, noise_qe, sol, cache
+        ),
+        vec(copy(A_1_qe))
+    )
+    @test vec(dA_1) ≈ fd_dA_1 rtol = 1.0e-4
 end
 
 # =============================================================================
@@ -165,15 +192,18 @@ end
 @testset "EnzymeTestUtils - Pruned quadratic forward (all Duplicated)" begin
     sol, cache = make_pruned_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
-        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
+        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe
+    )
 
-    test_forward(pruned_solve!, Const,
+    test_forward(
+        pruned_solve!, Const,
         (copy(A_0_qe), Duplicated), (copy(A_1_qe), Duplicated),
         (copy(A_2_qe), Duplicated), (copy(B_qe), Duplicated),
         (copy(C_0_qe), Duplicated), (copy(C_1_qe), Duplicated),
         (copy(C_2_qe), Duplicated), (copy(u0_qe), Duplicated),
         ([copy(n) for n in noise_qe], Duplicated),
-        (sol, Duplicated), (cache, Duplicated))
+        (sol, Duplicated), (cache, Duplicated)
+    )
 end
 
 # =============================================================================
@@ -183,10 +213,12 @@ end
 @testset "Pruned quadratic reverse — manual gradient check" begin
     sol, cache = make_pruned_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
-        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
+        C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe
+    )
 
     dA_1 = zero(A_1_qe)
-    autodiff(Reverse, pruned_scalar!, Active,
+    autodiff(
+        Reverse, pruned_scalar!, Active,
         Duplicated(copy(A_0_qe), zero(A_0_qe)),
         Duplicated(copy(A_1_qe), dA_1),
         Duplicated(copy(A_2_qe), zero(A_2_qe)),
@@ -197,11 +229,15 @@ end
         Duplicated(copy(u0_qe), zero(u0_qe)),
         Duplicated(deepcopy(noise_qe), [zeros(size(B_qe, 2)) for _ in noise_qe]),
         Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
-        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache))))
+        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache)))
+    )
 
     fd_dA_1 = fdm_gradient(
-        a -> pruned_scalar!(A_0_qe, reshape(a, size(A_1_qe)), A_2_qe, B_qe,
-            C_0_qe, C_1_qe, C_2_qe, u0_qe, noise_qe, sol, cache),
-        vec(copy(A_1_qe)))
-    @test vec(dA_1) ≈ fd_dA_1 rtol = 1e-4
+        a -> pruned_scalar!(
+            A_0_qe, reshape(a, size(A_1_qe)), A_2_qe, B_qe,
+            C_0_qe, C_1_qe, C_2_qe, u0_qe, noise_qe, sol, cache
+        ),
+        vec(copy(A_1_qe))
+    )
+    @test vec(dA_1) ≈ fd_dA_1 rtol = 1.0e-4
 end

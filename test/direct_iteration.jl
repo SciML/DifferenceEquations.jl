@@ -79,10 +79,12 @@ noise_rbc = [noise_rbc_matrix[:, t] for t in 1:size(noise_rbc_matrix, 2)]
     p = (; A = A_rbc, B = B_rbc, C = C_rbc)
 
     Random.seed!(1234)
-    sol_generic = solve(StateSpaceProblem(
-        linear_f!!, linear_g!!, u0_rbc, (0, 5), p;
-        n_shocks = 1, n_obs = 2
-    ))
+    sol_generic = solve(
+        StateSpaceProblem(
+            linear_f!!, linear_g!!, u0_rbc, (0, 5), p;
+            n_shocks = 1, n_obs = 2
+        )
+    )
 
     @test sol_linear.u ≈ sol_generic.u
     @test sol_linear.z ≈ sol_generic.z
@@ -96,10 +98,12 @@ end
     obs = observables_rbc[1:T]
     nse = noise_rbc[1:T]
 
-    sol_linear = solve(LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
-        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
-    ))
+    sol_linear = solve(
+        LinearStateSpaceProblem(
+            A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
+            observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
+        )
+    )
 
     linear_f!! = (x_next, x, w, p, t) -> begin
         mul!(x_next, p.A, x)
@@ -112,11 +116,13 @@ end
     end
     p = (; A = A_rbc, B = B_rbc, C = C_rbc)
 
-    sol_generic = solve(StateSpaceProblem(
-        linear_f!!, linear_g!!, u0_rbc, (0, T), p;
-        n_shocks = 1, n_obs = 2,
-        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
-    ))
+    sol_generic = solve(
+        StateSpaceProblem(
+            linear_f!!, linear_g!!, u0_rbc, (0, T), p;
+            n_shocks = 1, n_obs = 2,
+            observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
+        )
+    )
 
     @test sol_linear.u ≈ sol_generic.u
     @test sol_linear.z ≈ sol_generic.z
@@ -134,24 +140,30 @@ end
     end
     p = (; A = A_rbc, B = B_rbc)
 
-    sol = solve(StateSpaceProblem(
-        linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
-        n_shocks = 1, n_obs = 0
-    ))
+    sol = solve(
+        StateSpaceProblem(
+            linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
+            n_shocks = 1, n_obs = 0
+        )
+    )
     @test sol.z === nothing
     @test length(sol.u) == 6
 
     # Compare to LinearStateSpaceProblem with C=nothing
     Random.seed!(1234)
-    sol_linear = solve(LinearStateSpaceProblem(
-        A_rbc, B_rbc, [1.0, 0.5], (0, 5); C = nothing
-    ))
+    sol_linear = solve(
+        LinearStateSpaceProblem(
+            A_rbc, B_rbc, [1.0, 0.5], (0, 5); C = nothing
+        )
+    )
     # Must use same seed → same random noise
     Random.seed!(1234)
-    sol_generic = solve(StateSpaceProblem(
-        linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
-        n_shocks = 1, n_obs = 0
-    ))
+    sol_generic = solve(
+        StateSpaceProblem(
+            linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
+            n_shocks = 1, n_obs = 0
+        )
+    )
     @test sol_linear.u ≈ sol_generic.u
 end
 
@@ -168,19 +180,23 @@ end
     end
     p = (; A = A_rbc, C = C_rbc)
 
-    sol = solve(StateSpaceProblem(
-        linear_f!!, linear_g!!, [1.0, 0.5], (0, 5), p;
-        n_shocks = 0, n_obs = 2
-    ))
+    sol = solve(
+        StateSpaceProblem(
+            linear_f!!, linear_g!!, [1.0, 0.5], (0, 5), p;
+            n_shocks = 0, n_obs = 2
+        )
+    )
 
     @test sol.W === nothing
     @test length(sol.u) == 6
     @test length(sol.z) == 6
 
     # Compare to LinearStateSpaceProblem with B=nothing
-    sol_linear = solve(LinearStateSpaceProblem(
-        A_rbc, nothing, [1.0, 0.5], (0, 5); C = C_rbc
-    ))
+    sol_linear = solve(
+        LinearStateSpaceProblem(
+            A_rbc, nothing, [1.0, 0.5], (0, 5); C = C_rbc
+        )
+    )
     @test sol_linear.u ≈ sol.u
     @test sol_linear.z ≈ sol.z
 end
@@ -203,21 +219,27 @@ end
     end
     p = (; A = A_rbc, B = B_no_noise, C = C_rbc)
 
-    sol_no_noise = solve(StateSpaceProblem(
-        linear_f!!, linear_g!!, u0, (0, T), p;
-        n_shocks = 1, n_obs = 2
-    ))
+    sol_no_noise = solve(
+        StateSpaceProblem(
+            linear_f!!, linear_g!!, u0, (0, T), p;
+            n_shocks = 1, n_obs = 2
+        )
+    )
 
-    sol_obs_noise = solve(StateSpaceProblem(
-        linear_f!!, linear_g!!, u0, (0, T), p;
-        n_shocks = 1, n_obs = 2, observables_noise = Diagonal(D_rbc)
-    ))
+    sol_obs_noise = solve(
+        StateSpaceProblem(
+            linear_f!!, linear_g!!, u0, (0, T), p;
+            n_shocks = 1, n_obs = 2, observables_noise = Diagonal(D_rbc)
+        )
+    )
 
     # Tiny observation noise → nearly deterministic
-    sol_tiny = solve(StateSpaceProblem(
-        linear_f!!, linear_g!!, u0, (0, T), p;
-        n_shocks = 1, n_obs = 2, observables_noise = Diagonal([1.0e-16, 1.0e-16])
-    ))
+    sol_tiny = solve(
+        StateSpaceProblem(
+            linear_f!!, linear_g!!, u0, (0, T), p;
+            n_shocks = 1, n_obs = 2, observables_noise = Diagonal([1.0e-16, 1.0e-16])
+        )
+    )
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) < 1.0e-7
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) > 0.0
 end
@@ -281,26 +303,32 @@ end
     f_nn!!, g_nn!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, C_0_rbc, C_1_rbc, C_2_rbc, u0
     )
-    sol_no_noise = solve(StateSpaceProblem(
-        f_nn!!, g_nn!!, u0, (0, T);
-        n_shocks = 1, n_obs = 2
-    ))
+    sol_no_noise = solve(
+        StateSpaceProblem(
+            f_nn!!, g_nn!!, u0, (0, T);
+            n_shocks = 1, n_obs = 2
+        )
+    )
 
     f_on!!, g_on!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, C_0_rbc, C_1_rbc, C_2_rbc, u0
     )
-    sol_obs_noise = solve(StateSpaceProblem(
-        f_on!!, g_on!!, u0, (0, T);
-        n_shocks = 1, n_obs = 2, observables_noise = Diagonal(D_2_rbc)
-    ))
+    sol_obs_noise = solve(
+        StateSpaceProblem(
+            f_on!!, g_on!!, u0, (0, T);
+            n_shocks = 1, n_obs = 2, observables_noise = Diagonal(D_2_rbc)
+        )
+    )
 
     f_ti!!, g_ti!! = make_quadratic_callbacks(
         A_0_rbc, A_1_rbc, A_2_rbc, B_no_noise, C_0_rbc, C_1_rbc, C_2_rbc, u0
     )
-    sol_tiny = solve(StateSpaceProblem(
-        f_ti!!, g_ti!!, u0, (0, T);
-        n_shocks = 1, n_obs = 2, observables_noise = Diagonal([1.0e-16, 1.0e-16])
-    ))
+    sol_tiny = solve(
+        StateSpaceProblem(
+            f_ti!!, g_ti!!, u0, (0, T);
+            n_shocks = 1, n_obs = 2, observables_noise = Diagonal([1.0e-16, 1.0e-16])
+        )
+    )
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) < 1.0e-7
     @test maximum(maximum.(sol_tiny.z - sol_no_noise.z)) > 0.0
 end
@@ -389,10 +417,12 @@ end
     obs = observables_rbc[1:T]
     nse = noise_rbc[1:T]
 
-    sol_direct = solve(LinearStateSpaceProblem(
-        A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
-        observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
-    ))
+    sol_direct = solve(
+        LinearStateSpaceProblem(
+            A_rbc, B_rbc, u0_rbc, (0, T); C = C_rbc,
+            observables_noise = Diagonal(D_rbc), noise = nse, observables = obs
+        )
+    )
 
     linear_f!! = (x_next, x, w, p, t) -> begin
         mul!(x_next, p.A, x)
@@ -454,10 +484,12 @@ end
     p = (; A = A_rbc, B = B_rbc)
 
     Random.seed!(1234)
-    sol_direct = solve(StateSpaceProblem(
-        linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
-        n_shocks = 1, n_obs = 0
-    ))
+    sol_direct = solve(
+        StateSpaceProblem(
+            linear_f!!, nothing, [1.0, 0.5], (0, 5), p;
+            n_shocks = 1, n_obs = 0
+        )
+    )
 
     prob_gen = StateSpaceProblem(
         linear_f!!, nothing, [1.0, 0.5], (0, 5), p;

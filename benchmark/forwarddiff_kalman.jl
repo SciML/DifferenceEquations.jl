@@ -59,14 +59,16 @@ function kalman_loglik_fd_bench(A_vec, B, C, mu_0, Sigma_0, R, y, N)
         u0_prior_mean = _fd_promote(T_el, mu_0),
         u0_prior_var = _fd_promote(T_el, Sigma_0),
         observables_noise = _fd_promote(T_el, R),
-        observables = y)
+        observables = y
+    )
     sol = solve(prob, KalmanFilter())
     return sol.logpdf
 end
 
 function fd_gradient_kalman!(A_vec, B, C, mu_0, Sigma_0, R, y, N)
     return ForwardDiff.gradient(
-        a -> kalman_loglik_fd_bench(a, B, C, mu_0, Sigma_0, R, y, N), A_vec)
+        a -> kalman_loglik_fd_bench(a, B, C, mu_0, Sigma_0, R, y, N), A_vec
+    )
 end
 
 # =============================================================================
@@ -81,20 +83,26 @@ const kf_fd_l = make_kalman_fd_benchmark(p_kf_fd_large)
 # =============================================================================
 
 # Warmup
-fd_gradient_kalman!(vec(copy(kf_fd_s.A)), kf_fd_s.B, kf_fd_s.C,
-    kf_fd_s.mu_0, kf_fd_s.Sigma_0, kf_fd_s.R, kf_fd_s.y, p_kf_fd_small.N)
-fd_gradient_kalman!(vec(copy(kf_fd_l.A)), kf_fd_l.B, kf_fd_l.C,
-    kf_fd_l.mu_0, kf_fd_l.Sigma_0, kf_fd_l.R, kf_fd_l.y, p_kf_fd_large.N)
+fd_gradient_kalman!(
+    vec(copy(kf_fd_s.A)), kf_fd_s.B, kf_fd_s.C,
+    kf_fd_s.mu_0, kf_fd_s.Sigma_0, kf_fd_s.R, kf_fd_s.y, p_kf_fd_small.N
+)
+fd_gradient_kalman!(
+    vec(copy(kf_fd_l.A)), kf_fd_l.B, kf_fd_l.C,
+    kf_fd_l.mu_0, kf_fd_l.Sigma_0, kf_fd_l.R, kf_fd_l.y, p_kf_fd_large.N
+)
 
 KALMAN_FD["gradient"]["small_mutable"] = @benchmarkable fd_gradient_kalman!(
     $(vec(copy(kf_fd_s.A))), $(kf_fd_s.B), $(kf_fd_s.C),
     $(kf_fd_s.mu_0), $(kf_fd_s.Sigma_0), $(kf_fd_s.R), $(kf_fd_s.y),
-    $(p_kf_fd_small.N))
+    $(p_kf_fd_small.N)
+)
 
 KALMAN_FD["gradient"]["large_mutable"] = @benchmarkable fd_gradient_kalman!(
     $(vec(copy(kf_fd_l.A))), $(kf_fd_l.B), $(kf_fd_l.C),
     $(kf_fd_l.mu_0), $(kf_fd_l.Sigma_0), $(kf_fd_l.R), $(kf_fd_l.y),
-    $(p_kf_fd_large.N))
+    $(p_kf_fd_large.N)
+)
 
 # =============================================================================
 # StaticArrays variant (small only — static types impractical for N=30)
@@ -108,8 +116,10 @@ KALMAN_FD["gradient"]["small_static"] = let
     R_s = SMatrix{M, M}(R); mu_s = SVector{N}(mu_0); Sig_s = SMatrix{N, N}(Sigma_0)
     y_s = [SVector{M}(yi) for yi in y]
 
-    function _kf_loglik_static(A_vec, B_s, C_s, mu_s, Sig_s, R_s, y_s,
-            ::Val{N_}, ::Val{M_}, ::Val{K_}) where {N_, M_, K_}
+    function _kf_loglik_static(
+            A_vec, B_s, C_s, mu_s, Sig_s, R_s, y_s,
+            ::Val{N_}, ::Val{M_}, ::Val{K_}
+        ) where {N_, M_, K_}
         T_el = eltype(A_vec)
         A_d = SMatrix{N_, N_}(reshape(A_vec, N_, N_))
         prob = LinearStateSpaceProblem(
@@ -119,14 +129,17 @@ KALMAN_FD["gradient"]["small_static"] = let
             u0_prior_mean = SVector{N_}(T_el.(mu_s)),
             u0_prior_var = SMatrix{N_, N_}(T_el.(Sig_s)),
             observables_noise = SMatrix{M_, M_}(T_el.(R_s)),
-            observables = y_s)
+            observables = y_s
+        )
         sol = solve(prob, KalmanFilter())
         return sol.logpdf
     end
 
     A_vec = collect(vec(Matrix(A)))
-    f = a -> _kf_loglik_static(a, B_s, C_s, mu_s, Sig_s, R_s, y_s,
-        Val(N), Val(M), Val(K))
+    f = a -> _kf_loglik_static(
+        a, B_s, C_s, mu_s, Sig_s, R_s, y_s,
+        Val(N), Val(M), Val(K)
+    )
     # Warmup
     ForwardDiff.gradient(f, A_vec)
 

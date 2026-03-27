@@ -13,7 +13,7 @@ promote_array(::Type{T}, x::AbstractArray) where {T} = T.(x)
 
 Central finite-difference gradient of scalar function `f` at point `x`.
 """
-function fdm_gradient(f, x; h = 1e-7)
+function fdm_gradient(f, x; h = 1.0e-7)
     n = length(x)
     grad = zeros(n)
     xp = copy(x)

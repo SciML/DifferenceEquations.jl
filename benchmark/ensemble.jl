@@ -48,8 +48,10 @@ function make_ensemble_benchmark(; N, K, M, T, N_traj, seed = 42)
     dall_sol = [make_zero(s) for s in all_sol]
     dall_cache = [make_zero(c) for c in all_cache]
 
-    return (; A, B, C, u0, all_noise, all_sol, all_cache,
-        dA, dB, dC, du0, dall_noise, dall_sol, dall_cache)
+    return (;
+        A, B, C, u0, all_noise, all_sol, all_cache,
+        dA, dB, dC, du0, dall_noise, dall_sol, dall_cache,
+    )
 end
 
 # =============================================================================
@@ -92,24 +94,32 @@ function raw_ens!(A, B, C, u0, all_noise, all_sol, all_cache)
 end
 
 # Warmup
-raw_ens!(ens_s.A, ens_s.B, ens_s.C, ens_s.u0, ens_s.all_noise,
-    ens_s.all_sol, ens_s.all_cache)
-raw_ens!(ens_l.A, ens_l.B, ens_l.C, ens_l.u0, ens_l.all_noise,
-    ens_l.all_sol, ens_l.all_cache)
+raw_ens!(
+    ens_s.A, ens_s.B, ens_s.C, ens_s.u0, ens_s.all_noise,
+    ens_s.all_sol, ens_s.all_cache
+)
+raw_ens!(
+    ens_l.A, ens_l.B, ens_l.C, ens_l.u0, ens_l.all_noise,
+    ens_l.all_sol, ens_l.all_cache
+)
 
 ENS_BENCH["raw"]["small"] = @benchmarkable raw_ens!(
     $(ens_s.A), $(ens_s.B), $(ens_s.C), $(ens_s.u0), $(ens_s.all_noise),
-    $(ens_s.all_sol), $(ens_s.all_cache))
+    $(ens_s.all_sol), $(ens_s.all_cache)
+)
 ENS_BENCH["raw"]["large"] = @benchmarkable raw_ens!(
     $(ens_l.A), $(ens_l.B), $(ens_l.C), $(ens_l.u0), $(ens_l.all_noise),
-    $(ens_l.all_sol), $(ens_l.all_cache))
+    $(ens_l.all_sol), $(ens_l.all_cache)
+)
 
 # =============================================================================
 # Forward mode AD — perturb A[1,1], return computed arrays
 # =============================================================================
 
-function forward_ensemble_bench!(A, B, C, u0, all_noise, all_sol, all_cache,
-        dA, dB, dC, du0, dall_noise, dall_sol, dall_cache)
+function forward_ensemble_bench!(
+        A, B, C, u0, all_noise, all_sol, all_cache,
+        dA, dB, dC, du0, dall_noise, dall_sol, dall_cache
+    )
     # Zero all shadows
     dA = fill_zero!!(dA); dB = fill_zero!!(dB); dC = fill_zero!!(dC); du0 = fill_zero!!(du0)
     @inbounds for i in eachindex(dall_noise)
@@ -126,11 +136,13 @@ function forward_ensemble_bench!(A, B, C, u0, all_noise, all_sol, all_cache,
     # Set perturbation direction
     dA[1, 1] = 1.0
 
-    autodiff(Forward, ensemble_forward_bench!,
+    autodiff(
+        Forward, ensemble_forward_bench!,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(u0, du0), Duplicated(all_noise, dall_noise),
         Duplicated(all_sol, dall_sol),
-        Duplicated(all_cache, dall_cache))
+        Duplicated(all_cache, dall_cache)
+    )
     return nothing
 end
 
@@ -140,14 +152,16 @@ forward_ensemble_bench!(
     [[copy(n) for n in traj] for traj in ens_s.all_noise],
     ens_s.all_sol, ens_s.all_cache,
     ens_s.dA, ens_s.dB, ens_s.dC, ens_s.du0,
-    ens_s.dall_noise, ens_s.dall_sol, ens_s.dall_cache)
+    ens_s.dall_noise, ens_s.dall_sol, ens_s.dall_cache
+)
 
 ENS_BENCH["forward"]["small"] = @benchmarkable forward_ensemble_bench!(
     $(copy(ens_s.A)), $(copy(ens_s.B)), $(copy(ens_s.C)), $(copy(ens_s.u0)),
     $([[copy(n) for n in traj] for traj in ens_s.all_noise]),
     $(ens_s.all_sol), $(ens_s.all_cache),
     $(ens_s.dA), $(ens_s.dB), $(ens_s.dC), $(ens_s.du0),
-    $(ens_s.dall_noise), $(ens_s.dall_sol), $(ens_s.dall_cache))
+    $(ens_s.dall_noise), $(ens_s.dall_sol), $(ens_s.dall_cache)
+)
 
 # Warmup large
 forward_ensemble_bench!(
@@ -155,21 +169,25 @@ forward_ensemble_bench!(
     [[copy(n) for n in traj] for traj in ens_l.all_noise],
     ens_l.all_sol, ens_l.all_cache,
     ens_l.dA, ens_l.dB, ens_l.dC, ens_l.du0,
-    ens_l.dall_noise, ens_l.dall_sol, ens_l.dall_cache)
+    ens_l.dall_noise, ens_l.dall_sol, ens_l.dall_cache
+)
 
 ENS_BENCH["forward"]["large"] = @benchmarkable forward_ensemble_bench!(
     $(copy(ens_l.A)), $(copy(ens_l.B)), $(copy(ens_l.C)), $(copy(ens_l.u0)),
     $([[copy(n) for n in traj] for traj in ens_l.all_noise]),
     $(ens_l.all_sol), $(ens_l.all_cache),
     $(ens_l.dA), $(ens_l.dB), $(ens_l.dC), $(ens_l.du0),
-    $(ens_l.dall_noise), $(ens_l.dall_sol), $(ens_l.dall_cache))
+    $(ens_l.dall_noise), $(ens_l.dall_sol), $(ens_l.dall_cache)
+)
 
 # =============================================================================
 # Reverse mode AD — all Duplicated, scalar return with Active
 # =============================================================================
 
-function reverse_ensemble_bench!(A, B, C, u0, all_noise, all_sol, all_cache,
-        dA, dB, dC, du0, dall_noise, dall_sol, dall_cache)
+function reverse_ensemble_bench!(
+        A, B, C, u0, all_noise, all_sol, all_cache,
+        dA, dB, dC, du0, dall_noise, dall_sol, dall_cache
+    )
     # Zero all shadows
     dA = fill_zero!!(dA); dB = fill_zero!!(dB); dC = fill_zero!!(dC); du0 = fill_zero!!(du0)
     @inbounds for i in eachindex(dall_noise)
@@ -184,11 +202,13 @@ function reverse_ensemble_bench!(A, B, C, u0, all_noise, all_sol, all_cache,
         make_zero!(dall_cache[i])
     end
 
-    autodiff(Reverse, ensemble_scalar!, Active,
+    autodiff(
+        Reverse, ensemble_scalar!, Active,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(u0, du0), Duplicated(all_noise, dall_noise),
         Duplicated(all_sol, dall_sol),
-        Duplicated(all_cache, dall_cache))
+        Duplicated(all_cache, dall_cache)
+    )
     return nothing
 end
 
@@ -198,14 +218,16 @@ reverse_ensemble_bench!(
     [[copy(n) for n in traj] for traj in ens_s.all_noise],
     ens_s.all_sol, ens_s.all_cache,
     ens_s.dA, ens_s.dB, ens_s.dC, ens_s.du0,
-    ens_s.dall_noise, ens_s.dall_sol, ens_s.dall_cache)
+    ens_s.dall_noise, ens_s.dall_sol, ens_s.dall_cache
+)
 
 ENS_BENCH["reverse"]["small"] = @benchmarkable reverse_ensemble_bench!(
     $(copy(ens_s.A)), $(copy(ens_s.B)), $(copy(ens_s.C)), $(copy(ens_s.u0)),
     $([[copy(n) for n in traj] for traj in ens_s.all_noise]),
     $(ens_s.all_sol), $(ens_s.all_cache),
     $(ens_s.dA), $(ens_s.dB), $(ens_s.dC), $(ens_s.du0),
-    $(ens_s.dall_noise), $(ens_s.dall_sol), $(ens_s.dall_cache))
+    $(ens_s.dall_noise), $(ens_s.dall_sol), $(ens_s.dall_cache)
+)
 
 # Warmup large
 reverse_ensemble_bench!(
@@ -213,13 +235,15 @@ reverse_ensemble_bench!(
     [[copy(n) for n in traj] for traj in ens_l.all_noise],
     ens_l.all_sol, ens_l.all_cache,
     ens_l.dA, ens_l.dB, ens_l.dC, ens_l.du0,
-    ens_l.dall_noise, ens_l.dall_sol, ens_l.dall_cache)
+    ens_l.dall_noise, ens_l.dall_sol, ens_l.dall_cache
+)
 
 ENS_BENCH["reverse"]["large"] = @benchmarkable reverse_ensemble_bench!(
     $(copy(ens_l.A)), $(copy(ens_l.B)), $(copy(ens_l.C)), $(copy(ens_l.u0)),
     $([[copy(n) for n in traj] for traj in ens_l.all_noise]),
     $(ens_l.all_sol), $(ens_l.all_cache),
     $(ens_l.dA), $(ens_l.dB), $(ens_l.dC), $(ens_l.du0),
-    $(ens_l.dall_noise), $(ens_l.dall_sol), $(ens_l.dall_cache))
+    $(ens_l.dall_noise), $(ens_l.dall_sol), $(ens_l.dall_cache)
+)
 
 ENS_BENCH
