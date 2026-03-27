@@ -47,7 +47,8 @@ copy_noise_to_cache!(::Nothing, ::Nothing) = nothing
 Get observation at time t from vector-of-vectors observables.
 """
 Base.@propagate_inbounds @inline get_observable(
-    observables::AbstractVector{<:AbstractVector}, t) = observables[t]
+    observables::AbstractVector{<:AbstractVector}, t
+) = observables[t]
 
 # =============================================================================
 # Conditional size checking
@@ -84,8 +85,10 @@ end
 # observables_noise must be an AbstractMatrix (e.g., Diagonal(d), Symmetric(H*H'), or Matrix).
 make_observables_covariance_matrix(observables_noise::AbstractMatrix) = observables_noise
 function make_observables_covariance_matrix(observables_noise::AbstractVector)
-    return error("observables_noise must be an AbstractMatrix (e.g., Diagonal(d)). " *
-                 "Got a Vector. Use Diagonal(d) to construct a diagonal covariance matrix.")
+    return error(
+        "observables_noise must be an AbstractMatrix (e.g., Diagonal(d)). " *
+            "Got a Vector. Use Diagonal(d) to construct a diagonal covariance matrix."
+    )
 end
 
 # =============================================================================

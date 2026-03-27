@@ -160,4 +160,3 @@ function alloc_cache(prob::StateSpaceProblem, ::DirectIteration, T)
         innovation_solved = has_obs_noise ? [alloc_like(u0, M) for _ in 1:T_obs] : nothing,
     )
 end
-

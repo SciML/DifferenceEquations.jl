@@ -23,8 +23,11 @@ const u0_di_fd = zeros(N_di_fd)
 
 Random.seed!(42)
 const noise_di_fd = [randn(K_di_fd) for _ in 1:T_di_fd]
-const sim_sol_di_fd = solve(LinearStateSpaceProblem(
-    A_di_fd, B_di_fd, u0_di_fd, (0, T_di_fd); C = C_di_fd, noise = noise_di_fd))
+const sim_sol_di_fd = solve(
+    LinearStateSpaceProblem(
+        A_di_fd, B_di_fd, u0_di_fd, (0, T_di_fd); C = C_di_fd, noise = noise_di_fd
+    )
+)
 const y_di_fd = [sim_sol_di_fd.z[t + 1] + H_di_fd * randn(M_di_fd) for t in 1:T_di_fd]
 
 # =============================================================================
@@ -39,37 +42,46 @@ function di_loglik_fd(A, B, C, u0, noise, y, H)
         promote_array(T_el, u0), (0, length(y));
         C = promote_array(T_el, C),
         observables_noise = R,
-        observables = y, noise = noise)
+        observables = y, noise = noise
+    )
     sol = solve(prob, DirectIteration())
     return sol.logpdf
 end
 
 @testset "ForwardDiff - DirectIteration loglik (mutable)" begin
     @testset "primal sanity" begin
-        loglik_val = di_loglik_fd(A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
-            noise_di_fd, y_di_fd, H_di_fd)
+        loglik_val = di_loglik_fd(
+            A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
+            noise_di_fd, y_di_fd, H_di_fd
+        )
         @test isfinite(loglik_val)
     end
 
     @testset "gradient w.r.t. A" begin
-        f = a_vec -> di_loglik_fd(reshape(a_vec, N_di_fd, N_di_fd),
-            B_di_fd, C_di_fd, u0_di_fd, noise_di_fd, y_di_fd, H_di_fd)
+        f = a_vec -> di_loglik_fd(
+            reshape(a_vec, N_di_fd, N_di_fd),
+            B_di_fd, C_di_fd, u0_di_fd, noise_di_fd, y_di_fd, H_di_fd
+        )
         x0 = vec(copy(A_di_fd))
-        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1.0e-4
     end
 
     @testset "gradient w.r.t. u0" begin
-        f = u_vec -> di_loglik_fd(A_di_fd, B_di_fd, C_di_fd,
-            u_vec, noise_di_fd, y_di_fd, H_di_fd)
+        f = u_vec -> di_loglik_fd(
+            A_di_fd, B_di_fd, C_di_fd,
+            u_vec, noise_di_fd, y_di_fd, H_di_fd
+        )
         x0 = [0.1, -0.1]
-        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1.0e-4
     end
 
     @testset "gradient w.r.t. H" begin
-        f = h_vec -> di_loglik_fd(A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
-            noise_di_fd, y_di_fd, reshape(h_vec, M_di_fd, M_di_fd))
+        f = h_vec -> di_loglik_fd(
+            A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
+            noise_di_fd, y_di_fd, reshape(h_vec, M_di_fd, M_di_fd)
+        )
         x0 = vec(copy(H_di_fd))
-        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1.0e-4
     end
 end
 
@@ -88,30 +100,37 @@ function di_loglik_fd_offdiag(A, B, C, u0, noise, y, H)
         promote_array(T_el, u0), (0, length(y));
         C = promote_array(T_el, C),
         observables_noise = R,
-        observables = y, noise = noise)
+        observables = y, noise = noise
+    )
     sol = solve(prob, DirectIteration())
     return sol.logpdf
 end
 
 @testset "ForwardDiff - DirectIteration loglik non-diagonal R (mutable)" begin
     @testset "primal sanity" begin
-        loglik_val = di_loglik_fd_offdiag(A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
-            noise_di_fd, y_di_fd, H_di_fd_offdiag)
+        loglik_val = di_loglik_fd_offdiag(
+            A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
+            noise_di_fd, y_di_fd, H_di_fd_offdiag
+        )
         @test isfinite(loglik_val)
     end
 
     @testset "gradient w.r.t. H (off-diagonal)" begin
-        f = h_vec -> di_loglik_fd_offdiag(A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
-            noise_di_fd, y_di_fd, reshape(h_vec, M_di_fd, M_di_fd))
+        f = h_vec -> di_loglik_fd_offdiag(
+            A_di_fd, B_di_fd, C_di_fd, u0_di_fd,
+            noise_di_fd, y_di_fd, reshape(h_vec, M_di_fd, M_di_fd)
+        )
         x0 = vec(copy(H_di_fd_offdiag))
-        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1.0e-4
     end
 
     @testset "gradient w.r.t. A (with off-diagonal R)" begin
-        f = a_vec -> di_loglik_fd_offdiag(reshape(a_vec, N_di_fd, N_di_fd),
-            B_di_fd, C_di_fd, u0_di_fd, noise_di_fd, y_di_fd, H_di_fd_offdiag)
+        f = a_vec -> di_loglik_fd_offdiag(
+            reshape(a_vec, N_di_fd, N_di_fd),
+            B_di_fd, C_di_fd, u0_di_fd, noise_di_fd, y_di_fd, H_di_fd_offdiag
+        )
         x0 = vec(copy(A_di_fd))
-        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1.0e-4
     end
 end
 
@@ -130,15 +149,17 @@ const y_di_fd_s = [SVector{M_di_fd}(yi) for yi in y_di_fd]
             B_d = SMatrix{N_di_fd, K_di_fd}(T_el.(B_di_fd))
             C_d = SMatrix{M_di_fd, N_di_fd}(T_el.(C_di_fd))
             H_d = SMatrix{M_di_fd, M_di_fd}(T_el.(H_di_fd))
-            prob = LinearStateSpaceProblem(A_d, B_d,
+            prob = LinearStateSpaceProblem(
+                A_d, B_d,
                 SVector{N_di_fd}(zeros(T_el, N_di_fd)), (0, length(y_di_fd_s));
                 C = C_d, observables_noise = H_d * H_d',
-                observables = y_di_fd_s, noise = noise_di_fd_s)
+                observables = y_di_fd_s, noise = noise_di_fd_s
+            )
             sol = solve(prob, DirectIteration())
             return sol.logpdf
         end
         x0 = collect(vec(Matrix(A_di_fd)))
-        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1.0e-4
     end
 
     @testset "gradient w.r.t. H" begin
@@ -148,14 +169,16 @@ const y_di_fd_s = [SVector{M_di_fd}(yi) for yi in y_di_fd]
             B_d = SMatrix{N_di_fd, K_di_fd}(T_el.(B_di_fd))
             C_d = SMatrix{M_di_fd, N_di_fd}(T_el.(C_di_fd))
             H_d = SMatrix{M_di_fd, M_di_fd}(reshape(h_vec, M_di_fd, M_di_fd))
-            prob = LinearStateSpaceProblem(A_d, B_d,
+            prob = LinearStateSpaceProblem(
+                A_d, B_d,
                 SVector{N_di_fd}(zeros(T_el, N_di_fd)), (0, length(y_di_fd_s));
                 C = C_d, observables_noise = H_d * H_d',
-                observables = y_di_fd_s, noise = noise_di_fd_s)
+                observables = y_di_fd_s, noise = noise_di_fd_s
+            )
             sol = solve(prob, DirectIteration())
             return sol.logpdf
         end
         x0 = collect(vec(Matrix(H_di_fd)))
-        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1e-4
+        @test ForwardDiff.gradient(f, x0) ≈ fdm_gradient(f, x0) rtol = 1.0e-4
     end
 end
