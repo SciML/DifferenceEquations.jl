@@ -132,19 +132,30 @@ end
 # Unpruned reverse (scalar sum(u[end]), all Duplicated)
 # =============================================================================
 
-@testset "EnzymeTestUtils - Unpruned quadratic reverse (scalar, all Duplicated)" begin
+@testset "Unpruned quadratic reverse — manual gradient check" begin
     sol, cache = make_quad_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
         C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
 
-    # Same cache gradient FD mismatch as linear reverse tests
-    @test_broken test_reverse(quad_scalar!, Active,
-        (copy(A_0_qe), Duplicated), (copy(A_1_qe), Duplicated),
-        (copy(A_2_qe), Duplicated), (copy(B_qe), Duplicated),
-        (copy(C_0_qe), Duplicated), (copy(C_1_qe), Duplicated),
-        (copy(C_2_qe), Duplicated), (copy(u0_qe), Duplicated),
-        ([copy(n) for n in noise_qe], Duplicated),
-        (sol, Duplicated), (cache, Duplicated)) === nothing
+    dA_1 = zero(A_1_qe)
+    autodiff(Reverse, quad_scalar!, Active,
+        Duplicated(copy(A_0_qe), zero(A_0_qe)),
+        Duplicated(copy(A_1_qe), dA_1),
+        Duplicated(copy(A_2_qe), zero(A_2_qe)),
+        Duplicated(copy(B_qe), zero(B_qe)),
+        Duplicated(copy(C_0_qe), zero(C_0_qe)),
+        Duplicated(copy(C_1_qe), zero(C_1_qe)),
+        Duplicated(copy(C_2_qe), zero(C_2_qe)),
+        Duplicated(copy(u0_qe), zero(u0_qe)),
+        Duplicated(deepcopy(noise_qe), [zeros(size(B_qe, 2)) for _ in noise_qe]),
+        Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
+        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache))))
+
+    fd_dA_1 = fdm_gradient(
+        a -> quad_scalar!(A_0_qe, reshape(a, size(A_1_qe)), A_2_qe, B_qe,
+            C_0_qe, C_1_qe, C_2_qe, u0_qe, noise_qe, sol, cache),
+        vec(copy(A_1_qe)))
+    @test vec(dA_1) ≈ fd_dA_1 rtol = 1e-4
 end
 
 # =============================================================================
@@ -169,17 +180,28 @@ end
 # Pruned reverse (scalar sum(u[end]), all Duplicated)
 # =============================================================================
 
-@testset "EnzymeTestUtils - Pruned quadratic reverse (scalar, all Duplicated)" begin
+@testset "Pruned quadratic reverse — manual gradient check" begin
     sol, cache = make_pruned_sol_cache(
         A_0_qe, A_1_qe, A_2_qe, B_qe, u0_qe, noise_qe;
         C_0 = C_0_qe, C_1 = C_1_qe, C_2 = C_2_qe)
 
-    # Same cache gradient FD mismatch as linear reverse tests
-    @test_broken test_reverse(pruned_scalar!, Active,
-        (copy(A_0_qe), Duplicated), (copy(A_1_qe), Duplicated),
-        (copy(A_2_qe), Duplicated), (copy(B_qe), Duplicated),
-        (copy(C_0_qe), Duplicated), (copy(C_1_qe), Duplicated),
-        (copy(C_2_qe), Duplicated), (copy(u0_qe), Duplicated),
-        ([copy(n) for n in noise_qe], Duplicated),
-        (sol, Duplicated), (cache, Duplicated)) === nothing
+    dA_1 = zero(A_1_qe)
+    autodiff(Reverse, pruned_scalar!, Active,
+        Duplicated(copy(A_0_qe), zero(A_0_qe)),
+        Duplicated(copy(A_1_qe), dA_1),
+        Duplicated(copy(A_2_qe), zero(A_2_qe)),
+        Duplicated(copy(B_qe), zero(B_qe)),
+        Duplicated(copy(C_0_qe), zero(C_0_qe)),
+        Duplicated(copy(C_1_qe), zero(C_1_qe)),
+        Duplicated(copy(C_2_qe), zero(C_2_qe)),
+        Duplicated(copy(u0_qe), zero(u0_qe)),
+        Duplicated(deepcopy(noise_qe), [zeros(size(B_qe, 2)) for _ in noise_qe]),
+        Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
+        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache))))
+
+    fd_dA_1 = fdm_gradient(
+        a -> pruned_scalar!(A_0_qe, reshape(a, size(A_1_qe)), A_2_qe, B_qe,
+            C_0_qe, C_1_qe, C_2_qe, u0_qe, noise_qe, sol, cache),
+        vec(copy(A_1_qe)))
+    @test vec(dA_1) ≈ fd_dA_1 rtol = 1e-4
 end
