@@ -39,9 +39,11 @@ function make_kalman_benchmark(p; seed = 42)
     y = [sim.z[t + 1] + H * randn(L) for t in 1:T]
 
     # Create problem and workspace
-    prob = LinearStateSpaceProblem(A, B, zeros(N), (0, T); C,
+    prob = LinearStateSpaceProblem(
+        A, B, zeros(N), (0, T); C,
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
-        observables_noise = R, observables = y)
+        observables_noise = R, observables = y
+    )
     ws = init(prob, KalmanFilter())
     sol_out = ws.output
     cache = ws.cache
@@ -57,8 +59,10 @@ function make_kalman_benchmark(p; seed = 42)
     dR = make_zero(R)
     dy = [make_zero(y[1]) for _ in 1:T]
 
-    return (; A, B, C, R, mu_0, Sigma_0, y, prob, sol_out, cache,
-        dsol_out, dcache, dA, dB, dC, dmu_0, dSigma_0, dR, dy)
+    return (;
+        A, B, C, R, mu_0, Sigma_0, y, prob, sol_out, cache,
+        dsol_out, dcache, dA, dB, dC, dmu_0, dSigma_0, dR, dy,
+    )
 end
 
 # =============================================================================
@@ -66,9 +70,11 @@ end
 # =============================================================================
 
 function kalman_loglik_bench!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache)
-    prob = LinearStateSpaceProblem(A, B, zeros(eltype(A), size(A, 1)), (0, length(y)); C,
+    prob = LinearStateSpaceProblem(
+        A, B, zeros(eltype(A), size(A, 1)), (0, length(y)); C,
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
-        observables_noise = R, observables = y)
+        observables_noise = R, observables = y
+    )
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol_out, cache)
     return solve!(ws).logpdf
 end
@@ -78,9 +84,11 @@ end
 # =============================================================================
 
 function kalman_forward_bench!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache)
-    prob = LinearStateSpaceProblem(A, B, zeros(eltype(A), size(A, 1)), (0, length(y)); C,
+    prob = LinearStateSpaceProblem(
+        A, B, zeros(eltype(A), size(A, 1)), (0, length(y)); C,
         u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
-        observables_noise = R, observables = y)
+        observables_noise = R, observables = y
+    )
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol_out, cache)
     solve!(ws)
     return (sol_out.u[end], sol_out.P[end])
@@ -107,16 +115,20 @@ raw_kalman!(kf_s.prob, kf_s.sol_out, kf_s.cache)
 raw_kalman!(kf_l.prob, kf_l.sol_out, kf_l.cache)
 
 KALMAN_ENZYME["raw"]["small_mutable"] = @benchmarkable raw_kalman!(
-    $(kf_s.prob), $(kf_s.sol_out), $(kf_s.cache))
+    $(kf_s.prob), $(kf_s.sol_out), $(kf_s.cache)
+)
 KALMAN_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_kalman!(
-    $(kf_l.prob), $(kf_l.sol_out), $(kf_l.cache))
+    $(kf_l.prob), $(kf_l.sol_out), $(kf_l.cache)
+)
 
 # =============================================================================
 # Forward mode AD — perturb A[1,1], return computed matrices
 # =============================================================================
 
-function forward_kalman_bench!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
-        dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache)
+function forward_kalman_bench!(
+        A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
+        dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache
+    )
     # Zero all shadows
     make_zero!(dsol_out)
     make_zero!(dcache)
@@ -128,11 +140,13 @@ function forward_kalman_bench!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
     # Set perturbation direction
     dA[1, 1] = 1.0
 
-    autodiff(Forward, kalman_forward_bench!,
+    autodiff(
+        Forward, kalman_forward_bench!,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(mu_0, dmu_0), Duplicated(Sigma_0, dSigma_0),
         Duplicated(R, dR), Duplicated(y, dy),
-        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache)
+    )
     return nothing
 end
 
@@ -142,14 +156,16 @@ forward_kalman_bench!(
     copy(kf_s.mu_0), copy(kf_s.Sigma_0), copy(kf_s.R),
     [copy(yi) for yi in kf_s.y], kf_s.sol_out, kf_s.cache,
     kf_s.dA, kf_s.dB, kf_s.dC, kf_s.dmu_0, kf_s.dSigma_0, kf_s.dR,
-    kf_s.dy, kf_s.dsol_out, kf_s.dcache)
+    kf_s.dy, kf_s.dsol_out, kf_s.dcache
+)
 
 KALMAN_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_kalman_bench!(
     $(copy(kf_s.A)), $(copy(kf_s.B)), $(copy(kf_s.C)),
     $(copy(kf_s.mu_0)), $(copy(kf_s.Sigma_0)), $(copy(kf_s.R)),
     $([copy(yi) for yi in kf_s.y]), $(kf_s.sol_out), $(kf_s.cache),
     $(kf_s.dA), $(kf_s.dB), $(kf_s.dC), $(kf_s.dmu_0), $(kf_s.dSigma_0), $(kf_s.dR),
-    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 forward_kalman_bench!(
@@ -157,21 +173,25 @@ forward_kalman_bench!(
     copy(kf_l.mu_0), copy(kf_l.Sigma_0), copy(kf_l.R),
     [copy(yi) for yi in kf_l.y], kf_l.sol_out, kf_l.cache,
     kf_l.dA, kf_l.dB, kf_l.dC, kf_l.dmu_0, kf_l.dSigma_0, kf_l.dR,
-    kf_l.dy, kf_l.dsol_out, kf_l.dcache)
+    kf_l.dy, kf_l.dsol_out, kf_l.dcache
+)
 
 KALMAN_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_kalman_bench!(
     $(copy(kf_l.A)), $(copy(kf_l.B)), $(copy(kf_l.C)),
     $(copy(kf_l.mu_0)), $(copy(kf_l.Sigma_0)), $(copy(kf_l.R)),
     $([copy(yi) for yi in kf_l.y]), $(kf_l.sol_out), $(kf_l.cache),
     $(kf_l.dA), $(kf_l.dB), $(kf_l.dC), $(kf_l.dmu_0), $(kf_l.dSigma_0), $(kf_l.dR),
-    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Reverse mode AD — all Duplicated, scalar logpdf output
 # =============================================================================
 
-function reverse_kalman_bench!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
-        dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache)
+function reverse_kalman_bench!(
+        A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
+        dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache
+    )
     # Zero all shadows
     make_zero!(dsol_out)
     make_zero!(dcache)
@@ -181,11 +201,13 @@ function reverse_kalman_bench!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
         dy[i] = fill_zero!!(dy[i])
     end
 
-    autodiff(Reverse, kalman_loglik_bench!, Active,
+    autodiff(
+        Reverse, kalman_loglik_bench!, Active,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(mu_0, dmu_0), Duplicated(Sigma_0, dSigma_0),
         Duplicated(R, dR), Duplicated(y, dy),
-        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache)
+    )
     return nothing
 end
 
@@ -195,14 +217,16 @@ reverse_kalman_bench!(
     copy(kf_s.mu_0), copy(kf_s.Sigma_0), copy(kf_s.R),
     [copy(yi) for yi in kf_s.y], kf_s.sol_out, kf_s.cache,
     kf_s.dA, kf_s.dB, kf_s.dC, kf_s.dmu_0, kf_s.dSigma_0, kf_s.dR,
-    kf_s.dy, kf_s.dsol_out, kf_s.dcache)
+    kf_s.dy, kf_s.dsol_out, kf_s.dcache
+)
 
 KALMAN_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_kalman_bench!(
     $(copy(kf_s.A)), $(copy(kf_s.B)), $(copy(kf_s.C)),
     $(copy(kf_s.mu_0)), $(copy(kf_s.Sigma_0)), $(copy(kf_s.R)),
     $([copy(yi) for yi in kf_s.y]), $(kf_s.sol_out), $(kf_s.cache),
     $(kf_s.dA), $(kf_s.dB), $(kf_s.dC), $(kf_s.dmu_0), $(kf_s.dSigma_0), $(kf_s.dR),
-    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(kf_s.dy), $(kf_s.dsol_out), $(kf_s.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 reverse_kalman_bench!(
@@ -210,13 +234,15 @@ reverse_kalman_bench!(
     copy(kf_l.mu_0), copy(kf_l.Sigma_0), copy(kf_l.R),
     [copy(yi) for yi in kf_l.y], kf_l.sol_out, kf_l.cache,
     kf_l.dA, kf_l.dB, kf_l.dC, kf_l.dmu_0, kf_l.dSigma_0, kf_l.dR,
-    kf_l.dy, kf_l.dsol_out, kf_l.dcache)
+    kf_l.dy, kf_l.dsol_out, kf_l.dcache
+)
 
 KALMAN_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_kalman_bench!(
     $(copy(kf_l.A)), $(copy(kf_l.B)), $(copy(kf_l.C)),
     $(copy(kf_l.mu_0)), $(copy(kf_l.Sigma_0)), $(copy(kf_l.R)),
     $([copy(yi) for yi in kf_l.y]), $(kf_l.sol_out), $(kf_l.cache),
     $(kf_l.dA), $(kf_l.dB), $(kf_l.dC), $(kf_l.dmu_0), $(kf_l.dSigma_0), $(kf_l.dR),
-    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(kf_l.dy), $(kf_l.dsol_out), $(kf_l.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 KALMAN_ENZYME

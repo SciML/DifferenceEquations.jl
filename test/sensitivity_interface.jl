@@ -83,18 +83,22 @@ end
     A = [0.8 0.1; -0.1 0.7]
     u0 = [1.0, 0.5]
 
-    test_forward(minimal_solve_wrapper!, Const,
+    test_forward(
+        minimal_solve_wrapper!, Const,
         (copy(A), Duplicated),
         (copy(u0), Duplicated),
-        (alloc_minimal_cache(u0, 4), Duplicated))
+        (alloc_minimal_cache(u0, 4), Duplicated)
+    )
 end
 
 @testset "Minimal sensitivity - reverse (scalar loglik)" begin
     A = [0.8 0.1; -0.1 0.7]
     u0 = [1.0, 0.5]
 
-    test_reverse(minimal_loss, Active,
+    test_reverse(
+        minimal_loss, Active,
         (copy(A), Duplicated),
         (copy(u0), Duplicated),
-        (alloc_minimal_cache(u0, 4), Duplicated))
+        (alloc_minimal_cache(u0, 4), Duplicated)
+    )
 end

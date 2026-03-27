@@ -13,8 +13,10 @@ if !julia_mkl
     BLAS.set_num_threads(openblas_threads)
 end
 
-println("Threads.nthreads = $(Threads.nthreads()), MKL = $julia_mkl, " *
-        "BLAS.num_threads = $(BLAS.get_num_threads())\n")
+println(
+    "Threads.nthreads = $(Threads.nthreads()), MKL = $julia_mkl, " *
+        "BLAS.num_threads = $(BLAS.get_num_threads())\n"
+)
 
 BenchmarkTools.DEFAULT_PARAMETERS.seconds = 5.0
 BenchmarkTools.DEFAULT_PARAMETERS.evals = 1

@@ -45,8 +45,10 @@ function make_sim_benchmark(p; seed = 42)
     du0 = make_zero(u0)
     dnoise = [make_zero(noise[1]) for _ in 1:T]
 
-    return (; A, B, C, u0, noise, prob, sol_out, cache,
-        dsol_out, dcache, dA, dB, dC, du0, dnoise)
+    return (;
+        A, B, C, u0, noise, prob, sol_out, cache,
+        dsol_out, dcache, dA, dB, dC, du0, dnoise,
+    )
 end
 
 # =============================================================================
@@ -97,8 +99,10 @@ SIM_ENZYME["raw"]["large_mutable"] = @benchmarkable raw_sim!($(sim_l.prob), $(si
 # Forward mode AD — perturb A[1,1], return terminal state and observation
 # =============================================================================
 
-function forward_sim_bench!(A, B, C, u0, noise, sol_out, cache,
-        dA, dB, dC, du0, dnoise, dsol_out, dcache)
+function forward_sim_bench!(
+        A, B, C, u0, noise, sol_out, cache,
+        dA, dB, dC, du0, dnoise, dsol_out, dcache
+    )
     # Zero all shadows
     make_zero!(dsol_out)
     make_zero!(dcache)
@@ -110,10 +114,12 @@ function forward_sim_bench!(A, B, C, u0, noise, sol_out, cache,
     # Set perturbation direction
     dA[1, 1] = 1.0
 
-    autodiff(Forward, sim_forward_bench!,
+    autodiff(
+        Forward, sim_forward_bench!,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(u0, du0), Duplicated(noise, dnoise),
-        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache)
+    )
     return nothing
 end
 
@@ -123,14 +129,16 @@ forward_sim_bench!(
     copy(sim_s.u0), [copy(n) for n in sim_s.noise],
     sim_s.sol_out, sim_s.cache,
     sim_s.dA, sim_s.dB, sim_s.dC, sim_s.du0, sim_s.dnoise,
-    sim_s.dsol_out, sim_s.dcache)
+    sim_s.dsol_out, sim_s.dcache
+)
 
 SIM_ENZYME["forward"]["small_mutable"] = @benchmarkable forward_sim_bench!(
     $(copy(sim_s.A)), $(copy(sim_s.B)), $(copy(sim_s.C)),
     $(copy(sim_s.u0)), $([copy(n) for n in sim_s.noise]),
     $(sim_s.sol_out), $(sim_s.cache),
     $(sim_s.dA), $(sim_s.dB), $(sim_s.dC), $(sim_s.du0), $(sim_s.dnoise),
-    $(sim_s.dsol_out), $(sim_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(sim_s.dsol_out), $(sim_s.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 forward_sim_bench!(
@@ -138,21 +146,25 @@ forward_sim_bench!(
     copy(sim_l.u0), [copy(n) for n in sim_l.noise],
     sim_l.sol_out, sim_l.cache,
     sim_l.dA, sim_l.dB, sim_l.dC, sim_l.du0, sim_l.dnoise,
-    sim_l.dsol_out, sim_l.dcache)
+    sim_l.dsol_out, sim_l.dcache
+)
 
 SIM_ENZYME["forward"]["large_mutable"] = @benchmarkable forward_sim_bench!(
     $(copy(sim_l.A)), $(copy(sim_l.B)), $(copy(sim_l.C)),
     $(copy(sim_l.u0)), $([copy(n) for n in sim_l.noise]),
     $(sim_l.sol_out), $(sim_l.cache),
     $(sim_l.dA), $(sim_l.dB), $(sim_l.dC), $(sim_l.du0), $(sim_l.dnoise),
-    $(sim_l.dsol_out), $(sim_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(sim_l.dsol_out), $(sim_l.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # Reverse mode AD — all Duplicated, scalar sum(u[end]) output
 # =============================================================================
 
-function reverse_sim_bench!(A, B, C, u0, noise, sol_out, cache,
-        dA, dB, dC, du0, dnoise, dsol_out, dcache)
+function reverse_sim_bench!(
+        A, B, C, u0, noise, sol_out, cache,
+        dA, dB, dC, du0, dnoise, dsol_out, dcache
+    )
     # Zero all shadows
     make_zero!(dsol_out)
     make_zero!(dcache)
@@ -162,10 +174,12 @@ function reverse_sim_bench!(A, B, C, u0, noise, sol_out, cache,
         dnoise[i] = fill_zero!!(dnoise[i])
     end
 
-    autodiff(Reverse, sim_scalar_bench!, Active,
+    autodiff(
+        Reverse, sim_scalar_bench!, Active,
         Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
         Duplicated(u0, du0), Duplicated(noise, dnoise),
-        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache))
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache)
+    )
     return nothing
 end
 
@@ -175,14 +189,16 @@ reverse_sim_bench!(
     copy(sim_s.u0), [copy(n) for n in sim_s.noise],
     sim_s.sol_out, sim_s.cache,
     sim_s.dA, sim_s.dB, sim_s.dC, sim_s.du0, sim_s.dnoise,
-    sim_s.dsol_out, sim_s.dcache)
+    sim_s.dsol_out, sim_s.dcache
+)
 
 SIM_ENZYME["reverse"]["small_mutable"] = @benchmarkable reverse_sim_bench!(
     $(copy(sim_s.A)), $(copy(sim_s.B)), $(copy(sim_s.C)),
     $(copy(sim_s.u0)), $([copy(n) for n in sim_s.noise]),
     $(sim_s.sol_out), $(sim_s.cache),
     $(sim_s.dA), $(sim_s.dB), $(sim_s.dC), $(sim_s.du0), $(sim_s.dnoise),
-    $(sim_s.dsol_out), $(sim_s.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(sim_s.dsol_out), $(sim_s.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # Warmup large
 reverse_sim_bench!(
@@ -190,14 +206,16 @@ reverse_sim_bench!(
     copy(sim_l.u0), [copy(n) for n in sim_l.noise],
     sim_l.sol_out, sim_l.cache,
     sim_l.dA, sim_l.dB, sim_l.dC, sim_l.du0, sim_l.dnoise,
-    sim_l.dsol_out, sim_l.dcache)
+    sim_l.dsol_out, sim_l.dcache
+)
 
 SIM_ENZYME["reverse"]["large_mutable"] = @benchmarkable reverse_sim_bench!(
     $(copy(sim_l.A)), $(copy(sim_l.B)), $(copy(sim_l.C)),
     $(copy(sim_l.u0)), $([copy(n) for n in sim_l.noise]),
     $(sim_l.sol_out), $(sim_l.cache),
     $(sim_l.dA), $(sim_l.dB), $(sim_l.dC), $(sim_l.du0), $(sim_l.dnoise),
-    $(sim_l.dsol_out), $(sim_l.dcache)) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+    $(sim_l.dsol_out), $(sim_l.dcache)
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # --- Edge cases: no noise, no observation equation (raw primal only) ---
 
@@ -205,7 +223,7 @@ SIM_ENZYME["raw"]["no_noise"] = let
     A = sim_s.A; C = sim_s.C; u0 = sim_s.u0
     prob = LinearStateSpaceProblem(A, nothing, u0, (0, p_sim_small.T); C)
     ws = init(prob, DirectIteration())
-    @benchmarkable bench_nn!(ws_nn) setup=(ws_nn = $ws)
+    @benchmarkable bench_nn!(ws_nn) setup = (ws_nn = $ws)
 end
 
 function bench_nn!(ws)
@@ -217,7 +235,7 @@ SIM_ENZYME["raw"]["no_obs_eq"] = let
     A = sim_s.A; u0 = sim_s.u0
     prob = LinearStateSpaceProblem(A, nothing, u0, (0, p_sim_small.T))
     ws = init(prob, DirectIteration())
-    @benchmarkable bench_nn!(ws_nn) setup=(ws_nn = $ws)
+    @benchmarkable bench_nn!(ws_nn) setup = (ws_nn = $ws)
 end
 
 SIM_ENZYME

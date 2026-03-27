@@ -56,14 +56,16 @@ function di_loglik_fd_bench(A_vec, B, C, u0, noise, y, H, N)
         _fd_promote_di(T_el, u0), (0, length(y));
         C = _fd_promote_di(T_el, C),
         observables_noise = R,
-        observables = y, noise = noise)
+        observables = y, noise = noise
+    )
     sol = solve(prob, DirectIteration())
     return sol.logpdf
 end
 
 function fd_gradient_di!(A_vec, B, C, u0, noise, y, H, N)
     return ForwardDiff.gradient(
-        a -> di_loglik_fd_bench(a, B, C, u0, noise, y, H, N), A_vec)
+        a -> di_loglik_fd_bench(a, B, C, u0, noise, y, H, N), A_vec
+    )
 end
 
 # =============================================================================
@@ -77,20 +79,26 @@ const di_fd_l = make_di_fd_benchmark(p_di_fd_large)
 # Warmup and benchmarks
 # =============================================================================
 
-fd_gradient_di!(vec(copy(di_fd_s.A)), di_fd_s.B, di_fd_s.C,
-    di_fd_s.u0, di_fd_s.noise, di_fd_s.y, di_fd_s.H, p_di_fd_small.N)
-fd_gradient_di!(vec(copy(di_fd_l.A)), di_fd_l.B, di_fd_l.C,
-    di_fd_l.u0, di_fd_l.noise, di_fd_l.y, di_fd_l.H, p_di_fd_large.N)
+fd_gradient_di!(
+    vec(copy(di_fd_s.A)), di_fd_s.B, di_fd_s.C,
+    di_fd_s.u0, di_fd_s.noise, di_fd_s.y, di_fd_s.H, p_di_fd_small.N
+)
+fd_gradient_di!(
+    vec(copy(di_fd_l.A)), di_fd_l.B, di_fd_l.C,
+    di_fd_l.u0, di_fd_l.noise, di_fd_l.y, di_fd_l.H, p_di_fd_large.N
+)
 
 DI_FD["gradient"]["small_mutable"] = @benchmarkable fd_gradient_di!(
     $(vec(copy(di_fd_s.A))), $(di_fd_s.B), $(di_fd_s.C),
     $(di_fd_s.u0), $(di_fd_s.noise), $(di_fd_s.y), $(di_fd_s.H),
-    $(p_di_fd_small.N))
+    $(p_di_fd_small.N)
+)
 
 DI_FD["gradient"]["large_mutable"] = @benchmarkable fd_gradient_di!(
     $(vec(copy(di_fd_l.A))), $(di_fd_l.B), $(di_fd_l.C),
     $(di_fd_l.u0), $(di_fd_l.noise), $(di_fd_l.y), $(di_fd_l.H),
-    $(p_di_fd_large.N))
+    $(p_di_fd_large.N)
+)
 
 # =============================================================================
 # StaticArrays variant (small only)
@@ -104,8 +112,10 @@ DI_FD["gradient"]["small_static"] = let
     noise_s = [SVector{K}(n) for n in noise]
     y_s = [SVector{M}(yi) for yi in y]
 
-    function _di_loglik_static(A_vec, B_s, C_s, H_s, noise_s, y_s,
-            ::Val{N_}, ::Val{M_}, ::Val{K_}, ::Val{L_}) where {N_, M_, K_, L_}
+    function _di_loglik_static(
+            A_vec, B_s, C_s, H_s, noise_s, y_s,
+            ::Val{N_}, ::Val{M_}, ::Val{K_}, ::Val{L_}
+        ) where {N_, M_, K_, L_}
         T_el = eltype(A_vec)
         A_d = SMatrix{N_, N_}(reshape(A_vec, N_, N_))
         B_d = SMatrix{N_, K_}(T_el.(B_s))
@@ -113,16 +123,20 @@ DI_FD["gradient"]["small_static"] = let
         H_d = SMatrix{M_, L_}(T_el.(H_s))
         R_d = H_d * H_d'
         u0_d = SVector{N_}(zeros(T_el, N_))
-        prob = LinearStateSpaceProblem(A_d, B_d, u0_d, (0, length(y_s));
+        prob = LinearStateSpaceProblem(
+            A_d, B_d, u0_d, (0, length(y_s));
             C = C_d, observables_noise = R_d,
-            observables = y_s, noise = noise_s)
+            observables = y_s, noise = noise_s
+        )
         sol = solve(prob, DirectIteration())
         return sol.logpdf
     end
 
     A_vec = collect(vec(Matrix(A)))
-    f = a -> _di_loglik_static(a, B_s, C_s, H_s, noise_s, y_s,
-        Val(N), Val(M), Val(K), Val(L))
+    f = a -> _di_loglik_static(
+        a, B_s, C_s, H_s, noise_s, y_s,
+        Val(N), Val(M), Val(K), Val(L)
+    )
     ForwardDiff.gradient(f, A_vec)
 
     @benchmarkable ForwardDiff.gradient($f, $(copy(A_vec)))

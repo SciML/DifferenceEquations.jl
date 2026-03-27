@@ -75,7 +75,7 @@ end
 
 Central finite-difference gradient of scalar function `f` at vector `x`.
 """
-function fdm_gradient(f, x; h = 1e-7)
+function fdm_gradient(f, x; h = 1.0e-7)
     n = length(x)
     grad = zeros(n)
     xp = copy(x)
