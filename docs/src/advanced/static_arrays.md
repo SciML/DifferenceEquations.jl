@@ -33,8 +33,34 @@ See [Internals](@ref) for the full list of bang-bang operators and their behavio
 
 ## Supported Problem Types
 
-StaticArrays work with all problem types: [`LinearStateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref), [`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref).
+StaticArrays work with all problem types:
+
+- [`LinearStateSpaceProblem`](@ref) with `DirectIteration` — simulation and log-likelihood
+- [`LinearStateSpaceProblem`](@ref) with `KalmanFilter` — filtering, smoothing, and log-likelihood
+- [`QuadraticStateSpaceProblem`](@ref) and [`PrunedQuadraticStateSpaceProblem`](@ref) — second-order perturbation models
+- [`StateSpaceProblem`](@ref) — generic callbacks using bang-bang operators
+
+## Kalman Filter Example
+
+```@example static
+using DifferenceEquations, StaticArrays, LinearAlgebra, Random
+Random.seed!(42)
+A = SMatrix{2,2}(0.8*I(2))
+B = SMatrix{2,1}([0.1; 0.05])
+C = SMatrix{2,2}(1.0*I(2))
+R = SMatrix{2,2}(0.01*I(2))
+mu0 = @SVector zeros(2)
+Sig0 = SMatrix{2,2}(1.0*I(2))
+y = [SVector{2}(randn(2)) for _ in 1:10]
+prob = LinearStateSpaceProblem(A, B, mu0, (0, 10); C,
+    u0_prior_mean=mu0, u0_prior_var=Sig0,
+    observables_noise=R, observables=y)
+sol = solve(prob, KalmanFilter())
+sol.logpdf
+```
 
 ## AD Performance Note
 
-ForwardDiff with StaticArrays does not improve AD performance for this package. The overhead of constructing `SMatrix{N,N,Dual{...}}` temporaries outweighs the benefit. StaticArrays are most useful for the primal solve (no AD) of small models. See [ForwardDiff AD](@ref) for details.
+Enzyme reverse-mode AD benefits significantly from StaticArrays at small dimensions (N ≤ 5), with 5--7x speedups over mutable arrays for both the primal and AD passes.
+
+ForwardDiff with StaticArrays does not improve AD performance for this package. The overhead of constructing `SMatrix{N,N,Dual{...}}` temporaries outweighs the benefit. See [ForwardDiff AD](@ref) for details.

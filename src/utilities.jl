@@ -18,6 +18,10 @@ get_concrete_noise(prob, noise::AbstractVector{<:AbstractVector}, B::Nothing, T)
 function get_concrete_noise(prob, noise::Nothing, B, T)
     return [randn(eltype(B), size(B, 2)) for _ in 1:T]
 end
+function get_concrete_noise(prob, noise::Nothing, B::StaticMatrix, T)
+    K = size(B, 2)
+    return [SVector{K}(randn(eltype(B), K)) for _ in 1:T]
+end
 
 # =============================================================================
 # Copy noise into cache buffers
@@ -96,16 +100,22 @@ end
 # =============================================================================
 
 """
-    _add_observation_noise!(z, F_chol)
+    _add_observation_noise!!(z, F_chol)
 
 Add observation noise to simulated observations using a pre-computed Cholesky factor.
 `F_chol` is an upper-triangular Cholesky factor (R = U'U), so L = U'.
+Bang-bang: works with both mutable (Vector) and immutable (SVector) observation elements.
 """
-function _add_observation_noise!(z, F_chol)
+function _add_observation_noise!!(z, F_chol)
     M = size(F_chol, 1)
-    for z_val in z
-        if !isnothing(z_val)
-            z_val .+= F_chol.L * randn(M)
+    @inbounds for t in eachindex(z)
+        if !isnothing(z[t])
+            noise = F_chol.L * randn(M)
+            if ismutable(z[t])
+                z[t] .+= noise
+            else
+                z[t] = z[t] + noise
+            end
         end
     end
     return nothing
