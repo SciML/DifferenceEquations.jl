@@ -141,7 +141,7 @@ function _solve_direct_iteration!(
 
     # Add observation noise for simulation (when no observables provided)
     if has_obs_noise && isnothing(prob.observables)
-        _add_observation_noise!(z, F_obs)
+        _add_observation_noise!!(z, F_obs)
     end
 
     t_values = prob.tspan[1]:prob.tspan[2]

@@ -74,6 +74,7 @@ function alloc_cache(prob::LinearStateSpaceProblem, ::DirectIteration, T)
     return _alloc_di_base_cache(B, u0, M, T, has_obs_noise)
 end
 
+_alloc_noise(B::AbstractMatrix, T) = [alloc_like(B, size(B, 2)) for _ in 1:(T - 1)]
 _alloc_noise(B, T) = [Vector{eltype(B)}(undef, size(B, 2)) for _ in 1:(T - 1)]
 _alloc_noise(::Nothing, T) = nothing
 

@@ -8,7 +8,7 @@ using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
     cholesky!, dot, ldiv!, mul!, transpose!
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
     ODEFunction, remake, ConstantInterpolation, build_solution, ReturnCode
-using StaticArrays: StaticArrays, SVector, SMatrix, ismutable
+using StaticArrays: StaticArrays, SVector, SMatrix, StaticMatrix, ismutable
 using SymbolicIndexingInterface: SymbolicIndexingInterface, SymbolCache, variable_index
 
 include("utilities_bangbang.jl")
