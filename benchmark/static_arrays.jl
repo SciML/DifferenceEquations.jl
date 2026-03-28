@@ -5,7 +5,7 @@
 # Returns SA_BENCH BenchmarkGroup
 
 using StaticArrays
-using Enzyme: make_zero, make_zero!
+using Enzyme: make_zero, make_zero!, remake_zero!
 using DifferenceEquations: init, solve!, mul!!, muladd!!, fill_zero!!, StateSpaceWorkspace
 
 const SA_BENCH = BenchmarkGroup()
@@ -231,6 +231,235 @@ const prob_qm = PrunedQuadraticStateSpaceProblem(
 )
 const ws_qm = init(prob_qm, DirectIteration())
 SA_BENCH["quadratic"]["mutable_2x2"] = @benchmarkable bench_solve!($ws_qm)
+
+# =============================================================================
+# AD benchmarks for Kalman filter (static and mutable)
+# =============================================================================
+
+SA_BENCH["kalman"]["forward"] = BenchmarkGroup()
+SA_BENCH["kalman"]["reverse"] = BenchmarkGroup()
+
+function kalman_fwd_sa!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache)
+    prob = LinearStateSpaceProblem(
+        A, B, zero(mu_0), (0, length(y)); C,
+        u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
+        observables_noise = R, observables = y
+    )
+    ws = StateSpaceWorkspace(prob, KalmanFilter(), sol_out, cache)
+    solve!(ws)
+    return (sol_out.u[end], sol_out.P[end])
+end
+
+function kalman_rev_sa!(A, B, C, mu_0, Sigma_0, R, y, sol_out, cache)
+    prob = LinearStateSpaceProblem(
+        A, B, zero(mu_0), (0, length(y)); C,
+        u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
+        observables_noise = R, observables = y
+    )
+    ws = StateSpaceWorkspace(prob, KalmanFilter(), sol_out, cache)
+    return solve!(ws).logpdf
+end
+
+function forward_kalman_sa!(
+        A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
+        dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache
+    )
+    remake_zero!(dsol_out); remake_zero!(dcache)
+    dA = fill_zero!!(dA); dB = fill_zero!!(dB); dC = fill_zero!!(dC)
+    dmu_0 = fill_zero!!(dmu_0); dSigma_0 = fill_zero!!(dSigma_0); dR = fill_zero!!(dR)
+    @inbounds for i in eachindex(dy)
+        dy[i] = fill_zero!!(dy[i])
+    end
+    if ismutable(dA)
+        dA[1, 1] = 1.0
+    else
+        dA = setindex(dA, 1.0, 1, 1)
+    end
+    autodiff(
+        Forward, kalman_fwd_sa!,
+        Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
+        Duplicated(mu_0, dmu_0), Duplicated(Sigma_0, dSigma_0),
+        Duplicated(R, dR), Duplicated(y, dy),
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache)
+    )
+    return nothing
+end
+
+function reverse_kalman_sa!(
+        A, B, C, mu_0, Sigma_0, R, y, sol_out, cache,
+        dA, dB, dC, dmu_0, dSigma_0, dR, dy, dsol_out, dcache
+    )
+    remake_zero!(dsol_out); remake_zero!(dcache)
+    dA = fill_zero!!(dA); dB = fill_zero!!(dB); dC = fill_zero!!(dC)
+    dmu_0 = fill_zero!!(dmu_0); dSigma_0 = fill_zero!!(dSigma_0); dR = fill_zero!!(dR)
+    @inbounds for i in eachindex(dy)
+        dy[i] = fill_zero!!(dy[i])
+    end
+    autodiff(
+        Reverse, kalman_rev_sa!, Active,
+        Duplicated(A, dA), Duplicated(B, dB), Duplicated(C, dC),
+        Duplicated(mu_0, dmu_0), Duplicated(Sigma_0, dSigma_0),
+        Duplicated(R, dR), Duplicated(y, dy),
+        Duplicated(sol_out, dsol_out), Duplicated(cache, dcache)
+    )
+    return nothing
+end
+
+# --- Kalman 3x3 static AD shadows ---
+
+const dA_kf3s = make_zero(A_kf_3); const dB_kf3s = make_zero(B_kf_3)
+const dC_kf3s = make_zero(C_kf_3); const dmu0_kf3s = make_zero(mu0_kf_3)
+const dSig0_kf3s = make_zero(Sig0_kf_3); const dR_kf3s = make_zero(R_kf_3)
+const dy_kf3s = [make_zero(y_kf_3[1]) for _ in 1:10]
+const dsol_kf3s = make_zero(ws_ks3.output); const dcache_kf3s = make_zero(ws_ks3.cache)
+
+# --- Kalman 3x3 mutable AD shadows ---
+
+const A_kf3m = Matrix(A_kf_3); const B_kf3m = Matrix(B_kf_3)
+const C_kf3m = Matrix(C_kf_3); const mu0_kf3m = Vector(mu0_kf_3)
+const Sig0_kf3m = Matrix(Sig0_kf_3); const R_kf3m = Matrix(R_kf_3)
+const y_kf3m = [Vector(y) for y in y_kf_3]
+const dA_kf3m = make_zero(A_kf3m); const dB_kf3m = make_zero(B_kf3m)
+const dC_kf3m = make_zero(C_kf3m); const dmu0_kf3m = make_zero(mu0_kf3m)
+const dSig0_kf3m = make_zero(Sig0_kf3m); const dR_kf3m = make_zero(R_kf3m)
+const dy_kf3m = [make_zero(y_kf3m[1]) for _ in 1:10]
+const dsol_kf3m = make_zero(ws_km3.output); const dcache_kf3m = make_zero(ws_km3.cache)
+
+# --- Kalman 5x5 static AD shadows ---
+
+const dA_kf5s = make_zero(A_kf_5); const dB_kf5s = make_zero(B_kf_5)
+const dC_kf5s = make_zero(C_kf_5); const dmu0_kf5s = make_zero(mu0_kf_5)
+const dSig0_kf5s = make_zero(Sig0_kf_5); const dR_kf5s = make_zero(R_kf_5)
+const dy_kf5s = [make_zero(y_kf_5[1]) for _ in 1:20]
+const dsol_kf5s = make_zero(ws_ks5.output); const dcache_kf5s = make_zero(ws_ks5.cache)
+
+# --- Kalman 5x5 mutable AD shadows ---
+
+const A_kf5m = Matrix(A_kf_5); const B_kf5m = Matrix(B_kf_5)
+const C_kf5m = Matrix(C_kf_5); const mu0_kf5m = Vector(mu0_kf_5)
+const Sig0_kf5m = Matrix(Sig0_kf_5); const R_kf5m = Matrix(R_kf_5)
+const y_kf5m = [Vector(y) for y in y_kf_5]
+const dA_kf5m = make_zero(A_kf5m); const dB_kf5m = make_zero(B_kf5m)
+const dC_kf5m = make_zero(C_kf5m); const dmu0_kf5m = make_zero(mu0_kf5m)
+const dSig0_kf5m = make_zero(Sig0_kf5m); const dR_kf5m = make_zero(R_kf5m)
+const dy_kf5m = [make_zero(y_kf5m[1]) for _ in 1:20]
+const dsol_kf5m = make_zero(ws_km5.output); const dcache_kf5m = make_zero(ws_km5.cache)
+
+# --- Kalman AD warmups ---
+
+forward_kalman_sa!(
+    A_kf_3, B_kf_3, C_kf_3, mu0_kf_3, Sig0_kf_3, R_kf_3, y_kf_3,
+    ws_ks3.output, ws_ks3.cache,
+    dA_kf3s, dB_kf3s, dC_kf3s, dmu0_kf3s, dSig0_kf3s, dR_kf3s, dy_kf3s,
+    dsol_kf3s, dcache_kf3s
+)
+
+forward_kalman_sa!(
+    A_kf3m, B_kf3m, C_kf3m, mu0_kf3m, Sig0_kf3m, R_kf3m, y_kf3m,
+    ws_km3.output, ws_km3.cache,
+    dA_kf3m, dB_kf3m, dC_kf3m, dmu0_kf3m, dSig0_kf3m, dR_kf3m, dy_kf3m,
+    dsol_kf3m, dcache_kf3m
+)
+
+reverse_kalman_sa!(
+    A_kf_3, B_kf_3, C_kf_3, mu0_kf_3, Sig0_kf_3, R_kf_3, y_kf_3,
+    ws_ks3.output, ws_ks3.cache,
+    dA_kf3s, dB_kf3s, dC_kf3s, dmu0_kf3s, dSig0_kf3s, dR_kf3s, dy_kf3s,
+    dsol_kf3s, dcache_kf3s
+)
+
+reverse_kalman_sa!(
+    A_kf3m, B_kf3m, C_kf3m, mu0_kf3m, Sig0_kf3m, R_kf3m, y_kf3m,
+    ws_km3.output, ws_km3.cache,
+    dA_kf3m, dB_kf3m, dC_kf3m, dmu0_kf3m, dSig0_kf3m, dR_kf3m, dy_kf3m,
+    dsol_kf3m, dcache_kf3m
+)
+
+forward_kalman_sa!(
+    A_kf_5, B_kf_5, C_kf_5, mu0_kf_5, Sig0_kf_5, R_kf_5, y_kf_5,
+    ws_ks5.output, ws_ks5.cache,
+    dA_kf5s, dB_kf5s, dC_kf5s, dmu0_kf5s, dSig0_kf5s, dR_kf5s, dy_kf5s,
+    dsol_kf5s, dcache_kf5s
+)
+
+forward_kalman_sa!(
+    A_kf5m, B_kf5m, C_kf5m, mu0_kf5m, Sig0_kf5m, R_kf5m, y_kf5m,
+    ws_km5.output, ws_km5.cache,
+    dA_kf5m, dB_kf5m, dC_kf5m, dmu0_kf5m, dSig0_kf5m, dR_kf5m, dy_kf5m,
+    dsol_kf5m, dcache_kf5m
+)
+
+reverse_kalman_sa!(
+    A_kf_5, B_kf_5, C_kf_5, mu0_kf_5, Sig0_kf_5, R_kf_5, y_kf_5,
+    ws_ks5.output, ws_ks5.cache,
+    dA_kf5s, dB_kf5s, dC_kf5s, dmu0_kf5s, dSig0_kf5s, dR_kf5s, dy_kf5s,
+    dsol_kf5s, dcache_kf5s
+)
+
+reverse_kalman_sa!(
+    A_kf5m, B_kf5m, C_kf5m, mu0_kf5m, Sig0_kf5m, R_kf5m, y_kf5m,
+    ws_km5.output, ws_km5.cache,
+    dA_kf5m, dB_kf5m, dC_kf5m, dmu0_kf5m, dSig0_kf5m, dR_kf5m, dy_kf5m,
+    dsol_kf5m, dcache_kf5m
+)
+
+# --- Kalman AD benchmarkables ---
+
+SA_BENCH["kalman"]["forward"]["static_3x3"] = @benchmarkable forward_kalman_sa!(
+    $A_kf_3, $B_kf_3, $C_kf_3, $mu0_kf_3, $Sig0_kf_3, $R_kf_3, $y_kf_3,
+    $(ws_ks3.output), $(ws_ks3.cache),
+    $dA_kf3s, $dB_kf3s, $dC_kf3s, $dmu0_kf3s, $dSig0_kf3s, $dR_kf3s, $dy_kf3s,
+    $dsol_kf3s, $dcache_kf3s
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+
+SA_BENCH["kalman"]["forward"]["mutable_3x3"] = @benchmarkable forward_kalman_sa!(
+    $A_kf3m, $B_kf3m, $C_kf3m, $mu0_kf3m, $Sig0_kf3m, $R_kf3m, $y_kf3m,
+    $(ws_km3.output), $(ws_km3.cache),
+    $dA_kf3m, $dB_kf3m, $dC_kf3m, $dmu0_kf3m, $dSig0_kf3m, $dR_kf3m, $dy_kf3m,
+    $dsol_kf3m, $dcache_kf3m
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+
+SA_BENCH["kalman"]["reverse"]["static_3x3"] = @benchmarkable reverse_kalman_sa!(
+    $A_kf_3, $B_kf_3, $C_kf_3, $mu0_kf_3, $Sig0_kf_3, $R_kf_3, $y_kf_3,
+    $(ws_ks3.output), $(ws_ks3.cache),
+    $dA_kf3s, $dB_kf3s, $dC_kf3s, $dmu0_kf3s, $dSig0_kf3s, $dR_kf3s, $dy_kf3s,
+    $dsol_kf3s, $dcache_kf3s
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+
+SA_BENCH["kalman"]["reverse"]["mutable_3x3"] = @benchmarkable reverse_kalman_sa!(
+    $A_kf3m, $B_kf3m, $C_kf3m, $mu0_kf3m, $Sig0_kf3m, $R_kf3m, $y_kf3m,
+    $(ws_km3.output), $(ws_km3.cache),
+    $dA_kf3m, $dB_kf3m, $dC_kf3m, $dmu0_kf3m, $dSig0_kf3m, $dR_kf3m, $dy_kf3m,
+    $dsol_kf3m, $dcache_kf3m
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+
+SA_BENCH["kalman"]["forward"]["static_5x5"] = @benchmarkable forward_kalman_sa!(
+    $A_kf_5, $B_kf_5, $C_kf_5, $mu0_kf_5, $Sig0_kf_5, $R_kf_5, $y_kf_5,
+    $(ws_ks5.output), $(ws_ks5.cache),
+    $dA_kf5s, $dB_kf5s, $dC_kf5s, $dmu0_kf5s, $dSig0_kf5s, $dR_kf5s, $dy_kf5s,
+    $dsol_kf5s, $dcache_kf5s
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+
+SA_BENCH["kalman"]["forward"]["mutable_5x5"] = @benchmarkable forward_kalman_sa!(
+    $A_kf5m, $B_kf5m, $C_kf5m, $mu0_kf5m, $Sig0_kf5m, $R_kf5m, $y_kf5m,
+    $(ws_km5.output), $(ws_km5.cache),
+    $dA_kf5m, $dB_kf5m, $dC_kf5m, $dmu0_kf5m, $dSig0_kf5m, $dR_kf5m, $dy_kf5m,
+    $dsol_kf5m, $dcache_kf5m
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+
+SA_BENCH["kalman"]["reverse"]["static_5x5"] = @benchmarkable reverse_kalman_sa!(
+    $A_kf_5, $B_kf_5, $C_kf_5, $mu0_kf_5, $Sig0_kf_5, $R_kf_5, $y_kf_5,
+    $(ws_ks5.output), $(ws_ks5.cache),
+    $dA_kf5s, $dB_kf5s, $dC_kf5s, $dmu0_kf5s, $dSig0_kf5s, $dR_kf5s, $dy_kf5s,
+    $dsol_kf5s, $dcache_kf5s
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
+
+SA_BENCH["kalman"]["reverse"]["mutable_5x5"] = @benchmarkable reverse_kalman_sa!(
+    $A_kf5m, $B_kf5m, $C_kf5m, $mu0_kf5m, $Sig0_kf5m, $R_kf5m, $y_kf5m,
+    $(ws_km5.output), $(ws_km5.cache),
+    $dA_kf5m, $dB_kf5m, $dC_kf5m, $dmu0_kf5m, $dSig0_kf5m, $dR_kf5m, $dy_kf5m,
+    $dsol_kf5m, $dcache_kf5m
+) teardown = (GC.enable(true); GC.gc(); GC.enable(false))
 
 # =============================================================================
 # AD benchmarks for Linear 2x2 (static and mutable)
