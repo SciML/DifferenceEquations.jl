@@ -42,15 +42,12 @@ rho_true = 0.8
 sigma_e = 0.5
 T = 200
 
-# Generate AR(1) data: y_t = rho * y_{t-1} + e_t
+# Simulate AR(1) data using the package
 Random.seed!(42)
-y_scalar = zeros(T)
-x = 0.0
-for t in 1:T
-    x = rho_true * x + sigma_e * randn()
-    y_scalar[t] = x
-end
-y = [[yi] for yi in y_scalar]  # Vector{Vector{Float64}}
+prob_sim = LinearStateSpaceProblem(
+    fill(rho_true, 1, 1), fill(sigma_e, 1, 1), [0.0], (0, T))
+sol_sim = solve(prob_sim)
+y = sol_sim.u[2:end]  # observed states y_1, ..., y_T
 
 # Compute conditional log-likelihood
 prob = LinearStateSpaceProblem(
@@ -68,21 +65,19 @@ The same approach works for multivariate models:
 
 ```@example cond_lik
 A = [0.8 0.1; -0.1 0.7]
-R = Diagonal([0.25, 0.25])
+B = [0.5 0.0; 0.0 0.5]
 T_var = 100
 
+# Simulate VAR(1) data
 Random.seed!(123)
-y_var = Vector{Vector{Float64}}(undef, T_var)
-x_var = zeros(2)
-for t in 1:T_var
-    x_var = A * x_var + cholesky(R).L * randn(2)
-    y_var[t] = copy(x_var)
-end
+prob_sim_var = LinearStateSpaceProblem(A, B, zeros(2), (0, T_var))
+sol_sim_var = solve(prob_sim_var)
+y_var = sol_sim_var.u[2:end]
 
 prob_var = LinearStateSpaceProblem(
     A, nothing, zeros(2), (0, T_var);
     observables = y_var,
-    observables_noise = R,
+    observables_noise = Diagonal([0.25, 0.25]),
 )
 sol_var = solve(prob_var, ConditionalLikelihood())
 sol_var.logpdf
@@ -94,6 +89,8 @@ sol_var.logpdf
 nonlinear callbacks via [`StateSpaceProblem`](@ref).
 
 Here we estimate a nonlinear AR(1): ``x_{t+1} = \rho x_t + \alpha x_t^2 + e_t``.
+We first simulate data using a generic `StateSpaceProblem`, then compute the
+conditional likelihood.
 
 ```@example cond_lik
 rho_nl = 0.8
@@ -101,17 +98,30 @@ alpha_nl = 0.05
 sigma_nl = 0.3
 T_nl = 100
 
-Random.seed!(99)
-y_nl_scalar = zeros(T_nl)
-x_nl = 0.0
-for t in 1:T_nl
-    x_nl = rho_nl * x_nl + alpha_nl * x_nl^2 + sigma_nl * randn()
-    y_nl_scalar[t] = x_nl
-end
-y_nl = [[yi] for yi in y_nl_scalar]
-
-# Define nonlinear transition (supports both mutable and immutable arrays)
+# Nonlinear transition (supports both mutable and immutable arrays)
 function nl_transition!!(x_next, x, w, p, t)
+    (; rho, alpha) = p
+    val = rho * x[1] + alpha * x[1]^2
+    if ismutable(x_next)
+        x_next[1] = val + w[1]
+        return x_next
+    else
+        return typeof(x)(val + w[1])
+    end
+end
+
+p_nl = (; rho = rho_nl, alpha = alpha_nl)
+
+# Simulate nonlinear data
+Random.seed!(99)
+prob_sim_nl = StateSpaceProblem(
+    nl_transition!!, nothing, [0.0], (0, T_nl), p_nl;
+    n_shocks = 1, n_obs = 0)
+sol_sim_nl = solve(prob_sim_nl)
+y_nl = sol_sim_nl.u[2:end]
+
+# Conditional likelihood (no noise in prediction, noise only in obs)
+function nl_transition_noiseless!!(x_next, x, w, p, t)
     (; rho, alpha) = p
     val = rho * x[1] + alpha * x[1]^2
     if ismutable(x_next)
@@ -122,9 +132,8 @@ function nl_transition!!(x_next, x, w, p, t)
     end
 end
 
-p_nl = (; rho = rho_nl, alpha = alpha_nl)
 prob_nl = StateSpaceProblem(
-    nl_transition!!, nothing, [0.0], (0, T_nl), p_nl;
+    nl_transition_noiseless!!, nothing, [0.0], (0, T_nl), p_nl;
     n_shocks = 0, n_obs = 0,
     observables = y_nl,
     observables_noise = Diagonal([sigma_nl^2]),
@@ -154,7 +163,7 @@ function neg_loglik(rho_vec)
         observables = y,
         observables_noise = Diagonal([T_el(sigma_e^2)]),
     )
-    return -solve(prob_opt, ConditionalLikelihood(); save_everystep=false).logpdf
+    return -solve(prob_opt, ConditionalLikelihood(); save_everystep = false).logpdf
 end
 
 # Gradient at the true value
@@ -180,7 +189,7 @@ With `save_everystep=false`, the workspace allocates only 2-element
 buffers:
 
 ```@example cond_lik
-ws_ep = init(prob, ConditionalLikelihood(); save_everystep=false)
+ws_ep = init(prob, ConditionalLikelihood(); save_everystep = false)
 sol_ep = solve!(ws_ep)
 length(sol_ep.u)  # 2: [u_initial, u_final]
 ```
