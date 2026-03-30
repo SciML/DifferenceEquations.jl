@@ -1,3 +1,10 @@
+# Enzyme AD tests for KalmanFilter
+# prob passed as Duplicated — observables get zero shadow automatically.
+# GC disabled to avoid Enzyme reverse-mode GC corruption (#2355).
+
+GC.gc()
+GC.enable(false)
+
 using LinearAlgebra, Test, Enzyme, EnzymeTestUtils, StaticArrays, Random
 using DifferenceEquations
 using DifferenceEquations: init, solve!, StateSpaceWorkspace
@@ -5,7 +12,9 @@ using FiniteDifferences: central_fdm
 
 include("enzyme_test_utils.jl")  # vech helpers only
 
-const _fdm_kf = central_fdm(5, 1)
+# max_range needed: FD perturbation of observables_noise inside prob can push
+# the matrix non-positive-definite, causing DomainError in logdet_chol.
+const _fdm_kf = central_fdm(5, 1; max_range = 1.0e-3)
 
 # --- Test setup ---
 
@@ -46,33 +55,34 @@ function make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
     )
 end
 
-function make_kalman_sol_cache(A, B, C, R, mu_0, Sigma_0, y)
-    ws = init(make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y), KalmanFilter())
-    return ws.output, ws.cache
-end
+# --- Wrappers — prob as single Duplicated arg ---
 
-# --- Wrapper functions for Enzyme AD ---
-
-function kalman_solve!(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
-    prob = make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
+function kalman_solve_prob!(prob, sol, cache)
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol, cache)
     solve!(ws)
     return (sol.u, sol.P, sol.z)
 end
 
-function kalman_loglik(A, B, C, mu_0, Sigma_0, R, y, sol, cache)::Float64
-    prob = make_kalman_prob(A, B, C, R, mu_0, Sigma_0, y)
+function kalman_loglik_prob(prob, sol, cache)::Float64
     ws = StateSpaceWorkspace(prob, KalmanFilter(), sol, cache)
     return solve!(ws).logpdf
 end
 
+# Vech: separate args (y stays Duplicated — remake doesn't work with Enzyme shadows)
 function kalman_solve_vech!(
         A, B, C, mu_0, sigma_0_vech, r_vech, y, sol, cache,
         n_state, n_obs
     )
     Sigma_0 = make_posdef_from_vech(sigma_0_vech, n_state)
     R = make_posdef_from_vech(r_vech, n_obs)
-    return kalman_solve!(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
+    prob = LinearStateSpaceProblem(
+        A, B, zeros(eltype(A), size(A, 1)), (0, length(y));
+        C, u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
+        observables_noise = R, observables = y
+    )
+    ws = StateSpaceWorkspace(prob, KalmanFilter(), sol, cache)
+    solve!(ws)
+    return (sol.u, sol.P, sol.z)
 end
 
 function kalman_loglik_vech(
@@ -81,48 +91,58 @@ function kalman_loglik_vech(
     )::Float64
     Sigma_0 = make_posdef_from_vech(sigma_0_vech, n_state)
     R = make_posdef_from_vech(r_vech, n_obs)
-    return kalman_loglik(A, B, C, mu_0, Sigma_0, R, y, sol, cache)
+    prob = LinearStateSpaceProblem(
+        A, B, zeros(eltype(A), size(A, 1)), (0, length(y));
+        C, u0_prior_mean = mu_0, u0_prior_var = Sigma_0,
+        observables_noise = R, observables = y
+    )
+    ws = StateSpaceWorkspace(prob, KalmanFilter(), sol, cache)
+    return solve!(ws).logpdf
 end
 
 # --- Basic sanity test ---
 
 @testset "Kalman loglik via solve!() - sanity" begin
-    sol, cache = make_kalman_sol_cache(A_kf, B_kf, C_kf, R_kf, mu_0_kf, Sigma_0_kf, y_kf)
-    loglik = kalman_loglik(A_kf, B_kf, C_kf, mu_0_kf, Sigma_0_kf, R_kf, y_kf, sol, cache)
+    prob = make_kalman_prob(A_kf, B_kf, C_kf, R_kf, mu_0_kf, Sigma_0_kf, y_kf)
+    ws = init(prob, KalmanFilter())
+    loglik = kalman_loglik_prob(prob, ws.output, ws.cache)
     @test isfinite(loglik)
     @test loglik < 0
 
-    loglik2 = kalman_loglik(A_kf, B_kf, C_kf, mu_0_kf, Sigma_0_kf, R_kf, y_kf, sol, cache)
+    loglik2 = kalman_loglik_prob(prob, ws.output, ws.cache)
     @test loglik ≈ loglik2 rtol = 1.0e-12
 end
 
-# --- Mutable arrays — all Duplicated (small model, N=M=K=L=2, T=2) ---
+# --- Forward — prob as Duplicated (small model, N=M=K=L=2, T=2) ---
 
-@testset "EnzymeTestUtils - Kalman forward (all Duplicated)" begin
+@testset "EnzymeTestUtils - Kalman forward (prob Duplicated)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; R_s = [0.01 0.0; 0.0 0.01]
     mu_0_s = zeros(2); Sigma_0_s = Matrix{Float64}(I, 2, 2)
     y_s = [[0.5, 0.3], [0.2, 0.1]]
-    sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_s, mu_0_s, Sigma_0_s, y_s)
+    prob = make_kalman_prob(A_s, B_s, C_s, R_s, mu_0_s, Sigma_0_s, y_s)
+    ws = init(prob, KalmanFilter())
 
     test_forward(
-        kalman_solve!, Const,
-        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
-        (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
-        (copy(Sigma_0_s), Duplicated), (copy(R_s), Duplicated),
-        ([copy(y) for y in y_s], Duplicated),
-        (sol, Duplicated), (cache, Duplicated)
+        kalman_solve_prob!, Const,
+        (prob, Duplicated),
+        (ws.output, Duplicated), (ws.cache, Duplicated);
+        fdm = _fdm_kf,
     )
 end
 
+# --- Reverse via vech (all Duplicated) ---
+
 @testset "EnzymeTestUtils - Kalman reverse via vech (all Duplicated)" begin
+    _fdm_vech = central_fdm(5, 1)
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; R_s = [0.01 0.0; 0.0 0.01]
     mu_0_s = zeros(2); Sigma_0_s = Matrix{Float64}(I, 2, 2)
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     sigma_0_v = make_vech_for(Sigma_0_s)
     r_v = make_vech_for(R_s)
-    sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_s, mu_0_s, Sigma_0_s, y_s)
+    prob = make_kalman_prob(A_s, B_s, C_s, R_s, mu_0_s, Sigma_0_s, y_s)
+    ws = init(prob, KalmanFilter())
 
     test_reverse(
         kalman_loglik_vech, Active,
@@ -130,14 +150,15 @@ end
         (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
         (copy(sigma_0_v), Duplicated), (copy(r_v), Duplicated),
         ([copy(y) for y in y_s], Duplicated),
-        (sol, Duplicated), (cache, Duplicated),
-        (2, Const), (2, Const)
+        (deepcopy(ws.output), Duplicated), (deepcopy(ws.cache), Duplicated),
+        (2, Const), (2, Const);
+        fdm = _fdm_vech,
     )
 end
 
-# --- Rectangular B (N≠K) — validates mul_aat!! workaround ---
+# --- Forward — rectangular B (N!=K) — validates mul_aat!! workaround ---
 
-@testset "EnzymeTestUtils - Kalman rectangular B forward (all Duplicated)" begin
+@testset "EnzymeTestUtils - Kalman rectangular B forward (prob Duplicated)" begin
     A_r = [
         0.3 0.1 0.0 0.05 0.02; -0.1 0.3 0.05 0.0 0.01;
         0.02 -0.05 0.3 0.1 0.0; 0.0 0.02 -0.1 0.3 0.05;
@@ -148,19 +169,21 @@ end
     R_r = 0.01 * Matrix{Float64}(I, 3, 3)
     mu_0_r = zeros(5); Sigma_0_r = Matrix{Float64}(I, 5, 5)
     y_r = [[0.5, 0.3, 0.1], [0.2, -0.1, 0.4], [0.8, 0.4, -0.2]]
-    sol, cache = make_kalman_sol_cache(A_r, B_r, C_r, R_r, mu_0_r, Sigma_0_r, y_r)
+    prob = make_kalman_prob(A_r, B_r, C_r, R_r, mu_0_r, Sigma_0_r, y_r)
+    ws = init(prob, KalmanFilter())
 
     test_forward(
-        kalman_solve!, Const,
-        (copy(A_r), Duplicated), (copy(B_r), Duplicated),
-        (copy(C_r), Duplicated), (copy(mu_0_r), Duplicated),
-        (copy(Sigma_0_r), Duplicated), (copy(R_r), Duplicated),
-        ([copy(y) for y in y_r], Duplicated),
-        (sol, Duplicated), (cache, Duplicated)
+        kalman_solve_prob!, Const,
+        (prob, Duplicated),
+        (ws.output, Duplicated), (ws.cache, Duplicated);
+        fdm = _fdm_kf,
     )
 end
 
+# --- Reverse — rectangular B via vech ---
+
 @testset "EnzymeTestUtils - Kalman rectangular B reverse via vech (all Duplicated)" begin
+    _fdm_vech = central_fdm(5, 1)
     N_r, M_r = 5, 3
     A_r = [
         0.3 0.1 0.0 0.05 0.02; -0.1 0.3 0.05 0.0 0.01;
@@ -174,7 +197,8 @@ end
     y_r = [[0.5, 0.3, 0.1], [0.2, -0.1, 0.4], [0.8, 0.4, -0.2]]
     sigma_0_v = make_vech_for(Sigma_0_r)
     r_v = make_vech_for(R_r)
-    sol, cache = make_kalman_sol_cache(A_r, B_r, C_r, R_r, mu_0_r, Sigma_0_r, y_r)
+    prob = make_kalman_prob(A_r, B_r, C_r, R_r, mu_0_r, Sigma_0_r, y_r)
+    ws = init(prob, KalmanFilter())
 
     test_reverse(
         kalman_loglik_vech, Active,
@@ -182,14 +206,16 @@ end
         (copy(C_r), Duplicated), (copy(mu_0_r), Duplicated),
         (copy(sigma_0_v), Duplicated), (copy(r_v), Duplicated),
         ([copy(y) for y in y_r], Duplicated),
-        (sol, Duplicated), (cache, Duplicated),
-        (N_r, Const), (M_r, Const)
+        (deepcopy(ws.output), Duplicated), (deepcopy(ws.cache), Duplicated),
+        (N_r, Const), (M_r, Const);
+        fdm = _fdm_vech,
     )
 end
 
 # --- Non-diagonal R via vech (genuinely off-diagonal) ---
 
 @testset "EnzymeTestUtils - Kalman non-diagonal R forward (vech)" begin
+    _fdm_vech = central_fdm(5, 1)
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]
     R_offdiag = [0.02 0.005; 0.005 0.01]
@@ -197,7 +223,8 @@ end
     mu_0_s = zeros(2); Sigma_0_s = Matrix{Float64}(I, 2, 2)
     sigma_0_v = make_vech_for(Sigma_0_s)
     y_s = [[0.5, 0.3], [0.2, 0.1]]
-    sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_offdiag, mu_0_s, Sigma_0_s, y_s)
+    prob = make_kalman_prob(A_s, B_s, C_s, R_offdiag, mu_0_s, Sigma_0_s, y_s)
+    ws = init(prob, KalmanFilter())
 
     test_forward(
         kalman_solve_vech!, Const,
@@ -205,12 +232,14 @@ end
         (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
         (copy(sigma_0_v), Duplicated), (copy(r_v), Duplicated),
         ([copy(y) for y in y_s], Duplicated),
-        (sol, Duplicated), (cache, Duplicated),
-        (2, Const), (2, Const)
+        (ws.output, Duplicated), (ws.cache, Duplicated),
+        (2, Const), (2, Const);
+        fdm = _fdm_vech,
     )
 end
 
 @testset "EnzymeTestUtils - Kalman non-diagonal R reverse (vech)" begin
+    _fdm_vech = central_fdm(5, 1)
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]
     R_offdiag = [0.02 0.005; 0.005 0.01]
@@ -218,7 +247,8 @@ end
     mu_0_s = zeros(2); Sigma_0_s = Matrix{Float64}(I, 2, 2)
     sigma_0_v = make_vech_for(Sigma_0_s)
     y_s = [[0.5, 0.3], [0.2, 0.1]]
-    sol, cache = make_kalman_sol_cache(A_s, B_s, C_s, R_offdiag, mu_0_s, Sigma_0_s, y_s)
+    prob = make_kalman_prob(A_s, B_s, C_s, R_offdiag, mu_0_s, Sigma_0_s, y_s)
+    ws = init(prob, KalmanFilter())
 
     test_reverse(
         kalman_loglik_vech, Active,
@@ -226,8 +256,9 @@ end
         (copy(C_s), Duplicated), (copy(mu_0_s), Duplicated),
         (copy(sigma_0_v), Duplicated), (copy(r_v), Duplicated),
         ([copy(y) for y in y_s], Duplicated),
-        (sol, Duplicated), (cache, Duplicated),
-        (2, Const), (2, Const)
+        (deepcopy(ws.output), Duplicated), (deepcopy(ws.cache), Duplicated),
+        (2, Const), (2, Const);
+        fdm = _fdm_vech,
     )
 end
 
@@ -238,17 +269,13 @@ end
     C_reg = [1.0 0.0; 0.0 1.0]; R_reg = [0.01 0.0; 0.0 0.01]
     mu_0_reg = [0.0, 0.0]; Sigma_0_reg = [1.0 0.0; 0.0 1.0]
     y_reg = [[0.5, -0.3], [0.8, -0.1], [0.6, 0.2]]
+    prob = make_kalman_prob(A_reg, B_reg, C_reg, R_reg, mu_0_reg, Sigma_0_reg, y_reg)
+    ws = init(prob, KalmanFilter())
 
-    sol, cache = make_kalman_sol_cache(
-        A_reg, B_reg, C_reg, R_reg, mu_0_reg,
-        Sigma_0_reg, y_reg
-    )
-    loglik = kalman_loglik(
-        A_reg, B_reg, C_reg, mu_0_reg, Sigma_0_reg, R_reg,
-        y_reg, sol, cache
-    )
-
+    loglik = kalman_loglik_prob(prob, ws.output, ws.cache)
     @test isfinite(loglik)
     @test loglik < 0
-    @test length(sol.u) == 4
+    @test length(ws.output.u) == 4
 end
+
+GC.enable(true)
