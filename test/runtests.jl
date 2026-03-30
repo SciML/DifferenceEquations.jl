@@ -26,9 +26,9 @@ include("kalman_forwarddiff.jl")
 include("conditional_likelihood.jl")
 include("conditional_likelihood_forwarddiff.jl")
 include("save_everystep.jl")
-include("gradient_comparison.jl")
 
 if get(ENV, "CI", "false") != "true"
+    include("gradient_comparison.jl")
     include("linear_direct_iteration_enzyme.jl")
     include("quadratic_direct_iteration_enzyme.jl")
     include("kalman_enzyme.jl")
