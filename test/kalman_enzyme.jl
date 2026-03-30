@@ -1,8 +1,11 @@
 using LinearAlgebra, Test, Enzyme, EnzymeTestUtils, StaticArrays, Random
 using DifferenceEquations
 using DifferenceEquations: init, solve!, StateSpaceWorkspace
+using FiniteDifferences: central_fdm
 
-include("enzyme_test_utils.jl")
+include("enzyme_test_utils.jl")  # vech helpers only
+
+const _fdm_kf = central_fdm(5, 1)
 
 # --- Test setup ---
 
