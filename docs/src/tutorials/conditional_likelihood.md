@@ -174,7 +174,7 @@ The gradient is near zero at the true parameter value, confirming the MLE
 is correctly identified. For full optimization, use Optimization.jl with
 `AutoForwardDiff()` and an optimizer like `LBFGS()`.
 
-## Workspace API
+## Using the Workspace
 
 For repeated solves (e.g., inside an optimizer), use the `init`/`solve!`
 pattern to avoid repeated memory allocation:
