@@ -1,8 +1,15 @@
+# Enzyme AD tests for DirectIteration
+# Forward: test_forward (EnzymeTestUtils)
+# Reverse: test_reverse (EnzymeTestUtils)
+
 using LinearAlgebra, Test, Enzyme, EnzymeTestUtils, StaticArrays, Random
 using DifferenceEquations
 using DifferenceEquations: init, solve!, StateSpaceWorkspace
+using FiniteDifferences: central_fdm
 
-include("enzyme_test_utils.jl")
+include("enzyme_test_utils.jl")  # vech helpers only
+
+const _fdm_di = central_fdm(5, 1)
 
 # --- Test setup ---
 
@@ -41,7 +48,7 @@ function make_di_sol_cache(A, B, C, u0, noise, y, H)
     return ws.output, ws.cache
 end
 
-# --- Wrapper functions ---
+# --- Forward wrapper ---
 
 function di_solve!(A, B, C, u0, noise, y, H, sol, cache)
     prob = make_di_prob(A, B, C, u0, noise, y, H)
@@ -49,6 +56,8 @@ function di_solve!(A, B, C, u0, noise, y, H, sol, cache)
     solve!(ws)
     return (sol.u, sol.z)
 end
+
+# --- Reverse wrapper (logpdf) ---
 
 function di_loglik(A, B, C, u0, noise, y, H, sol, cache)::Float64
     prob = make_di_prob(A, B, C, u0, noise, y, H)
@@ -83,51 +92,30 @@ end
         ([copy(n) for n in noise_s], Duplicated),
         ([copy(y) for y in y_s], Duplicated),
         (copy(H_s), Duplicated),
-        (sol, Duplicated), (cache, Duplicated)
+        (sol, Duplicated), (cache, Duplicated);
+        fdm = _fdm_di,
     )
 end
 
-# --- Reverse (scalar logpdf, all Duplicated) ---
+# --- Reverse (all Duplicated, logpdf) ---
 
-@testset "DirectIteration reverse — manual gradient check (logpdf)" begin
+@testset "EnzymeTestUtils - DirectIteration reverse (logpdf)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; H_s = [0.1 0.0; 0.0 0.1]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
 
-    # Manual autodiff + FD comparison for model parameters.
-    # EnzymeTestUtils.test_reverse checks all Duplicated args including sol/cache,
-    # but sol/cache are write-first scratch whose initial values don't affect output.
-    dA = zero(A_s); dB = zero(B_s); dC = zero(C_s); dH = zero(H_s); du0 = zero(u0_s)
-    autodiff(
-        Reverse, di_loglik, Active,
-        Duplicated(copy(A_s), dA), Duplicated(copy(B_s), dB),
-        Duplicated(copy(C_s), dC), Duplicated(copy(u0_s), du0),
-        Duplicated(deepcopy(noise_s), [zeros(2) for _ in noise_s]),
-        Duplicated(deepcopy(y_s), [zeros(2) for _ in y_s]),
-        Duplicated(copy(H_s), dH),
-        Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
-        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache)))
+    test_reverse(
+        di_loglik, Active,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
+        ([copy(n) for n in noise_s], Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (copy(H_s), Duplicated),
+        (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
+        fdm = _fdm_di,
     )
-
-    fd_dA = fdm_gradient(
-        a -> di_loglik(reshape(a, 2, 2), B_s, C_s, u0_s, noise_s, y_s, H_s, sol, cache),
-        vec(copy(A_s))
-    )
-    @test vec(dA) ≈ fd_dA rtol = 1.0e-4
-
-    fd_dH = fdm_gradient(
-        h -> di_loglik(A_s, B_s, C_s, u0_s, noise_s, y_s, reshape(h, 2, 2), sol, cache),
-        vec(copy(H_s))
-    )
-    @test vec(dH) ≈ fd_dH rtol = 1.0e-4
-
-    fd_du0 = fdm_gradient(
-        u -> di_loglik(A_s, B_s, C_s, u, noise_s, y_s, H_s, sol, cache),
-        copy(u0_s)
-    )
-    @test du0 ≈ fd_du0 rtol = 1.0e-4
 end
 
 # --- Rectangular H forward (all Duplicated) ---
@@ -148,12 +136,10 @@ end
         ([copy(n) for n in noise_r], Duplicated),
         ([copy(y) for y in y_r], Duplicated),
         (copy(H_r), Duplicated),
-        (sol, Duplicated), (cache, Duplicated)
+        (sol, Duplicated), (cache, Duplicated);
+        fdm = _fdm_di,
     )
 end
-
-# DI rectangular H reverse: skipped due to marginal cache gradient FD mismatch.
-# Forward test validates correctness above.
 
 # --- Non-diagonal R via vech parameterization ---
 
@@ -185,7 +171,6 @@ end
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     R_offdiag = [0.02 0.005; 0.005 0.01]
     r_v = make_vech_for(R_offdiag)
-    # Allocate sol/cache using the full matrix R
     sol, cache = make_di_sol_cache(
         A_s, B_s, C_s, u0_s, noise_s, y_s,
         [sqrt(0.02) 0.0; 0.0 sqrt(0.01)]
@@ -198,11 +183,12 @@ end
         ([copy(n) for n in noise_s], Duplicated),
         ([copy(y) for y in y_s], Duplicated),
         (copy(r_v), Duplicated), (2, Const),
-        (sol, Duplicated), (cache, Duplicated)
+        (sol, Duplicated), (cache, Duplicated);
+        fdm = _fdm_di,
     )
 end
 
-@testset "DirectIteration non-diagonal R reverse — manual gradient check (vech)" begin
+@testset "EnzymeTestUtils - DirectIteration non-diagonal R reverse (vech)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
@@ -214,35 +200,16 @@ end
         [sqrt(0.02) 0.0; 0.0 sqrt(0.01)]
     )
 
-    dA = zero(A_s); dr_v = zero(r_v)
-    autodiff(
-        Reverse, di_loglik_vech, Active,
-        Duplicated(copy(A_s), dA), Duplicated(copy(B_s), zero(B_s)),
-        Duplicated(copy(C_s), zero(C_s)), Duplicated(copy(u0_s), zero(u0_s)),
-        Duplicated(deepcopy(noise_s), [zeros(2) for _ in noise_s]),
-        Duplicated(deepcopy(y_s), [zeros(2) for _ in y_s]),
-        Duplicated(copy(r_v), dr_v), Const(2),
-        Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
-        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache)))
+    test_reverse(
+        di_loglik_vech, Active,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
+        ([copy(n) for n in noise_s], Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (copy(r_v), Duplicated), (2, Const),
+        (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
+        fdm = _fdm_di,
     )
-
-    fd_dA = fdm_gradient(
-        a -> di_loglik_vech(
-            reshape(a, 2, 2), B_s, C_s, u0_s, noise_s, y_s,
-            r_v, 2, sol, cache
-        ),
-        vec(copy(A_s))
-    )
-    @test vec(dA) ≈ fd_dA rtol = 1.0e-4
-
-    fd_dr_v = fdm_gradient(
-        rv -> di_loglik_vech(
-            A_s, B_s, C_s, u0_s, noise_s, y_s,
-            rv, 2, sol, cache
-        ),
-        copy(r_v)
-    )
-    @test dr_v ≈ fd_dr_v rtol = 1.0e-4
 end
 
 # --- Regression test ---
@@ -262,8 +229,6 @@ end
 end
 
 # --- Edge-case helpers ---
-# For configs with Nothing fields in sol/cache, pass individual arrays
-# and construct NamedTuples inside the wrapper to avoid Enzyme shadow issues.
 
 function _alloc_u(u0, T)
     return [similar(u0) for _ in 1:T]
@@ -341,7 +306,7 @@ function di_impulse_solve!(A, B, C, u0, noise, u_out, z_out, noise_cache)
     return (u_out, z_out)
 end
 
-# Scalar z_sum and u_sum (reuse make_di_prob with full config)
+# Scalar wrappers for reverse mode
 function di_z_sum(A, B, C, u0, noise, y, H, sol, cache)::Float64
     prob = make_di_prob(A, B, C, u0, noise, y, H)
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
@@ -356,7 +321,7 @@ function di_u_sum(A, B, C, u0, noise, y, H, sol, cache)::Float64
     return sol.u[2][1] + sol.u[3][2]
 end
 
-# --- Test A: No observables forward ---
+# --- Edge-case forward tests ---
 
 @testset "EnzymeTestUtils - DirectIteration no observables forward" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
@@ -371,11 +336,10 @@ end
         (copy(A_s), Duplicated), (copy(B_s), Duplicated),
         (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
         ([copy(n) for n in noise_s], Duplicated),
-        (u_out, Duplicated), (z_out, Duplicated), (nc, Duplicated)
+        (u_out, Duplicated), (z_out, Duplicated), (nc, Duplicated);
+        fdm = _fdm_di,
     )
 end
-
-# --- Test B: No noise forward ---
 
 @testset "EnzymeTestUtils - DirectIteration no noise forward" begin
     A_s = [0.8 0.1; -0.1 0.7]; C_s = [1.0 0.0; 0.0 1.0]
@@ -387,11 +351,10 @@ end
         (copy(A_s), Duplicated), (copy(C_s), Duplicated),
         (copy(u0_s), Duplicated),
         (u_out, Duplicated), (z_out, Duplicated),
-        (T_val, Const)
+        (T_val, Const);
+        fdm = _fdm_di,
     )
 end
-
-# --- Test C: No observation equation forward ---
 
 @testset "EnzymeTestUtils - DirectIteration no observation equation forward" begin
     A_s = [0.8 0.1; -0.1 0.7]
@@ -401,11 +364,10 @@ end
     test_forward(
         di_no_obs_eq_solve!, Const,
         (copy(A_s), Duplicated), (copy(u0_s), Duplicated),
-        (u_out, Duplicated), (T_val, Const)
+        (u_out, Duplicated), (T_val, Const);
+        fdm = _fdm_di,
     )
 end
-
-# --- Test D: Noise but no observation equation forward ---
 
 @testset "EnzymeTestUtils - DirectIteration noise no observation equation forward" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
@@ -419,11 +381,10 @@ end
         (copy(A_s), Duplicated), (copy(B_s), Duplicated),
         (copy(u0_s), Duplicated),
         ([copy(n) for n in noise_s], Duplicated),
-        (u_out, Duplicated), (nc, Duplicated)
+        (u_out, Duplicated), (nc, Duplicated);
+        fdm = _fdm_di,
     )
 end
-
-# --- Test E: Impulse response forward ---
 
 @testset "EnzymeTestUtils - DirectIteration impulse response forward" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
@@ -438,62 +399,47 @@ end
         (copy(A_s), Duplicated), (copy(B_s), Duplicated),
         (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
         ([copy(n) for n in noise_s], Duplicated),
-        (u_out, Duplicated), (z_out, Duplicated), (nc, Duplicated)
+        (u_out, Duplicated), (z_out, Duplicated), (nc, Duplicated);
+        fdm = _fdm_di,
     )
 end
 
-# --- Test F: Scalar z_sum reverse ---
+# --- Reverse: z_sum and u_sum ---
 
-@testset "DirectIteration z_sum reverse — manual gradient check" begin
+@testset "EnzymeTestUtils - DirectIteration z_sum reverse" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; H_s = [0.1 0.0; 0.0 0.1]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
 
-    dA = zero(A_s)
-    autodiff(
-        Reverse, di_z_sum, Active,
-        Duplicated(copy(A_s), dA), Duplicated(copy(B_s), zero(B_s)),
-        Duplicated(copy(C_s), zero(C_s)), Duplicated(copy(u0_s), zero(u0_s)),
-        Duplicated(deepcopy(noise_s), [zeros(2) for _ in noise_s]),
-        Duplicated(deepcopy(y_s), [zeros(2) for _ in y_s]),
-        Duplicated(copy(H_s), zero(H_s)),
-        Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
-        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache)))
+    test_reverse(
+        di_z_sum, Active,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
+        ([copy(n) for n in noise_s], Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (copy(H_s), Duplicated),
+        (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
+        fdm = _fdm_di,
     )
-
-    fd_dA = fdm_gradient(
-        a -> di_z_sum(reshape(a, 2, 2), B_s, C_s, u0_s, noise_s, y_s, H_s, sol, cache),
-        vec(copy(A_s))
-    )
-    @test vec(dA) ≈ fd_dA rtol = 1.0e-4
 end
 
-# --- Test G: Scalar u_sum reverse ---
-
-@testset "DirectIteration u_sum reverse — manual gradient check" begin
+@testset "EnzymeTestUtils - DirectIteration u_sum reverse" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; H_s = [0.1 0.0; 0.0 0.1]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
     y_s = [[0.5, 0.3], [0.2, 0.1]]
     sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
 
-    dA = zero(A_s)
-    autodiff(
-        Reverse, di_u_sum, Active,
-        Duplicated(copy(A_s), dA), Duplicated(copy(B_s), zero(B_s)),
-        Duplicated(copy(C_s), zero(C_s)), Duplicated(copy(u0_s), zero(u0_s)),
-        Duplicated(deepcopy(noise_s), [zeros(2) for _ in noise_s]),
-        Duplicated(deepcopy(y_s), [zeros(2) for _ in y_s]),
-        Duplicated(copy(H_s), zero(H_s)),
-        Duplicated(deepcopy(sol), Enzyme.make_zero(deepcopy(sol))),
-        Duplicated(deepcopy(cache), Enzyme.make_zero(deepcopy(cache)))
+    test_reverse(
+        di_u_sum, Active,
+        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
+        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
+        ([copy(n) for n in noise_s], Duplicated),
+        ([copy(y) for y in y_s], Duplicated),
+        (copy(H_s), Duplicated),
+        (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
+        fdm = _fdm_di,
     )
-
-    fd_dA = fdm_gradient(
-        a -> di_u_sum(reshape(a, 2, 2), B_s, C_s, u0_s, noise_s, y_s, H_s, sol, cache),
-        vec(copy(A_s))
-    )
-    @test vec(dA) ≈ fd_dA rtol = 1.0e-4
 end
