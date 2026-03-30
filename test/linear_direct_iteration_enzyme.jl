@@ -1,6 +1,9 @@
 # Enzyme AD tests for DirectIteration
-# Forward: test_forward (EnzymeTestUtils)
-# Reverse: test_reverse (EnzymeTestUtils)
+# prob passed as Duplicated — observables get zero shadow automatically.
+# GC disabled to avoid Enzyme reverse-mode GC corruption (#2355).
+
+GC.gc()
+GC.enable(false)
 
 using LinearAlgebra, Test, Enzyme, EnzymeTestUtils, StaticArrays, Random
 using DifferenceEquations
@@ -9,7 +12,9 @@ using FiniteDifferences: central_fdm
 
 include("enzyme_test_utils.jl")  # vech helpers only
 
-const _fdm_di = central_fdm(5, 1)
+# max_range needed: FD perturbation of observables_noise inside prob can push
+# the matrix non-positive-definite, causing DomainError in logdet_chol.
+const _fdm_di = central_fdm(5, 1; max_range = 1.0e-3)
 
 # --- Test setup ---
 
@@ -48,19 +53,48 @@ function make_di_sol_cache(A, B, C, u0, noise, y, H)
     return ws.output, ws.cache
 end
 
-# --- Forward wrapper ---
+# --- Wrappers — prob as single Duplicated arg ---
 
-function di_solve!(A, B, C, u0, noise, y, H, sol, cache)
-    prob = make_di_prob(A, B, C, u0, noise, y, H)
+function di_solve_prob!(prob, sol, cache)
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     solve!(ws)
     return (sol.u, sol.z)
 end
 
-# --- Reverse wrapper (logpdf) ---
+function di_loglik_prob(prob, sol, cache)::Float64
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
+    return solve!(ws).logpdf
+end
 
-function di_loglik(A, B, C, u0, noise, y, H, sol, cache)::Float64
-    prob = make_di_prob(A, B, C, u0, noise, y, H)
+# Scalar wrappers for reverse mode (prob pattern)
+function di_z_sum_prob(prob, sol, cache)::Float64
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
+    solve!(ws)
+    return sol.z[2][1] + sol.z[3][2]
+end
+
+function di_u_sum_prob(prob, sol, cache)::Float64
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
+    solve!(ws)
+    return sol.u[2][1] + sol.u[3][2]
+end
+
+# Vech: separate args (y stays Duplicated — remake doesn't work with Enzyme shadows)
+function di_solve_vech!(A, B, C, u0, noise, y, r_v, n_obs, sol, cache)
+    prob = LinearStateSpaceProblem(
+        A, B, u0, (0, length(y));
+        C, observables_noise = make_posdef_from_vech(r_v, n_obs), observables = y, noise
+    )
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
+    solve!(ws)
+    return (sol.u, sol.z)
+end
+
+function di_loglik_vech(A, B, C, u0, noise, y, r_v, n_obs, sol, cache)::Float64
+    prob = LinearStateSpaceProblem(
+        A, B, u0, (0, length(y));
+        C, observables_noise = make_posdef_from_vech(r_v, n_obs), observables = y, noise
+    )
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     return solve!(ws).logpdf
 end
@@ -68,103 +102,75 @@ end
 # --- Sanity test ---
 
 @testset "DirectIteration loglik via solve!() - sanity" begin
-    sol, cache = make_di_sol_cache(A_di, B_di, C_di, u0_di, noise_di, y_di, H_di)
-    loglik = di_loglik(A_di, B_di, C_di, u0_di, noise_di, y_di, H_di, sol, cache)
+    prob = make_di_prob(A_di, B_di, C_di, u0_di, noise_di, y_di, H_di)
+    ws = init(prob, DirectIteration())
+    loglik = di_loglik_prob(prob, ws.output, ws.cache)
     @test isfinite(loglik)
 
-    loglik2 = di_loglik(A_di, B_di, C_di, u0_di, noise_di, y_di, H_di, sol, cache)
+    loglik2 = di_loglik_prob(prob, ws.output, ws.cache)
     @test loglik ≈ loglik2 rtol = 1.0e-12
 end
 
-# --- Forward (all Duplicated) ---
+# --- Forward — prob as Duplicated ---
 
-@testset "EnzymeTestUtils - DirectIteration forward (all Duplicated)" begin
+@testset "EnzymeTestUtils - DirectIteration forward (prob Duplicated)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; H_s = [0.1 0.0; 0.0 0.1]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
     y_s = [[0.5, 0.3], [0.2, 0.1]]
-    sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    prob = make_di_prob(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    ws = init(prob, DirectIteration())
 
     test_forward(
-        di_solve!, Const,
-        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
-        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
-        ([copy(n) for n in noise_s], Duplicated),
-        ([copy(y) for y in y_s], Duplicated),
-        (copy(H_s), Duplicated),
-        (sol, Duplicated), (cache, Duplicated);
+        di_solve_prob!, Const,
+        (prob, Duplicated),
+        (ws.output, Duplicated), (ws.cache, Duplicated);
         fdm = _fdm_di,
     )
 end
 
-# --- Reverse (all Duplicated, logpdf) ---
+# --- Reverse — prob as Duplicated (logpdf) ---
 
-@testset "EnzymeTestUtils - DirectIteration reverse (logpdf)" begin
+@testset "EnzymeTestUtils - DirectIteration reverse (prob Duplicated, logpdf)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; H_s = [0.1 0.0; 0.0 0.1]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
     y_s = [[0.5, 0.3], [0.2, 0.1]]
-    sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    prob = make_di_prob(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    ws = init(prob, DirectIteration())
 
     test_reverse(
-        di_loglik, Active,
-        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
-        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
-        ([copy(n) for n in noise_s], Duplicated),
-        ([copy(y) for y in y_s], Duplicated),
-        (copy(H_s), Duplicated),
-        (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
+        di_loglik_prob, Active,
+        (prob, Duplicated),
+        (deepcopy(ws.output), Duplicated), (deepcopy(ws.cache), Duplicated);
         fdm = _fdm_di,
     )
 end
 
-# --- Rectangular H forward (all Duplicated) ---
+# --- Forward — rectangular H (prob as Duplicated) ---
 
-@testset "EnzymeTestUtils - DirectIteration rectangular H forward (all Duplicated)" begin
+@testset "EnzymeTestUtils - DirectIteration rectangular H forward (prob Duplicated)" begin
     A_r = [0.5 0.1 0.0; -0.1 0.5 0.05; 0.02 -0.05 0.5]
     B_r = 0.1 * [1.0 0.5; 0.3 -0.2; 0.7 0.1]
     C_r = [1.0 0.0 0.5; 0.0 1.0 0.0]
     H_r = 0.1 * [1.0 0.5 0.3; -0.2 0.7 0.1]
     u0_r = zeros(3); noise_r = [[0.1, -0.1], [0.2, 0.05]]
     y_r = [[0.5, 0.3], [0.2, -0.1]]
-    sol, cache = make_di_sol_cache(A_r, B_r, C_r, u0_r, noise_r, y_r, H_r)
+    prob = make_di_prob(A_r, B_r, C_r, u0_r, noise_r, y_r, H_r)
+    ws = init(prob, DirectIteration())
 
     test_forward(
-        di_solve!, Const,
-        (copy(A_r), Duplicated), (copy(B_r), Duplicated),
-        (copy(C_r), Duplicated), (copy(u0_r), Duplicated),
-        ([copy(n) for n in noise_r], Duplicated),
-        ([copy(y) for y in y_r], Duplicated),
-        (copy(H_r), Duplicated),
-        (sol, Duplicated), (cache, Duplicated);
+        di_solve_prob!, Const,
+        (prob, Duplicated),
+        (ws.output, Duplicated), (ws.cache, Duplicated);
         fdm = _fdm_di,
     )
 end
 
 # --- Non-diagonal R via vech parameterization ---
 
-function make_di_prob_vech(A, B, C, u0, noise, y, r_v, n_obs)
-    R = make_posdef_from_vech(r_v, n_obs)
-    return LinearStateSpaceProblem(
-        A, B, u0, (0, length(y));
-        C, observables_noise = R, observables = y, noise
-    )
-end
-
-function di_solve_vech!(A, B, C, u0, noise, y, r_v, n_obs, sol, cache)
-    prob = make_di_prob_vech(A, B, C, u0, noise, y, r_v, n_obs)
-    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
-    solve!(ws)
-    return (sol.u, sol.z)
-end
-
-function di_loglik_vech(A, B, C, u0, noise, y, r_v, n_obs, sol, cache)::Float64
-    prob = make_di_prob_vech(A, B, C, u0, noise, y, r_v, n_obs)
-    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
-    return solve!(ws).logpdf
-end
-
 @testset "EnzymeTestUtils - DirectIteration non-diagonal R forward (vech)" begin
+    _fdm_vech = central_fdm(5, 1)
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
@@ -184,11 +190,12 @@ end
         ([copy(y) for y in y_s], Duplicated),
         (copy(r_v), Duplicated), (2, Const),
         (sol, Duplicated), (cache, Duplicated);
-        fdm = _fdm_di,
+        fdm = _fdm_vech,
     )
 end
 
 @testset "EnzymeTestUtils - DirectIteration non-diagonal R reverse (vech)" begin
+    _fdm_vech = central_fdm(5, 1)
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
@@ -208,7 +215,7 @@ end
         ([copy(y) for y in y_s], Duplicated),
         (copy(r_v), Duplicated), (2, Const),
         (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
-        fdm = _fdm_di,
+        fdm = _fdm_vech,
     )
 end
 
@@ -219,12 +226,13 @@ end
     C_reg = [1.0 0.0; 0.0 1.0]; H_reg = [0.1 0.0; 0.0 0.1]
     u0_reg = [0.0, 0.0]; noise_reg = [[0.1, -0.1], [0.2, 0.05], [0.0, 0.1]]
     y_reg = [[0.5, -0.3], [0.8, -0.1], [0.6, 0.2]]
-    sol, cache = make_di_sol_cache(A_reg, B_reg, C_reg, u0_reg, noise_reg, y_reg, H_reg)
+    prob = make_di_prob(A_reg, B_reg, C_reg, u0_reg, noise_reg, y_reg, H_reg)
+    ws = init(prob, DirectIteration())
 
-    loglik = di_loglik(A_reg, B_reg, C_reg, u0_reg, noise_reg, y_reg, H_reg, sol, cache)
+    loglik = di_loglik_prob(prob, ws.output, ws.cache)
     @test isfinite(loglik)
 
-    loglik2 = di_loglik(A_reg, B_reg, C_reg, u0_reg, noise_reg, y_reg, H_reg, sol, cache)
+    loglik2 = di_loglik_prob(prob, ws.output, ws.cache)
     @test loglik ≈ loglik2 rtol = 1.0e-12
 end
 
@@ -304,21 +312,6 @@ function di_impulse_solve!(A, B, C, u0, noise, u_out, z_out, noise_cache)
     ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
     solve!(ws)
     return (u_out, z_out)
-end
-
-# Scalar wrappers for reverse mode
-function di_z_sum(A, B, C, u0, noise, y, H, sol, cache)::Float64
-    prob = make_di_prob(A, B, C, u0, noise, y, H)
-    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
-    solve!(ws)
-    return sol.z[2][1] + sol.z[3][2]
-end
-
-function di_u_sum(A, B, C, u0, noise, y, H, sol, cache)::Float64
-    prob = make_di_prob(A, B, C, u0, noise, y, H)
-    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
-    solve!(ws)
-    return sol.u[2][1] + sol.u[3][2]
 end
 
 # --- Edge-case forward tests ---
@@ -404,42 +397,38 @@ end
     )
 end
 
-# --- Reverse: z_sum and u_sum ---
+# --- Reverse: z_sum and u_sum (prob as Duplicated) ---
 
-@testset "EnzymeTestUtils - DirectIteration z_sum reverse" begin
+@testset "EnzymeTestUtils - DirectIteration z_sum reverse (prob Duplicated)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; H_s = [0.1 0.0; 0.0 0.1]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
     y_s = [[0.5, 0.3], [0.2, 0.1]]
-    sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    prob = make_di_prob(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    ws = init(prob, DirectIteration())
 
     test_reverse(
-        di_z_sum, Active,
-        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
-        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
-        ([copy(n) for n in noise_s], Duplicated),
-        ([copy(y) for y in y_s], Duplicated),
-        (copy(H_s), Duplicated),
-        (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
+        di_z_sum_prob, Active,
+        (prob, Duplicated),
+        (deepcopy(ws.output), Duplicated), (deepcopy(ws.cache), Duplicated);
         fdm = _fdm_di,
     )
 end
 
-@testset "EnzymeTestUtils - DirectIteration u_sum reverse" begin
+@testset "EnzymeTestUtils - DirectIteration u_sum reverse (prob Duplicated)" begin
     A_s = [0.8 0.1; -0.1 0.7]; B_s = [0.1 0.0; 0.0 0.1]
     C_s = [1.0 0.0; 0.0 1.0]; H_s = [0.1 0.0; 0.0 0.1]
     u0_s = zeros(2); noise_s = [[0.1, -0.1], [0.2, 0.05]]
     y_s = [[0.5, 0.3], [0.2, 0.1]]
-    sol, cache = make_di_sol_cache(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    prob = make_di_prob(A_s, B_s, C_s, u0_s, noise_s, y_s, H_s)
+    ws = init(prob, DirectIteration())
 
     test_reverse(
-        di_u_sum, Active,
-        (copy(A_s), Duplicated), (copy(B_s), Duplicated),
-        (copy(C_s), Duplicated), (copy(u0_s), Duplicated),
-        ([copy(n) for n in noise_s], Duplicated),
-        ([copy(y) for y in y_s], Duplicated),
-        (copy(H_s), Duplicated),
-        (deepcopy(sol), Duplicated), (deepcopy(cache), Duplicated);
+        di_u_sum_prob, Active,
+        (prob, Duplicated),
+        (deepcopy(ws.output), Duplicated), (deepcopy(ws.cache), Duplicated);
         fdm = _fdm_di,
     )
 end
+
+GC.enable(true)
