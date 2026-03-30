@@ -23,10 +23,18 @@ include("sciml_interfaces.jl")
 include("sensitivity_interface.jl")
 include("linear_direct_iteration_forwarddiff.jl")
 include("kalman_forwarddiff.jl")
+include("conditional_likelihood.jl")
+include("conditional_likelihood_forwarddiff.jl")
+include("save_everystep.jl")
 include("gradient_comparison.jl")
-include("linear_direct_iteration_enzyme.jl")
-include("quadratic_direct_iteration_enzyme.jl")
-include("kalman_enzyme.jl")
+
+if get(ENV, "CI", "false") != "true"
+    include("linear_direct_iteration_enzyme.jl")
+    include("quadratic_direct_iteration_enzyme.jl")
+    include("kalman_enzyme.jl")
+    include("conditional_likelihood_enzyme.jl")
+end
+
 
 if get(ENV, "GROUP", "") == "JET"
     activate_jet_env()

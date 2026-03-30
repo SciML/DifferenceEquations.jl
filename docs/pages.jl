@@ -4,6 +4,7 @@ pages = [
     "Tutorials" => [
         "Linear Simulation" => "tutorials/linear_simulation.md",
         "Likelihood & Kalman Filter" => "tutorials/linear_likelihood.md",
+        "Conditional Likelihood" => "tutorials/conditional_likelihood.md",
         "Quadratic Models" => "tutorials/quadratic.md",
         "Generic Callbacks" => "tutorials/generic_callbacks.md",
     ],

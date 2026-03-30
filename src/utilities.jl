@@ -82,6 +82,18 @@ function maybe_check_size(m::AbstractVector{<:AbstractVector}, index::Integer, v
 end
 
 # =============================================================================
+# Ping-pong index for save_everystep=false (2-element buffer)
+# =============================================================================
+
+"""
+    _u_idx_pingpong(t)
+
+Ping-pong index mapping for 2-element buffers: t=1→1, t=2→2, t=3→1, t=4→2, ...
+Used by `save_everystep=false` solver loops to alternate between two scratch slots.
+"""
+@inline _u_idx_pingpong(t) = 2 - t % 2
+
+# =============================================================================
 # Observation noise covariance
 # =============================================================================
 

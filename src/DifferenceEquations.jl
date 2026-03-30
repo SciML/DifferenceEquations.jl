@@ -27,7 +27,7 @@ include("precompilation.jl")
 # Exports
 export AbstractStateSpaceProblem, LinearStateSpaceProblem, StateSpaceProblem
 export QuadraticStateSpaceProblem, PrunedQuadraticStateSpaceProblem
-export StateSpaceSolution, DirectIteration, KalmanFilter
+export StateSpaceSolution, DirectIteration, KalmanFilter, ConditionalLikelihood
 export StateSpaceWorkspace
 
 export solve, init, solve!, remake

@@ -34,6 +34,30 @@ See also: [`DirectIteration`](@ref).
 """
 struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 
+"""
+    ConditionalLikelihood()
+
+Conditional likelihood (prediction error decomposition) algorithm for
+fully-observed state-space models. At each step, predicts the next
+observation from the *observed* current state using the transition equation,
+and accumulates the Gaussian log-likelihood of the innovation.
+
+Works with all problem types (`LinearStateSpaceProblem`, `StateSpaceProblem`,
+`QuadraticStateSpaceProblem`, `PrunedQuadraticStateSpaceProblem`). The only
+requirement is additive Gaussian observation noise.
+
+Requires:
+- `observables` (observed data y₁, …, y_T),
+- `observables_noise` (innovation covariance R).
+
+The solution contains predicted observations in `sol.z` (when an observation
+equation is present), the conditional log-likelihood in `sol.logpdf`, and the
+state trajectory (clamped to observables) in `sol.u`.
+
+See also: [`DirectIteration`](@ref), [`KalmanFilter`](@ref).
+"""
+struct ConditionalLikelihood <: AbstractDifferenceEquationAlgorithm end
+
 # The typical algorithm in discrete-time is DirectIteration()
 # Unlike continuous time, there aren't many simple variations
 default_alg(prob::AbstractStateSpaceProblem) = DirectIteration()
