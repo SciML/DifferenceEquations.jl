@@ -78,3 +78,38 @@ end
     y = _add_quadratic!!(y, C_2, u_f)
     return y
 end
+
+# --- Pruned quadratic: save_everystep=false overloads (ping-pong u_f) ---
+
+function _init_model_state!!(prob::PrunedQuadraticStateSpaceProblem, cache, ::Val{false})
+    cache.u_f[1] = assign!!(cache.u_f[1], prob.u0)
+    return nothing
+end
+
+@inline function _transition!!(
+        x_next, x, w, prob::PrunedQuadraticStateSpaceProblem, cache, t, ::Val{false}
+    )
+    (; A_0, A_1, A_2, B) = prob
+    uf_prev_idx = _u_idx_pingpong(t - 1)
+    uf_curr_idx = _u_idx_pingpong(t)
+    u_f_prev = cache.u_f[uf_prev_idx]
+    u_f_new = mul!!(cache.u_f[uf_curr_idx], A_1, u_f_prev)
+    u_f_new = muladd!!(u_f_new, B, w)
+    cache.u_f[uf_curr_idx] = u_f_new
+    x_next = copyto!!(x_next, A_0)
+    x_next = mul!!(x_next, A_1, x, 1.0, 1.0)
+    x_next = _add_quadratic!!(x_next, A_2, u_f_prev)
+    x_next = muladd!!(x_next, B, w)
+    return x_next
+end
+
+@inline function _observation!!(
+        y, x, prob::PrunedQuadraticStateSpaceProblem, cache, t, ::Val{false}
+    )
+    (; C_0, C_1, C_2) = prob
+    u_f = cache.u_f[_u_idx_pingpong(t)]
+    y = copyto!!(y, C_0)
+    y = mul!!(y, C_1, x, 1.0, 1.0)
+    y = _add_quadratic!!(y, C_2, u_f)
+    return y
+end

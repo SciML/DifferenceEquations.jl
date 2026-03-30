@@ -44,6 +44,25 @@ using LinearAlgebra: I
         ws_k = CommonSolve.init(prob_kalman, KalmanFilter())
         sol_k = CommonSolve.solve!(ws_k)
 
+        # === ConditionalLikelihood ===
+        # With C
+        prob_cl = LinearStateSpaceProblem(
+            A, nothing, u0, (0, length(observables));
+            C, observables_noise = D, observables
+        )
+        sol_cl = solve(prob_cl, ConditionalLikelihood())
+
+        # Without C (identity observation)
+        prob_cl_no_c = LinearStateSpaceProblem(
+            A, nothing, u0, (0, length(observables));
+            observables_noise = Diagonal([0.01, 0.01]), observables
+        )
+        sol_cl_no_c = solve(prob_cl_no_c, ConditionalLikelihood())
+
+        # init/solve!
+        ws_cl = CommonSolve.init(prob_cl, ConditionalLikelihood())
+        sol_cl_ws = CommonSolve.solve!(ws_cl)
+
         # === LinearStateSpaceProblem with no noise matrix ===
         prob_no_noise = LinearStateSpaceProblem(A, nothing, u0, (0, T); C)
         sol_no_noise = solve(prob_no_noise)
