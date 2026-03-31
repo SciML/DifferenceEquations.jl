@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Quadratic Models · DifferenceEquations.jl</title><meta name="title" content="Quadratic Models · DifferenceEquations.jl"/><meta property="og:title" content="Quadratic Models · DifferenceEquations.jl"/><meta property="twitter:title" content="Quadratic Models · DifferenceEquations.jl"/><meta name="description" content="Documentation for DifferenceEquations.jl."/><meta property="og:description" content="Documentation for DifferenceEquations.jl."/><meta property="twitter:description" content="Documentation for DifferenceEquations.jl."/><meta property="og:url" content="https://docs.sciml.ai/DifferenceEquations/stable/tutorials/quadratic/"/><meta property="twitter:url" content="https://docs.sciml.ai/DifferenceEquations/stable/tutorials/quadratic/"/><link rel="canonical" href="https://docs.sciml.ai/DifferenceEquations/stable/tutorials/quadratic/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.png" alt="DifferenceEquations.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">DifferenceEquations.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../getting_started/">Getting Started</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../linear_simulation/">Linear Simulation</a></li><li><a class="tocitem" href="../linear_likelihood/">Likelihood &amp; Kalman Filter</a></li><li><a class="tocitem" href="../conditional_likelihood/">Conditional Likelihood</a></li><li class="is-active"><a class="tocitem" href>Quadratic Models</a><ul class="internal"><li><a class="tocitem" href="#Simulating-a-Quadratic-Model"><span>Simulating a Quadratic Model</span></a></li><li><a class="tocitem" href="#Plotting-and-Ensembles"><span>Plotting and Ensembles</span></a></li><li><a class="tocitem" href="#Joint-Likelihood"><span>Joint Likelihood</span></a></li><li><a class="tocitem" href="#Pruned-Quadratic-Models"><span>Pruned Quadratic Models</span></a></li><li><a class="tocitem" href="#Differentiating-with-Enzyme"><span>Differentiating with Enzyme</span></a></li></ul></li><li><a class="tocitem" href="../generic_callbacks/">Generic Callbacks</a></li></ul></li><li><span class="tocitem">Basics</span><ul><li><a class="tocitem" href="../../basics/problem_types/">Problem Types</a></li><li><a class="tocitem" href="../../basics/solvers/">Solvers</a></li><li><a class="tocitem" href="../../basics/solutions/">Solutions</a></li><li><a class="tocitem" href="../../basics/workspace/">Workspace API</a></li><li><a class="tocitem" href="../../basics/faq/">FAQ</a></li></ul></li><li><span class="tocitem">Advanced</span><ul><li><a class="tocitem" href="../../advanced/enzyme_ad/">Enzyme AD</a></li><li><a class="tocitem" href="../../advanced/forwarddiff_ad/">ForwardDiff AD</a></li><li><a class="tocitem" href="../../advanced/static_arrays/">StaticArrays</a></li><li><a class="tocitem" href="../../advanced/internals/">Internals</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Quadratic Models</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Quadratic Models</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/SciML/DifferenceEquations.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/SciML/DifferenceEquations.jl/blob/main/docs/src/tutorials/quadratic.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Quadratic-Models"><a class="docs-heading-anchor" href="#Quadratic-Models">Quadratic Models</a><a id="Quadratic-Models-1"></a><a class="docs-heading-anchor-permalink" href="#Quadratic-Models" title="Permalink"></a></h1><p>DifferenceEquations.jl supports second-order perturbation solutions through <a href="../../basics/problem_types/#QuadraticStateSpaceProblem"><code>QuadraticStateSpaceProblem</code></a> and <a href="../../basics/problem_types/#PrunedQuadraticStateSpaceProblem"><code>PrunedQuadraticStateSpaceProblem</code></a>. These extend the linear state-space model with quadratic terms:</p><p class="math-container">\[u_{n+1} = A_0 + A_1 \, u_n + u_n^\top A_2 \, u_n + B \, w_{n+1}\]</p><p>with observation equation</p><p class="math-container">\[z_n = C_0 + C_1 \, u_n + u_n^\top C_2 \, u_n + v_n\]</p><p>This formulation follows Andreasen, Fernandez-Villaverde, and Rubio-Ramirez (2017), &quot;The Pruned State-Space System for Non-Linear DSGE Models: Theory and Empirical Applications.&quot;</p><h2 id="Simulating-a-Quadratic-Model"><a class="docs-heading-anchor" href="#Simulating-a-Quadratic-Model">Simulating a Quadratic Model</a><a id="Simulating-a-Quadratic-Model-1"></a><a class="docs-heading-anchor-permalink" href="#Simulating-a-Quadratic-Model" title="Permalink"></a></h2><p>We define the quadratic coefficients. The tensors <code>A_2</code> and <code>C_2</code> are 3-dimensional arrays where <code>A_2[i, :, :]</code> gives the matrix for the <code>i</code>-th element of the quadratic form. For a 2-state model, <code>A_2</code> is a <code>2×2×2</code> array: the quadratic contribution to state <code>i</code> is <span>$u^\top A_2[i,:,:]\, u$</span>. For example, <code>A_2[1,:,:]</code> is the 2×2 matrix whose quadratic form gives the nonlinear correction to the first state element.</p><pre><code class="language-julia hljs">using DifferenceEquations, LinearAlgebra, Random, Plots
+
+A_0 = [-7.824904812740593e-5, 0.0]
+A_1 = [0.95 6.2; 0.0 0.2]
+A_2 = cat([-0.0002 0.0334; 0.0 0.0], [0.034 3.129; 0.0 0.0]; dims = 3)
+B = [0.0; 0.01;;]
+C_0 = [7.8e-5, 0.0]
+C_1 = [0.09 0.67; 1.00 0.00]
+C_2 = cat([-0.00019 0.0026; 0.0 0.0], [0.0026 0.313; 0.0 0.0]; dims = 3)
+D = Diagonal([0.01, 0.01])
+u0 = zeros(2)
+T = 30
+
+Random.seed!(42)
+prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
+    C_0, C_1, C_2, observables_noise = D, syms = (:a, :b))
+sol = solve(prob)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
+Interpolation: Piecewise constant interpolation
+t: 0:1:30
+u: 31-element Vector{Vector{Float64}}:
+ [0.0, 0.0]
+ [-7.824904812740593e-5, 0.007883556016042917]
+ [0.04891988885175858, -0.007221874756335411]
+ [0.0017589257528020396, -0.010182309773363343]
+ [-0.061214384981922526, -0.009369011599021596]
+ [-0.11600722245697045, -0.008895754307381123]
+ [-0.1651243120498138, -0.002504969541934924]
+ [-0.17243509703288032, -0.009630227771786251]
+ [-0.22320283898400928, 0.0043901627568102754]
+ [-0.18491763906354783, 0.01526486530847619]
+ ⋮
+ [0.058305824094747605, 0.01193042589888877]
+ [0.12977249524792234, 0.0052839691241533]
+ [0.15609644165272454, -0.014251596803596712]
+ [0.0603341824604796, -0.0006663062536166405]
+ [0.05310607708731666, -0.006224420214619914]
+ [0.011879503547645217, 0.005244589569794043]
+ [0.043813971057767936, 0.014407612549804024]
+ [0.13156389952858036, -0.003777682906262093]
+ [0.10149351503106013, -0.01081151648500947]</code></pre><p>The solution has the same structure as the linear case: <code>sol.u</code> holds the state trajectory, <code>sol.z</code> holds observations, and <code>sol.W</code> holds the noise sequence – all as <code>Vector{Vector}</code>.</p><h2 id="Plotting-and-Ensembles"><a class="docs-heading-anchor" href="#Plotting-and-Ensembles">Plotting and Ensembles</a><a id="Plotting-and-Ensembles-1"></a><a class="docs-heading-anchor-permalink" href="#Plotting-and-Ensembles" title="Permalink"></a></h2><p>The standard plotting recipes work identically:</p><pre><code class="language-julia hljs">plot(sol)</code></pre><img src="6ef2b25c.svg" alt="Example block output"/><p>Ensemble simulations follow the same SciML interface:</p><pre><code class="language-julia hljs">using DiffEqBase
+
+prob_ens = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
+    C_0, C_1, C_2, observables_noise = D, syms = (:a, :b))
+ensemble_sol = solve(EnsembleProblem(prob_ens), DirectIteration(), EnsembleThreads();
+    trajectories = 50)
+summ = EnsembleSummary(ensemble_sol)
+plot(summ)</code></pre><img src="0827f41b.svg" alt="Example block output"/><h2 id="Joint-Likelihood"><a class="docs-heading-anchor" href="#Joint-Likelihood">Joint Likelihood</a><a id="Joint-Likelihood-1"></a><a class="docs-heading-anchor-permalink" href="#Joint-Likelihood" title="Permalink"></a></h2><p>When both <code>noise</code> and <code>observables</code> are provided, the solver computes the joint log-likelihood conditioned on the noise realization. As with linear models, observables correspond to <span>$z_1, \ldots, z_T$</span>, so we pass <code>sol.z[2:end]</code>.</p><pre><code class="language-julia hljs">observables = sol.z[2:end]  # Vector{Vector}, length T
+noise = sol.W               # Vector{Vector}, length T
+
+prob_lik = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(observables));
+    C_0, C_1, C_2, observables_noise = D, observables, noise)
+sol_lik = solve(prob_lik)
+sol_lik.logpdf</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">57.285424467951074</code></pre><h2 id="Pruned-Quadratic-Models"><a class="docs-heading-anchor" href="#Pruned-Quadratic-Models">Pruned Quadratic Models</a><a id="Pruned-Quadratic-Models-1"></a><a class="docs-heading-anchor-permalink" href="#Pruned-Quadratic-Models" title="Permalink"></a></h2><p>The pruned formulation of Andreasen et al. (2017) prevents explosive dynamics in higher-order perturbation solutions. Instead of applying the quadratic term to the full state, it maintains a separate linear-part state <span>$u_f$</span> and applies the quadratic form to that:</p><p class="math-container">\[u_f^{n+1} = A_1 \, u_f^n + B \, w_{n+1}\]</p><p class="math-container">\[u_{n+1} = A_0 + A_1 \, u_n + (u_f^n)^\top A_2 \, u_f^n + B \, w_{n+1}\]</p><p>The <a href="../../basics/problem_types/#PrunedQuadraticStateSpaceProblem"><code>PrunedQuadraticStateSpaceProblem</code></a> takes the same arguments as the unpruned version:</p><pre><code class="language-julia hljs">Random.seed!(42)
+prob_pruned = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
+    C_0, C_1, C_2, observables_noise = D, syms = (:a, :b))
+sol_pruned = solve(prob_pruned)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
+Interpolation: Piecewise constant interpolation
+t: 0:1:30
+u: 31-element Vector{Vector{Float64}}:
+ [0.0, 0.0]
+ [-7.824904812740593e-5, 0.007883556016042917]
+ [0.048919930430745995, -0.007221874756335411]
+ [0.0017589864378015187, -0.010182309773363343]
+ [-0.06121425835630855, -0.009369011599021596]
+ [-0.11600689560416926, -0.008895754307381123]
+ [-0.16512369313247072, -0.002504969541934924]
+ [-0.17243443044707005, -0.009630227771786251]
+ [-0.22320180468519848, 0.0043901627568102754]
+ [-0.18491703215469107, 0.01526486530847619]
+ ⋮
+ [0.05830411781022135, 0.01193042589888877]
+ [0.12977002636611878, 0.0052839691241533]
+ [0.1560936562742395, -0.014251596803596712]
+ [0.06033299313394192, -0.0006663062536166405]
+ [0.05310506782710932, -0.006224420214619914]
+ [0.011879244006927931, 0.005244589569794043]
+ [0.04381319104050511, 0.014407612549804024]
+ [0.13156176216772178, -0.003777682906262093]
+ [0.1014920994933044, -0.01081151648500947]</code></pre><p>With the same noise, we can compare the pruned and unpruned trajectories:</p><pre><code class="language-julia hljs">Random.seed!(100)
+noise_compare = [randn(1) for _ in 1:T]
+
+sol_unpruned = solve(QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
+    C_0, C_1, C_2, noise = noise_compare))
+sol_pruned_compare = solve(PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
+    C_0, C_1, C_2, noise = noise_compare))
+
+plot(
+    plot([sol_unpruned.u[t][1] for t in eachindex(sol_unpruned.u)], label = &quot;unpruned&quot;,
+        title = &quot;State 1&quot;),
+    plot([sol_pruned_compare.u[t][1] for t in eachindex(sol_pruned_compare.u)],
+        label = &quot;pruned&quot;, title = &quot;State 1 (pruned)&quot;),
+    layout = (1, 2)
+)</code></pre><img src="920f7498.svg" alt="Example block output"/><p>The pruned joint likelihood works the same way:</p><pre><code class="language-julia hljs">obs_pruned = sol_pruned.z[2:end]
+noise_pruned = sol_pruned.W
+
+prob_pruned_lik = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0,
+    (0, length(obs_pruned));
+    C_0, C_1, C_2, observables_noise = D, observables = obs_pruned,
+    noise = noise_pruned)
+sol_pruned_lik = solve(prob_pruned_lik)
+sol_pruned_lik.logpdf</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">57.285424467951074</code></pre><h2 id="Differentiating-with-Enzyme"><a class="docs-heading-anchor" href="#Differentiating-with-Enzyme">Differentiating with Enzyme</a><a id="Differentiating-with-Enzyme-1"></a><a class="docs-heading-anchor-permalink" href="#Differentiating-with-Enzyme" title="Permalink"></a></h2><p>The joint likelihood for quadratic models can be differentiated with Enzyme.jl, using the workspace-based <code>init</code>/<code>solve!</code> pattern.</p><div class="admonition is-info" id="Enzyme.jl-required-c2a5b47eb7e320cc"><header class="admonition-header">Enzyme.jl required<a class="admonition-anchor" href="#Enzyme.jl-required-c2a5b47eb7e320cc" title="Permalink"></a></header><div class="admonition-body"><p>This example requires Enzyme.jl to be installed. The code is shown but not executed during documentation build due to Enzyme&#39;s compilation overhead.</p></div></div><pre><code class="language-julia hljs">using Enzyme
+
+function quad_joint_loglik(A_0, A_1, A_2, B, C_0, C_1, C_2, u0, noise, obs, D,
+        sol, cache)::Float64
+    prob = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(obs));
+        C_0, C_1, C_2, observables_noise = D, observables = obs, noise)
+    ws = StateSpaceWorkspace(prob, DirectIteration(), sol, cache)
+    return solve!(ws).logpdf
+end
+
+# Pre-allocate workspace
+prob0 = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(obs_pruned));
+    C_0, C_1, C_2, observables_noise = D, observables = obs_pruned, noise = noise_pruned)
+ws0 = init(prob0, DirectIteration())
+
+# Compute gradient with respect to A_1 (all arguments Duplicated)
+dA_1 = zero(A_1)
+Enzyme.autodiff(Reverse, quad_joint_loglik,
+    Duplicated(copy(A_0), zero(A_0)), Duplicated(copy(A_1), dA_1),
+    Duplicated(copy(A_2), zero(A_2)), Duplicated(copy(B), zero(B)),
+    Duplicated(copy(C_0), zero(C_0)), Duplicated(copy(C_1), zero(C_1)),
+    Duplicated(copy(C_2), zero(C_2)), Duplicated(copy(u0), zero(u0)),
+    Duplicated(deepcopy(noise_pruned), [zeros(size(B, 2)) for _ in noise_pruned]),
+    Duplicated(deepcopy(obs_pruned), [zeros(length(C_0)) for _ in obs_pruned]),
+    Duplicated(copy(D), zero(D)),
+    Duplicated(deepcopy(ws0.output), Enzyme.make_zero(deepcopy(ws0.output))),
+    Duplicated(deepcopy(ws0.cache), Enzyme.make_zero(deepcopy(ws0.cache))))
+dA_1  # gradient of logpdf with respect to A_1</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../conditional_likelihood/">« Conditional Likelihood</a><a class="docs-footer-nextpage" href="../generic_callbacks/">Generic Callbacks »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 31 March 2026 00:52">Tuesday 31 March 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
