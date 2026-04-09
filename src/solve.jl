@@ -1,6 +1,6 @@
-using DiffEqBase: DEAlgorithm, KeywordArgSilent
+using DiffEqBase: AbstractDEAlgorithm, KeywordArgSilent
 
-abstract type AbstractDifferenceEquationAlgorithm <: DEAlgorithm end
+abstract type AbstractDifferenceEquationAlgorithm <: AbstractDEAlgorithm end
 struct DirectIteration <: AbstractDifferenceEquationAlgorithm end
 struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 
