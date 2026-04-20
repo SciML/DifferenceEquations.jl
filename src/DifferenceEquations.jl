@@ -1,30 +1,35 @@
 module DifferenceEquations
 
-using ChainRulesCore: ChainRulesCore, NoTangent, Tangent, ZeroTangent
-using CommonSolve: CommonSolve, solve
+using CommonSolve: CommonSolve, solve, init, solve!
+using ConcreteStructs: @concrete
 using DiffEqBase: DiffEqBase, DEProblem, get_concrete_u0, get_concrete_p, isconcreteu0,
     promote_u0
-using Distributions: Distributions, Distribution, MvNormal, UnivariateDistribution,
-    ZeroMeanDiagNormal, logpdf
-using LinearAlgebra: LinearAlgebra, Cholesky, Diagonal, NoPivot, Symmetric, cholesky!,
-    dot, ldiv!, lmul!, mul!, rmul!, transpose!
-using PDMats: PDMats, PDMat
+using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
+    cholesky!, dot, ldiv!, mul!, transpose!
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
-    ODEFunction, remake, ConstantInterpolation, build_solution
-using UnPack: UnPack, @unpack
+    ODEFunction, remake, ConstantInterpolation, build_solution, ReturnCode
+using StaticArrays: StaticArrays, SVector, SMatrix, StaticMatrix, ismutable
+using SymbolicIndexingInterface: SymbolicIndexingInterface, SymbolCache, variable_index
 
+include("utilities_bangbang.jl")
 include("utilities.jl")
 include("problems/state_space_problems.jl")
+include("problems/quadratic_state_space_problems.jl")
 include("solutions/state_space_solutions.jl")
 include("solve.jl")
+include("caches.jl")
+include("workspace.jl")
 include("algorithms/linear.jl")
+include("algorithms/generic.jl")
 include("algorithms/quadratic.jl")
 include("precompilation.jl")
 
 # Exports
-export AbstractStateSpaceProblem, LinearStateSpaceProblem, QuadraticStateSpaceProblem
-export StateSpaceSolution, DirectIteration, KalmanFilter
+export AbstractStateSpaceProblem, LinearStateSpaceProblem, StateSpaceProblem
+export QuadraticStateSpaceProblem, PrunedQuadraticStateSpaceProblem
+export StateSpaceSolution, DirectIteration, KalmanFilter, ConditionalLikelihood
+export StateSpaceWorkspace
 
-export solve
+export solve, init, solve!, remake
 
 end # module

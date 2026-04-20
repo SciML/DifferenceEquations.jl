@@ -5,28 +5,38 @@ using Distributions
 using LinearAlgebra
 using Random
 
-const GROUP = get(ENV, "GROUP", "All")
-
 function activate_jet_env()
     Pkg.activate("jet")
     Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     return Pkg.instantiate()
 end
 
-if GROUP == "All" || GROUP == "Core"
-    # include("matrix_vector_of_vectors.jl") # may add later to support noise inputs as vector of vectors
-    include("qa.jl")
-    include("explicit_imports.jl")
-    include("kalman_likelihood.jl")
-    include("linear_likelihood.jl")
-    include("linear_gradients.jl")
-    include("linear_simulations.jl")
-    include("quadratic_likelihood.jl")
-    include("quadratic_simulations.jl")
-    include("sciml_interfaces.jl")
+include("qa.jl")
+include("explicit_imports.jl")
+include("linear_direct_iteration.jl")
+include("kalman.jl")
+include("direct_iteration.jl")
+include("quadratic_direct_iteration.jl")
+include("static_arrays.jl")
+include("cache_reuse.jl")
+include("sciml_interfaces.jl")
+include("sensitivity_interface.jl")
+include("linear_direct_iteration_forwarddiff.jl")
+include("kalman_forwarddiff.jl")
+include("conditional_likelihood.jl")
+include("conditional_likelihood_forwarddiff.jl")
+include("save_everystep.jl")
+
+if get(ENV, "CI", "false") != "true"
+    include("gradient_comparison.jl")
+    include("linear_direct_iteration_enzyme.jl")
+    include("quadratic_direct_iteration_enzyme.jl")
+    include("kalman_enzyme.jl")
+    include("conditional_likelihood_enzyme.jl")
 end
 
-if GROUP == "JET"
+
+if get(ENV, "GROUP", "") == "JET"
     activate_jet_env()
     include("jet/jet_tests.jl")
 end
