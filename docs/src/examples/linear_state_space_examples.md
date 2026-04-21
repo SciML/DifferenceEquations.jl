@@ -42,22 +42,22 @@ See the [SciML docs](https://diffeq.sciml.ai/latest/basics/plot/) for more optio
 plot(sol)
 ```
 
-By default, the solution provides an interface to access the simulated `u`.  That is, `sol.u[...] = sol[...]`,
+By default, the solution provides an interface to access the simulated `u` via `sol.u`,
 
 ```@example 1
-sol[2]
+sol.u[2]
 ```
 
 Or to get the first element of the last step
 
 ```@example 1
-sol[end][1] #first element of last step
+sol.u[end][1] #first element of last step
 ```
 
 Finally, to extract the full vector
 
 ```@example 1
-@show sol[2, :];  # whole second vector
+@show sol[:, 2];  # whole second vector
 ```
 
 The results for all of `sol.u` can be loaded in a dataframe, where the column names will be the (optionally) provided symbols.

@@ -1,4 +1,4 @@
-abstract type AbstractStateSpaceProblem <: DEProblem end
+abstract type AbstractStateSpaceProblem <: AbstractDEProblem end
 abstract type AbstractPerturbationProblem <: AbstractStateSpaceProblem end
 
 # TODO: Can add in more checks on the algorithm choice
