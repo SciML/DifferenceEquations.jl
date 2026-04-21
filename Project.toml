@@ -1,6 +1,6 @@
 name = "DifferenceEquations"
 uuid = "e0ca9c66-1f9e-11ec-127a-1304ce62169c"
-version = "1.1.0"
+version = "1.0.0"
 authors = ["various contributors"]
 
 [deps]
