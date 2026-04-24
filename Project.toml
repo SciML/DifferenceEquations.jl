@@ -18,7 +18,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [compat]
 ChainRulesCore = "1.24"
 CommonSolve = "0.2"
-DiffEqBase = "6.145"
+DiffEqBase = "6.145, 7.0"
 Distributions = "0.25"
 LinearAlgebra = "1"
 PDMats = "0.11"
