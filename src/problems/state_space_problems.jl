@@ -57,7 +57,7 @@ struct LinearStateSpaceProblem{
             syms = nothing,
             f = ODEFunction{false}(
                 (u, p, t) -> error("not implemented");
-                syms = syms
+                sys = syms === nothing ? nothing : SymbolCache(collect(syms))
             ),
             kwargs...
         ) where {iip}
@@ -131,7 +131,7 @@ struct QuadraticStateSpaceProblem{
             syms = nothing,
             f = ODEFunction{false}(
                 (u, p, t) -> error("not implemented");
-                syms = syms
+                sys = syms === nothing ? nothing : SymbolCache(collect(syms))
             ),
             kwargs...
         ) where {iip}

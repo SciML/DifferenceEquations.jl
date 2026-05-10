@@ -11,6 +11,7 @@ using LinearAlgebra: LinearAlgebra, Cholesky, Diagonal, NoPivot, Symmetric, chol
 using PDMats: PDMats, PDMat
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractRODESolution,
     ODEFunction, remake, ConstantInterpolation, build_solution
+using SymbolicIndexingInterface: SymbolCache
 using UnPack: UnPack, @unpack
 
 include("utilities.jl")
