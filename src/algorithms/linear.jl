@@ -52,7 +52,7 @@ function DiffEqBase.__solve(
     )
 end
 
-# Ideally hook into existing sensitity dispatching
+# Ideally hook into existing sensitivity dispatching
 # Trouble with Zygote.  The problem isn't the _concrete_solve_adjoint but rather something in the
 # adjoint of the basic solve and `solve_up`.  Probably promotion on the prob
 

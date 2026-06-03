@@ -121,7 +121,7 @@ end
 maybe_add_Δ_slice!(Δz, Δsol_A, t) = nothing
 
 # Don't add logpdf to observables unless provided
-# TODO: check if this can be repalced with the following and if it has a performance regression for diagonal noise covariance
+# TODO: check if this can be replaced with the following and if it has a performance regression for diagonal noise covariance
 # ldiv!(Δz, observables_noise.Σ.chol, innovation[t])
 # rmul!(Δlogpdf, Δz)
 Base.@propagate_inbounds @inline function maybe_add_Δ_logpdf!(
