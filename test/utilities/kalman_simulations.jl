@@ -1,7 +1,5 @@
-using ChainRulesTestUtils, DifferenceEquations, Distributions, LinearAlgebra, Test, Zygote
+using DifferenceEquations, Distributions, LinearAlgebra
 using DelimitedFiles
-using DiffEqBase
-using FiniteDiff: finite_difference_gradient
 
 A_kalman = [
     0.0495388 0.0109918 0.0960529 0.0767147 0.0404643;

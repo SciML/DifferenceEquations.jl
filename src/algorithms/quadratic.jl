@@ -1,206 +1,115 @@
-# This should be ported over to use the "maybe" utilities of the linear model, which will expand the number of model variations that are available.
-function DiffEqBase.__solve(
-        prob::QuadraticStateSpaceProblem{
-            uType, uPriorMeanType,
-            uPriorVarType,
-            tType, P, NP, F, A0Type,
-            A1Type, A2Type, BType, C0Type,
-            C1Type,
-            C2Type, RType, ObsType, K,
-        },
-        alg::DirectIteration, args...;
-        kwargs...
-    ) where {
-        uType, uPriorMeanType, uPriorVarType, tType,
-        P, NP, F,
-        A0Type, A1Type, A2Type,
-        BType, C0Type, C1Type, C2Type, RType, ObsType,
-        K,
-    }
-    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
-    observables_noise = make_observables_noise(prob.observables_noise)
-    # checks on bounds
-    @assert size(noise, 1) == size(prob.B, 2)
-    @assert size(noise, 2) == T - 1
-    @assert maybe_check_size(prob.observables, 2, T - 1)
+# Quadratic state-space model dispatches for DirectIteration solver
+# Two variants: unpruned (quad on x) and pruned (quad on linear-part u_f)
+# Both plug into the generic _solve_direct_iteration! loop via these methods.
 
-    @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
+# --- Noise matrix extraction ---
+_noise_matrix(prob::AnyQuadraticProblem) = prob.B
 
-    # These should be be the native datastructure and replace A_2 and C_2
-    # See https://github.com/SciML/DifferenceEquations.jl/issues/54
-    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)]
-    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)]
+# --- Model initialization ---
+_init_model_state!!(::QuadraticStateSpaceProblem, cache) = nothing
 
-    u_f = [zero(prob.u0) for _ in 1:T]
-    u = [zero(prob.u0) for _ in 1:T]
-    z = [zero(C_0) for _ in 1:T]
-
-    u[1] .= prob.u0
-    u_f[1] .= prob.u0
-    z[1] .= C_0
-    mul!(z[1], C_1, prob.u0, 1, 1)
-    quad_muladd!(z[1], C_2_vec, prob.u0) #z0 .+= quad(C_2, prob.u0)
-
-    loglik = 0.0
-    @inbounds @views for t in 2:T
-        mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, view(noise, :, t - 1), 1, 1)
-
-        u[t] .= A_0
-        mul!(u[t], A_1, u[t - 1], 1, 1)
-        quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
-
-        z[t] .= C_0
-        mul!(z[t], C_1, u[t], 1, 1)
-        quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += maybe_logpdf(observables_noise, prob.observables, t - 1, z, t)
-    end
-
-    maybe_add_observation_noise!(z, observables_noise, prob.observables)
-    t_values = prob.tspan[1]:prob.tspan[2]
-    return build_solution(
-        prob, alg, t_values, u; W = noise,
-        logpdf = ObsType <: Nothing ? nothing : loglik, z,
-        retcode = :Success
-    )
+function _init_model_state!!(prob::PrunedQuadraticStateSpaceProblem, cache)
+    cache.u_f[1] = assign!!(cache.u_f[1], prob.u0)
+    return nothing
 end
 
-# Note: this repeats the primal calculation because so many of the internal buffers are useful for the rrule.  Refactoring could enable directly shared buffers.
-function ChainRulesCore.rrule(
-        ::typeof(solve), prob::QuadraticStateSpaceProblem,
-        alg::DirectIteration, args...; kwargs...
-    )
-    T = convert(Int64, prob.tspan[2] - prob.tspan[1] + 1)
-    noise = get_concrete_noise(prob, prob.noise, prob.B, T - 1)  # concrete noise for simulations as required.
-    @assert !isnothing(prob.noise)  # need to have concrete noise for this simple method
-    # checks on bounds
-    observables_noise = make_observables_noise(prob.observables_noise)
-    @assert observables_noise isa ZeroMeanDiagNormal  # can extend to more general in rrule
+# --- Observation flag (shared with linear, already defined) ---
+# _has_observations(sol) = !isnothing(sol.z)  # defined in linear.jl
 
-    @assert size(noise, 1) == size(prob.B, 2)
-    @assert maybe_check_size(prob.observables, 2, T - 1)
-    @assert size(noise, 2) == T - 1
-
-    @unpack A_0, A_1, A_2, B, C_0, C_1, C_2 = prob
-
-    # These should be be the native datastructure and replace A_2 and C_2
-    # See https://github.com/SciML/DifferenceEquations.jl/issues/54
-    C_2_vec = [C_2[i, :, :] for i in 1:size(C_2, 1)]
-    A_2_vec = [A_2[i, :, :] for i in 1:size(A_2, 1)]
-
-    u_f = [zero(prob.u0) for _ in 1:T]
-    u = [zero(prob.u0) for _ in 1:T]
-    z = [zero(C_0) for _ in 1:T]
-
-    u[1] .= prob.u0
-    u_f[1] .= prob.u0
-    z[1] .= C_0
-    mul!(z[1], C_1, prob.u0, 1, 1)
-    quad_muladd!(z[1], C_2_vec, prob.u0) #z0 .+= quad(C_2, prob.u0)
-
-    loglik = 0.0
-    @inbounds @views for t in 2:T
-        mul!(u_f[t], A_1, u_f[t - 1])
-        mul!(u_f[t], B, view(noise, :, t - 1), 1, 1)
-
-        u[t] .= A_0
-        mul!(u[t], A_1, u[t - 1], 1, 1)
-        quad_muladd!(u[t], A_2_vec, u_f[t - 1]) # u[t] .+= quad(A_2, u_f[t - 1])
-        mul!(u[t], B, view(noise, :, t - 1), 1, 1)
-
-        z[t] .= C_0
-        mul!(z[t], C_1, u[t], 1, 1)
-        quad_muladd!(z[t], C_2_vec, u_f[t]) # z[t] .+= quad(C_2, u_f[t])
-        loglik += logpdf(observables_noise, view(prob.observables, :, t - 1) - z[t])
+# --- Quadratic form helper ---
+# Computes q[i] = v' * A_2[i, :, :] * v for each output dimension
+@inline function _add_quadratic!!(y, A_2, v)
+    if ismutable(y)
+        @inbounds for i in 1:length(y)
+            y[i] += dot(v, view(A_2, i, :, :), v)
+        end
+        return y
+    else
+        n = length(y)
+        return y + typeof(y)(ntuple(i -> dot(v, view(A_2, i, :, :), v), n))
     end
-    t_values = prob.tspan[1]:prob.tspan[2]
-    maybe_add_observation_noise!(z, observables_noise, prob.observables)
-    sol = build_solution(
-        prob, alg, t_values, u; W = noise, logpdf = loglik, z,
-        retcode = :Success
+end
+
+# =============================================================================
+# Unpruned quadratic: quad(A_2, x)
+# =============================================================================
+
+@inline function _transition!!(x_next, x, w, prob::QuadraticStateSpaceProblem, cache, t)
+    (; A_0, A_1, A_2, B) = prob
+    x_next = copyto!!(x_next, A_0)
+    x_next = mul!!(x_next, A_1, x, 1.0, 1.0)
+    x_next = _add_quadratic!!(x_next, A_2, x)
+    x_next = muladd!!(x_next, B, w)
+    return x_next
+end
+
+@inline function _observation!!(y, x, prob::QuadraticStateSpaceProblem, cache, t)
+    (; C_0, C_1, C_2) = prob
+    y = copyto!!(y, C_0)
+    y = mul!!(y, C_1, x, 1.0, 1.0)
+    y = _add_quadratic!!(y, C_2, x)
+    return y
+end
+
+# =============================================================================
+# Pruned quadratic: quad(A_2, u_f) where u_f tracks the linear-part state
+# =============================================================================
+
+@inline function _transition!!(x_next, x, w, prob::PrunedQuadraticStateSpaceProblem, cache, t)
+    (; A_0, A_1, A_2, B) = prob
+    u_f_prev = cache.u_f[t - 1]
+    # Advance u_f: u_f[t] = A_1 * u_f[t-1] + B * w
+    u_f_new = mul!!(cache.u_f[t], A_1, u_f_prev)
+    u_f_new = muladd!!(u_f_new, B, w)
+    cache.u_f[t] = u_f_new
+    # Full transition: x_next = A_0 + A_1*x + quad(A_2, u_f_prev) + B*w
+    x_next = copyto!!(x_next, A_0)
+    x_next = mul!!(x_next, A_1, x, 1.0, 1.0)
+    x_next = _add_quadratic!!(x_next, A_2, u_f_prev)
+    x_next = muladd!!(x_next, B, w)
+    return x_next
+end
+
+@inline function _observation!!(y, x, prob::PrunedQuadraticStateSpaceProblem, cache, t)
+    (; C_0, C_1, C_2) = prob
+    u_f = cache.u_f[t]
+    y = copyto!!(y, C_0)
+    y = mul!!(y, C_1, x, 1.0, 1.0)
+    y = _add_quadratic!!(y, C_2, u_f)
+    return y
+end
+
+# --- Pruned quadratic: save_everystep=false overloads (ping-pong u_f) ---
+
+function _init_model_state!!(prob::PrunedQuadraticStateSpaceProblem, cache, ::Val{false})
+    cache.u_f[1] = assign!!(cache.u_f[1], prob.u0)
+    return nothing
+end
+
+@inline function _transition!!(
+        x_next, x, w, prob::PrunedQuadraticStateSpaceProblem, cache, t, ::Val{false}
     )
+    (; A_0, A_1, A_2, B) = prob
+    uf_prev_idx = _u_idx_pingpong(t - 1)
+    uf_curr_idx = _u_idx_pingpong(t)
+    u_f_prev = cache.u_f[uf_prev_idx]
+    u_f_new = mul!!(cache.u_f[uf_curr_idx], A_1, u_f_prev)
+    u_f_new = muladd!!(u_f_new, B, w)
+    cache.u_f[uf_curr_idx] = u_f_new
+    x_next = copyto!!(x_next, A_0)
+    x_next = mul!!(x_next, A_1, x, 1.0, 1.0)
+    x_next = _add_quadratic!!(x_next, A_2, u_f_prev)
+    x_next = muladd!!(x_next, B, w)
+    return x_next
+end
 
-    function solve_pb(Δsol)
-        # Currently only changes in the logpdf are supported in the rrule
-        @assert Δsol.u == ZeroTangent()
-        @assert Δsol.W == ZeroTangent()
-
-        Δlogpdf = Δsol.logpdf
-        if iszero(Δlogpdf)
-            return (
-                NoTangent(), Tangent{typeof(prob)}(), NoTangent(),
-                map(_ -> NoTangent(), args)...,
-            )
-        end
-        ΔA_0 = zero(A_0)
-        ΔA_1 = zero(A_1)
-        ΔA_2_vec = [zero(A) for A in A_2_vec] # should be native datastructure
-        ΔA_2 = zero(A_2)
-
-        ΔB = zero(B)
-        ΔC_0 = zero(C_0)
-        ΔC_1 = zero(C_1)
-        ΔC_2_vec = [zero(A) for A in C_2_vec] # should be native datastructure
-        ΔC_2 = zero(C_2)
-        Δu_f_sum = zero(u[1])
-
-        Δnoise = similar(noise)
-        Δu = [zero(prob.u0) for _ in 1:T]
-        Δu_f = [zero(prob.u0) for _ in 1:T]
-        A_2_vec_sum = [(A + A') for A in A_2_vec] # prep the sum since we will use it repeatedly
-        C_2_vec_sum = [(A + A') for A in C_2_vec] # prep the sum since we will use it repeatedly
-
-        # Assert checked above about being diagonal
-        observables_noise_cov = prob.observables_noise
-
-        @views @inbounds for t in T:-1:2
-            Δz = Δlogpdf * (view(prob.observables, :, t - 1) - z[t]) ./
-                observables_noise_cov # More generally, it should be Σ^-1 * (z_obs - z)
-
-            # inplace adoint of quadratic form with accumulation
-            quad_muladd_pb!(ΔC_2_vec, Δu_f[t], Δz, C_2_vec_sum, u_f[t])
-            mul!(Δu[t], C_1', Δz, 1, 1)
-
-            quad_muladd_pb!(ΔA_2_vec, Δu_f[t - 1], Δu[t], A_2_vec_sum, u_f[t - 1])
-            mul!(Δu[t - 1], A_1', Δu[t])
-            mul!(Δu_f[t - 1], A_1', Δu_f[t], 1, 1)
-
-            # Δu_f_sum = Δu[t] .+ Δu_f[t]
-            copy!(Δu_f_sum, Δu[t])
-            Δu_f_sum .+= Δu_f[t]
-
-            mul!(view(Δnoise, :, t - 1), B', Δu_f_sum)
-            # Now, deal with the coefficients
-            ΔA_0 += Δu[t]
-            mul!(ΔA_1, Δu[t], u[t - 1]', 1, 1)
-            mul!(ΔA_1, Δu_f[t], u_f[t - 1]', 1, 1)
-            mul!(ΔB, Δu_f_sum, view(noise, :, t - 1)', 1, 1)
-            ΔC_0 += Δz
-            mul!(ΔC_1, Δz, u[t]', 1, 1)
-        end
-
-        # Remove once the vector of matrices or column-major organized 3-tensor is the native datastructure for C_2/A_2
-        @views @inbounds for (i, ΔA_2_slice) in enumerate(ΔA_2_vec)
-            ΔA_2[i, :, :] .= ΔA_2_slice
-        end
-        @views @inbounds for (i, ΔC_2_slice) in enumerate(ΔC_2_vec)
-            ΔC_2[i, :, :] .= ΔC_2_slice
-        end
-
-        return (
-            NoTangent(),
-            Tangent{typeof(prob)}(;
-                A_0 = ΔA_0, A_1 = ΔA_1, A_2 = ΔA_2, B = ΔB,
-                C_0 = ΔC_0,
-                C_1 = ΔC_1, C_2 = ΔC_2, u0 = Δu[1] + Δu_f[1],
-                noise = Δnoise,
-                observables = NoTangent(), # not implemented
-                observables_noise = NoTangent()
-            ), NoTangent(),
-            map(_ -> NoTangent(), args)...,
-        )
-    end
-    return sol, solve_pb
+@inline function _observation!!(
+        y, x, prob::PrunedQuadraticStateSpaceProblem, cache, t, ::Val{false}
+    )
+    (; C_0, C_1, C_2) = prob
+    u_f = cache.u_f[_u_idx_pingpong(t)]
+    y = copyto!!(y, C_0)
+    y = mul!!(y, C_1, x, 1.0, 1.0)
+    y = _add_quadratic!!(y, C_2, u_f)
+    return y
 end

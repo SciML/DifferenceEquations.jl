@@ -5,3 +5,4 @@ Manifest.toml
 /benchmark/*.json
 LocalPreferences.toml
 docs/build
+benchmark/results.json
