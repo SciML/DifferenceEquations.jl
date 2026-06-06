@@ -1,4 +1,4 @@
-using DiffEqBase: AbstractDEAlgorithm, KeywordArgSilent
+using DiffEqBase: DEAlgorithm, KeywordArgSilent
 
 abstract type AbstractDifferenceEquationAlgorithm <: DEAlgorithm end
 
