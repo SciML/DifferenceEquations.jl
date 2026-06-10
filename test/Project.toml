@@ -21,7 +21,7 @@ DifferenceEquations = {path = ".."}
 [compat]
 DataFrames = "1.8.2"
 DelimitedFiles = "1.9.1"
-DiffEqBase = "7.5.5"
+DiffEqBase = "6.210.1"
 DifferenceEquations = "1.0.0"
 Distributions = "0.25.126"
 Enzyme = "0.13"

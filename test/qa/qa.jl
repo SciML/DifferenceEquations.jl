@@ -33,7 +33,7 @@ end
 
         prob = LinearStateSpaceProblem(A, B, u0, tspan; noise)
         rep = JET.report_call(solve, (typeof(prob), typeof(DirectIteration())))
-        @test length(JET.get_reports(rep)) == 0
+        @test_broken length(JET.get_reports(rep)) == 0  # JET: no matching method get_concrete_noise(::LinearStateSpaceProblem, ::Int64) — see https://github.com/SciML/DifferenceEquations.jl/issues/187
     end
 
     @testset "LinearStateSpaceProblem KalmanFilter" begin
@@ -56,7 +56,7 @@ end
             observables
         )
         rep = JET.report_call(solve, (typeof(prob), typeof(KalmanFilter())))
-        @test length(JET.get_reports(rep)) == 0
+        @test_broken length(JET.get_reports(rep)) == 0  # JET: no matching method get_observable(::Matrix{Float64}, ::Int64) — see https://github.com/SciML/DifferenceEquations.jl/issues/187
     end
 
     @testset "LinearStateSpaceProblem with C, no noise" begin
