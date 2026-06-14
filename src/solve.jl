@@ -1,6 +1,7 @@
-using DiffEqBase: DEAlgorithm, KeywordArgSilent
+using DiffEqBase: KeywordArgSilent
+using SciMLBase: AbstractDEAlgorithm
 
-abstract type AbstractDifferenceEquationAlgorithm <: DEAlgorithm end
+abstract type AbstractDifferenceEquationAlgorithm <: AbstractDEAlgorithm end
 
 """
     DirectIteration()
