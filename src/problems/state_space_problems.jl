@@ -1,12 +1,12 @@
 """
-    AbstractStateSpaceProblem <: DEProblem
+    AbstractStateSpaceProblem <: AbstractDEProblem
 
 Abstract supertype for all discrete-time state-space problems in DifferenceEquations.jl.
 
 Subtypes include [`LinearStateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
 [`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref).
 """
-abstract type AbstractStateSpaceProblem <: DEProblem end
+abstract type AbstractStateSpaceProblem <: AbstractDEProblem end
 
 # TODO: Can add in more checks on the algorithm choice
 DiffEqBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothing
