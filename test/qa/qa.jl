@@ -1,27 +1,72 @@
-using DifferenceEquations
-using Aqua
-using ExplicitImports
+using SciMLTesting, DifferenceEquations, Test
 using JET
 using LinearAlgebra
-using Distributions
-using Test
 
-@testset "Aqua" begin
-    Aqua.find_persistent_tasks_deps(DifferenceEquations)
-    Aqua.test_ambiguities(DifferenceEquations, recursive = false)
-    Aqua.test_deps_compat(DifferenceEquations)
-    Aqua.test_piracies(DifferenceEquations)
-    Aqua.test_project_extras(DifferenceEquations)
-    Aqua.test_stale_deps(DifferenceEquations)
-    Aqua.test_unbound_args(DifferenceEquations)
-    Aqua.test_undefined_exports(DifferenceEquations)
-end
+run_qa(
+    DifferenceEquations;
+    JET = nothing,            # JET is run below as bespoke report_call cases (issue #187), not package-wide
+    explicit_imports = true,
+    ei_kwargs = (;
+        # Names re-exported by a dependency rather than imported from their owner.
+        all_explicit_imports_via_owners = (;
+            ignore = (
+                :KeywordArgSilent,   # SciMLBase (imported from DiffEqBase)
+                :get_concrete_p,     # SciMLBase (imported from DiffEqBase)
+                :get_concrete_u0,    # SciMLBase (imported from DiffEqBase)
+                :isconcreteu0,       # SciMLBase (imported from DiffEqBase)
+                :promote_u0,         # SciMLBase (imported from DiffEqBase)
+                :ismutable,          # Base (imported from StaticArrays)
+            ),
+        ),
+        all_qualified_accesses_via_owners = (;
+            ignore = (
+                :__solve,            # SciMLBase (accessed via DiffEqBase)
+            ),
+        ),
+        # Non-public names of dependency packages (go public as those base libs release).
+        all_qualified_accesses_are_public = (;
+            ignore = (
+                :var"@propagate_inbounds",  # Base
+                :Default,                    # SciMLBase.ReturnCode
+                :Success,                    # SciMLBase.ReturnCode
+                :T,                          # SciMLBase.ReturnCode
+                :__solve,                    # DiffEqBase
+                :build_solution,             # SciMLBase
+                :check_prob_alg_pairing,     # DiffEqBase
+                :get_concrete_problem,       # DiffEqBase
+                :getindepsym,                # SciMLBase
+                :getindepsym_defaultt,       # SciMLBase
+                :init,                       # CommonSolve
+                :solve,                      # CommonSolve
+                :solve!,                     # CommonSolve
+            ),
+        ),
+        all_explicit_imports_are_public = (;
+            ignore = (
+                :var"@add_kwonly",       # SciMLBase
+                :AbstractDEAlgorithm,    # SciMLBase
+                :AbstractDEProblem,      # SciMLBase
+                :AbstractRODESolution,   # SciMLBase
+                :ConstantInterpolation,  # SciMLBase
+                :KeywordArgSilent,       # DiffEqBase
+                :NullParameters,         # SciMLBase
+                :build_solution,         # SciMLBase
+                :get_concrete_p,         # DiffEqBase
+                :get_concrete_u0,        # DiffEqBase
+                :init,                   # CommonSolve
+                :isconcreteu0,           # DiffEqBase
+                :ismutable,              # StaticArrays
+                :promote_tspan,          # SciMLBase
+                :promote_u0,             # DiffEqBase
+                :solve,                  # CommonSolve
+                :solve!,                 # CommonSolve
+            ),
+        ),
+    ),
+)
 
-@testset "ExplicitImports" begin
-    @test check_no_implicit_imports(DifferenceEquations) === nothing
-    @test check_no_stale_explicit_imports(DifferenceEquations) === nothing
-end
-
+# JET cases tied to issue #187 are bespoke `report_call`s on specific solve paths:
+# `report_package` (the run_qa JET path) does not surface them, so they stay here.
 @testset "JET static analysis" begin
     @testset "LinearStateSpaceProblem DirectIteration" begin
         A = [0.9 0.1; 0.0 0.95]
