@@ -36,15 +36,12 @@ run_qa(
         all_explicit_imports_are_public = (;
             ignore = (
                 :var"@add_kwonly",       # SciMLBase
-                :AbstractDEProblem,      # SciMLBase
-                :AbstractRODESolution,   # SciMLBase
                 :ConstantInterpolation,  # SciMLBase
                 :KeywordArgSilent,       # DiffEqBase
                 :get_concrete_p,         # DiffEqBase
                 :get_concrete_u0,        # DiffEqBase
                 :isconcreteu0,           # DiffEqBase
                 :ismutable,              # StaticArrays
-                :promote_tspan,          # SciMLBase
                 :promote_u0,             # DiffEqBase
             ),
         ),
