@@ -148,7 +148,7 @@ function _solve_direct_iteration!(
             ν_solved = cache.innovation_solved[t - 1]
             ν_solved = ldiv!!(ν_solved, F_obs, ν)
             cache.innovation_solved[t - 1] = ν_solved
-            quad = dot(ν, ν_solved)
+            quad = dot_no_blas(ν, ν_solved)
             loglik -= 0.5 * (log_const + quad)
         end
     end
@@ -248,7 +248,7 @@ function _solve_direct_iteration_endpoints!(
             ν_solved = cache.innovation_solved[1]
             ν_solved = ldiv!!(ν_solved, F_obs, ν)
             cache.innovation_solved[1] = ν_solved
-            quad = dot(ν, ν_solved)
+            quad = dot_no_blas(ν, ν_solved)
             loglik -= 0.5 * (log_const + quad)
         end
     end
@@ -383,7 +383,7 @@ function _solve_conditional_likelihood!(
         ν_solved = cache.innovation_solved[t - 1]
         ν_solved = ldiv!!(ν_solved, F_obs, ν)
         cache.innovation_solved[t - 1] = ν_solved
-        quad = dot(ν, ν_solved)
+        quad = dot_no_blas(ν, ν_solved)
         loglik -= 0.5 * (log_const + quad)
 
         # CLAMP: set state to observation for next step
@@ -473,7 +473,7 @@ function _solve_conditional_likelihood_endpoints!(
         ν_solved = cache.innovation_solved[1]
         ν_solved = ldiv!!(ν_solved, F_obs, ν)
         cache.innovation_solved[1] = ν_solved
-        quad = dot(ν, ν_solved)
+        quad = dot_no_blas(ν, ν_solved)
         loglik -= 0.5 * (log_const + quad)
 
         # CLAMP
@@ -639,7 +639,7 @@ function _solve!(
         cache.innovation[t] = ν
         cache.innovation_solved[t] = ν_solved
         logdetS = logdet_chol(F)
-        quad = dot(ν_solved, ν)
+        quad = dot_no_blas(ν_solved, ν)
         loglik -= 0.5 * (log_const_kf + logdetS + quad)
     end
 
@@ -774,7 +774,7 @@ function _solve_kalman_endpoints!(
         cache.innovation[1] = ν
         cache.innovation_solved[1] = ν_solved
         logdetS = logdet_chol(F)
-        quad = dot(ν_solved, ν)
+        quad = dot_no_blas(ν_solved, ν)
         loglik -= 0.5 * (log_const_kf + logdetS + quad)
     end
 

@@ -5,7 +5,7 @@
     mul!!(Y, A, B)
 
 Computes `Y = A * B`.
-- If `Y` is mutable (e.g., Vector), it mutates `Y` in-place using `mul!`.
+- If `Y` is mutable (e.g., Vector), it mutates `Y` in-place.
 - If `Y` is immutable (e.g., SVector), it returns a new result.
 """
 @inline function mul!!(Y, A, B)
@@ -17,11 +17,20 @@ Computes `Y = A * B`.
     end
 end
 
+@inline function mul!!(Y::AbstractVector, A::AbstractMatrix, B::AbstractVector)
+    if ismutable(Y)
+        matvec_no_blas!(Y, A, B)
+        return Y
+    else
+        return A * B
+    end
+end
+
 """
     mul!!(Y, A, B, α, β)
 
 Computes `Y = α * A * B + β * Y` (5-argument form).
-- If `Y` is mutable, it mutates `Y` in-place using `mul!(Y, A, B, α, β)`.
+- If `Y` is mutable, it mutates `Y` in-place.
 - If `Y` is immutable, it returns `α * (A * B) + β * Y`.
 """
 @inline function mul!!(Y, A, B, α, β)
@@ -33,11 +42,20 @@ Computes `Y = α * A * B + β * Y` (5-argument form).
     end
 end
 
+@inline function mul!!(Y::AbstractVector, A::AbstractMatrix, B::AbstractVector, α, β)
+    if ismutable(Y)
+        matvec_no_blas!(Y, A, B, α, β)
+        return Y
+    else
+        return α * (A * B) + β * Y
+    end
+end
+
 """
     muladd!!(Y, A, B)
 
 Computes `Y = Y + A * B`.
-- If `Y` is mutable (e.g., Vector), it mutates `Y` in-place using `mul!`.
+- If `Y` is mutable (e.g., Vector), it mutates `Y` in-place.
 - If `Y` is immutable (e.g., SVector), it returns a new generic result.
 - If `A` or `B` is `nothing`, returns `Y` unchanged (no-op).
 """
@@ -50,10 +68,61 @@ Computes `Y = Y + A * B`.
     end
 end
 
+@inline function muladd!!(Y::AbstractVector, A::AbstractMatrix, B::AbstractVector)
+    if ismutable(Y)
+        T = promote_type(eltype(Y), eltype(A), eltype(B))
+        matvec_no_blas!(Y, A, B, one(T), one(T))
+        return Y
+    else
+        return Y + A * B
+    end
+end
+
 # Specializations for nothing arguments (no-op)
 @inline muladd!!(Y, ::Nothing, B) = Y
 @inline muladd!!(Y, A, ::Nothing) = Y
 @inline muladd!!(Y, ::Nothing, ::Nothing) = Y
+
+@inline function matvec_no_blas!(Y, A, B)
+    @boundscheck begin
+        size(Y, 1) == size(A, 1) && size(A, 2) == size(B, 1) ||
+            throw(DimensionMismatch("matrix-vector dimensions must match"))
+    end
+    @inbounds for i in axes(A, 1)
+        acc = zero(promote_type(eltype(A), eltype(B)))
+        for j in axes(A, 2)
+            acc += A[i, j] * B[j]
+        end
+        Y[i] = acc
+    end
+    return Y
+end
+
+@inline function matvec_no_blas!(Y, A, B, α, β)
+    @boundscheck begin
+        size(Y, 1) == size(A, 1) && size(A, 2) == size(B, 1) ||
+            throw(DimensionMismatch("matrix-vector dimensions must match"))
+    end
+    @inbounds for i in axes(A, 1)
+        acc = zero(promote_type(eltype(A), eltype(B)))
+        for j in axes(A, 2)
+            acc += A[i, j] * B[j]
+        end
+        Y[i] = α * acc + β * Y[i]
+    end
+    return Y
+end
+
+@inline function dot_no_blas(x::AbstractVector, y::AbstractVector)
+    @boundscheck begin
+        size(x, 1) == size(y, 1) || throw(DimensionMismatch("vector dimensions must match"))
+    end
+    acc = zero(promote_type(eltype(x), eltype(y)))
+    @inbounds for i in eachindex(x, y)
+        acc += conj(x[i]) * y[i]
+    end
+    return acc
+end
 
 """
     ldiv!!(y, F, x)
@@ -71,6 +140,24 @@ Computes `y = F \\ x` (linear solve with factorization F).
     end
 end
 
+@inline function ldiv!!(y::AbstractVector, F::LinearAlgebra.Cholesky, x::AbstractVector)
+    if ismutable(y)
+        cholesky_solve_no_blas!(y, F, x)
+        return y
+    else
+        return F \ x
+    end
+end
+
+@inline function ldiv!!(Y::AbstractMatrix, F::LinearAlgebra.Cholesky, X::AbstractMatrix)
+    if ismutable(Y)
+        cholesky_solve_no_blas!(Y, F, X)
+        return Y
+    else
+        return F \ X
+    end
+end
+
 """
     ldiv!!(F, x)
 
@@ -84,6 +171,24 @@ Computes `x = F \\ x` in-place (2-argument form).
         return x
     else
         return F \ x
+    end
+end
+
+@inline function ldiv!!(F::LinearAlgebra.Cholesky, x::AbstractVector)
+    if ismutable(x)
+        cholesky_solve_no_blas!(x, F, x)
+        return x
+    else
+        return F \ x
+    end
+end
+
+@inline function ldiv!!(F::LinearAlgebra.Cholesky, X::AbstractMatrix)
+    if ismutable(X)
+        cholesky_solve_no_blas!(X, F, X)
+        return X
+    else
+        return F \ X
     end
 end
 
@@ -125,15 +230,130 @@ end
     cholesky!!(A, uplo::Symbol=:U)
 
 Computes Cholesky factorization of symmetric matrix A.
-- If `A` is mutable, uses `cholesky!(Symmetric(A, uplo), NoPivot(); check=false)`.
+- If `A` is mutable, factors `A` in-place and returns a `Cholesky` factorization.
 - If `A` is immutable, uses `cholesky(Symmetric(A, uplo))`.
 """
 @inline function cholesky!!(A, uplo::Symbol = :U)
     if ismutable(A)
-        return cholesky!(Symmetric(A, uplo), NoPivot(); check = false)
+        cholesky_no_lapack!(A, uplo)
+        return LinearAlgebra.Cholesky(A, uplo, 0)
     else
         return cholesky(Symmetric(A, uplo))
     end
+end
+
+@inline function cholesky_no_lapack!(A, uplo::Symbol)
+    @boundscheck begin
+        size(A, 1) == size(A, 2) || throw(DimensionMismatch("matrix must be square"))
+    end
+    if uplo === :U
+        return cholesky_upper_no_lapack!(A)
+    elseif uplo === :L
+        return cholesky_lower_no_lapack!(A)
+    else
+        throw(ArgumentError("uplo must be :U or :L"))
+    end
+end
+
+@inline function cholesky_upper_no_lapack!(A)
+    n = size(A, 1)
+    @inbounds for j in 1:n
+        for k in 1:(j - 1)
+            acc = A[k, j]
+            for i in 1:(k - 1)
+                acc -= A[i, k] * A[i, j]
+            end
+            A[k, j] = acc / A[k, k]
+        end
+        diag = A[j, j]
+        for i in 1:(j - 1)
+            diag -= A[i, j] * A[i, j]
+        end
+        real(diag) > 0 || throw(LinearAlgebra.PosDefException(j))
+        A[j, j] = sqrt(diag)
+    end
+    @inbounds for j in 1:n
+        for i in (j + 1):n
+            A[i, j] = zero(eltype(A))
+        end
+    end
+    return A
+end
+
+@inline function cholesky_lower_no_lapack!(A)
+    n = size(A, 1)
+    @inbounds for j in 1:n
+        for k in 1:(j - 1)
+            acc = A[j, k]
+            for i in 1:(k - 1)
+                acc -= A[k, i] * A[j, i]
+            end
+            A[j, k] = acc / A[k, k]
+        end
+        diag = A[j, j]
+        for i in 1:(j - 1)
+            diag -= A[j, i] * A[j, i]
+        end
+        real(diag) > 0 || throw(LinearAlgebra.PosDefException(j))
+        A[j, j] = sqrt(diag)
+    end
+    @inbounds for j in 1:n
+        for i in 1:(j - 1)
+            A[i, j] = zero(eltype(A))
+        end
+    end
+    return A
+end
+
+@inline function cholesky_solve_no_blas!(y::AbstractVector, F::LinearAlgebra.Cholesky, x::AbstractVector)
+    U = F.U
+    n = size(U, 1)
+    @boundscheck begin
+        size(y, 1) == size(x, 1) || throw(DimensionMismatch("right-hand side dimensions must match"))
+        size(x, 1) == n ||
+            throw(DimensionMismatch("factor and right-hand side dimensions must match"))
+    end
+    @inbounds for i in 1:n
+        y[i] = x[i]
+    end
+    cholesky_solve_vector_no_blas!(y, U)
+    return y
+end
+
+@inline function cholesky_solve_no_blas!(Y::AbstractMatrix, F::LinearAlgebra.Cholesky, X::AbstractMatrix)
+    U = F.U
+    n = size(U, 1)
+    @boundscheck begin
+        size(Y) == size(X) || throw(DimensionMismatch("right-hand side dimensions must match"))
+        size(X, 1) == n ||
+            throw(DimensionMismatch("factor and right-hand side dimensions must match"))
+    end
+    @inbounds for j in axes(X, 2)
+        for i in 1:n
+            Y[i, j] = X[i, j]
+        end
+        cholesky_solve_vector_no_blas!(view(Y, :, j), U)
+    end
+    return Y
+end
+
+@inline function cholesky_solve_vector_no_blas!(y, U)
+    n = size(U, 1)
+    @inbounds for i in 1:n
+        acc = y[i]
+        for k in 1:(i - 1)
+            acc -= U[k, i] * y[k]
+        end
+        y[i] = acc / U[i, i]
+    end
+    @inbounds for i in n:-1:1
+        acc = y[i]
+        for k in (i + 1):n
+            acc -= U[i, k] * y[k]
+        end
+        y[i] = acc / U[i, i]
+    end
+    return y
 end
 
 """

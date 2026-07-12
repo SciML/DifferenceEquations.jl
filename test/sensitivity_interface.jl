@@ -29,6 +29,19 @@ function zero_minimal_cache!(cache)
     return cache
 end
 
+function minimal_matvec!(y, A, x)
+    size(y, 1) == size(A, 1) && size(A, 2) == size(x, 1) ||
+        throw(DimensionMismatch("matrix-vector dimensions must match"))
+    @inbounds for i in axes(A, 1)
+        acc = zero(promote_type(eltype(A), eltype(x)))
+        for j in axes(A, 2)
+            acc += A[i, j] * x[j]
+        end
+        y[i] = acc
+    end
+    return y
+end
+
 # =============================================================================
 # Solve: u[t+1] = A * u[t], in-place mutation of cache
 # =============================================================================
@@ -36,7 +49,7 @@ end
 function minimal_solve!(prob::MinimalProblem, cache::MinimalCache)
     cache.u[1] .= prob.u0
     for t in 1:(length(cache.u) - 1)
-        mul!(cache.u[t + 1], prob.A, cache.u[t])
+        minimal_matvec!(cache.u[t + 1], prob.A, cache.u[t])
     end
     return nothing
 end
