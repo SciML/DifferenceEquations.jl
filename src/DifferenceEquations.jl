@@ -3,8 +3,8 @@ module DifferenceEquations
 using CommonSolve: CommonSolve, solve, init, solve!
 using ConcreteStructs: @concrete
 using DiffEqBase: DiffEqBase, get_concrete_u0, get_concrete_p, isconcreteu0, promote_u0
-using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
-    cholesky!, dot, ldiv!, mul!, transpose!
+using LinearAlgebra: LinearAlgebra, Diagonal, Symmetric, cholesky,
+    dot, ldiv!, mul!, transpose!
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractDEProblem,
     AbstractRODESolution, ODEFunction, remake, ConstantInterpolation, build_solution, ReturnCode
 using StaticArrays: StaticArrays, SVector, SMatrix, StaticMatrix, ismutable
