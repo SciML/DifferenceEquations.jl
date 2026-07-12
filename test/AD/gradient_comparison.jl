@@ -6,7 +6,7 @@ using Enzyme: make_zero, make_zero!
 using DifferenceEquations
 using DifferenceEquations: init, solve!, StateSpaceWorkspace, fill_zero!!
 
-include("forwarddiff_test_utils.jl")
+include("../shared/forwarddiff_test_utils.jl")
 
 # =============================================================================
 # Kalman problem setup

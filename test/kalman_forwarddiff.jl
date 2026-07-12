@@ -4,7 +4,7 @@
 using LinearAlgebra, Test, ForwardDiff, StaticArrays, Random
 using DifferenceEquations
 
-include("forwarddiff_test_utils.jl")
+include("shared/forwarddiff_test_utils.jl")
 
 # =============================================================================
 # Problem setup

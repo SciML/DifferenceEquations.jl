@@ -10,7 +10,7 @@ using DifferenceEquations
 using DifferenceEquations: init, solve!, StateSpaceWorkspace
 using FiniteDifferences: central_fdm
 
-include("enzyme_test_utils.jl")  # vech helpers only
+include("../shared/enzyme_test_utils.jl")  # vech helpers only
 
 # max_range needed: FD perturbation of observables_noise inside prob can push
 # the matrix non-positive-definite, causing DomainError in logdet_chol.
