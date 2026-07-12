@@ -1,5 +1,11 @@
 [Core]
 versions = ["lts", "1", "pre"]
 
+# Enzyme-based AD tests. Excluded from "pre": Enzyme fails to differentiate stdlib
+# BLAS/LAPACK paths on Julia prereleases (e.g. 1.13-rc gemv!/dot/potrf! lazy-load
+# and LLVM-verification errors), so this group runs only on released Julia.
+[AD]
+versions = ["lts", "1"]
+
 [QA]
 versions = ["lts", "1"]

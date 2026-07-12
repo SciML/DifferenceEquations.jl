@@ -13,12 +13,10 @@ function qa_group()
     return include(joinpath(@__DIR__, "qa", "qa.jl"))
 end
 
-# Core test group. The previous runtests.jl ran these files for GROUP=All and
-# GROUP=Core, with the five Enzyme/gradient files gated behind `CI != "true"` (they
-# are skipped on CI). That CI guard cannot be expressed by folder-discovery — which
-# would run every file in the group unconditionally — so the group is wired as an
-# explicit `run_tests` `core` thunk that keeps the guard verbatim. Each file is run
-# in its own `@safetestset` module (it is self-contained, carrying its own `using`s).
+# Core test group. Each file is run in its own `@safetestset` module (it is
+# self-contained, carrying its own `using`s). The Enzyme/gradient files are NOT
+# here — they live in the `ad_group` below, which the AD group in test_groups.toml
+# runs on released Julia only (never on "pre").
 function core_group()
     @safetestset "Linear DirectIteration" begin
         include("linear_direct_iteration.jl")
@@ -59,32 +57,40 @@ function core_group()
     @safetestset "save_everystep" begin
         include("save_everystep.jl")
     end
+    return nothing
+end
 
-    if get(ENV, "CI", "false") != "true"
-        @safetestset "Gradient comparison" begin
-            include("gradient_comparison.jl")
-        end
-        @safetestset "Linear DirectIteration Enzyme" begin
-            include("linear_direct_iteration_enzyme.jl")
-        end
-        @safetestset "Quadratic DirectIteration Enzyme" begin
-            include("quadratic_direct_iteration_enzyme.jl")
-        end
-        @safetestset "Kalman Enzyme" begin
-            include("kalman_enzyme.jl")
-        end
-        @safetestset "ConditionalLikelihood Enzyme" begin
-            include("conditional_likelihood_enzyme.jl")
-        end
+# AD test group: the Enzyme reverse-mode and gradient-comparison suites. Split out of
+# Core so test_groups.toml can run it on released Julia only — Enzyme cannot
+# differentiate the stdlib BLAS/LAPACK paths on prereleases (see the [AD] note in
+# test_groups.toml), so "pre" is excluded from this group's version matrix. Each file
+# runs in its own self-contained `@safetestset` module.
+function ad_group()
+    @safetestset "Gradient comparison" begin
+        include("gradient_comparison.jl")
+    end
+    @safetestset "Linear DirectIteration Enzyme" begin
+        include("linear_direct_iteration_enzyme.jl")
+    end
+    @safetestset "Quadratic DirectIteration Enzyme" begin
+        include("quadratic_direct_iteration_enzyme.jl")
+    end
+    @safetestset "Kalman Enzyme" begin
+        include("kalman_enzyme.jl")
+    end
+    @safetestset "ConditionalLikelihood Enzyme" begin
+        include("conditional_likelihood_enzyme.jl")
     end
     return nothing
 end
 
-# The previous runtests.jl ran the Core block (not QA) for GROUP=All, so "All" is
-# curated to ["Core"]: GROUP=All and GROUP=Core both run the Core body, and QA runs
-# only for GROUP=QA.
+# "All" (the local `Pkg.test()` default) is curated to run Core then AD, preserving
+# the previous local behavior of running the Enzyme tests. On CI each group runs as
+# its own GROUP lane from test_groups.toml; AD is excluded from "pre" there. QA is
+# never part of "All" (it runs only as GROUP=QA).
 run_tests(;
     core = core_group,
     qa = qa_group,
-    all = ["Core"],
+    groups = Dict("AD" => ad_group),
+    all = ["Core", "AD"],
 )
