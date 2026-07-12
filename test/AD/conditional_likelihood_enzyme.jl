@@ -10,7 +10,7 @@ using DifferenceEquations
 using DifferenceEquations: init, solve!, StateSpaceWorkspace
 using FiniteDifferences: central_fdm
 
-include("enzyme_test_utils.jl")  # vech helpers
+include("../shared/enzyme_test_utils.jl")  # vech helpers
 
 # =============================================================================
 # Test data

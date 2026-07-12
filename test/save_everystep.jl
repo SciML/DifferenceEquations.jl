@@ -366,7 +366,7 @@ end
 # ForwardDiff gradients match
 # =============================================================================
 
-include("forwarddiff_test_utils.jl")
+include("shared/forwarddiff_test_utils.jl")
 
 @testset "save_everystep=false — ForwardDiff CL gradient matches" begin
     function cl_fd(A_vec, y, se)

@@ -5,7 +5,7 @@ using LinearAlgebra, Test, ForwardDiff, StaticArrays, Random
 using DifferenceEquations
 using FiniteDifferences: central_fdm, grad
 
-include("forwarddiff_test_utils.jl")  # promote_array only
+include("shared/forwarddiff_test_utils.jl")  # promote_array only
 
 const _fdm_cl_fd = central_fdm(5, 1)
 
