@@ -46,10 +46,6 @@ run_qa(
             ),
         ),
     ),
-    api_docs_kwargs = (;
-        rendered = true,
-        rendered_ignore = (:remake, :solve),
-    ),
 )
 
 # JET cases tied to issue #187 are bespoke `report_call`s on specific solve paths:
