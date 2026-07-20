@@ -5,7 +5,6 @@ using LinearAlgebra
 run_qa(
     DifferenceEquations;
     JET = nothing,            # JET is run below as bespoke report_call cases (issue #187), not package-wide
-    explicit_imports = true,
     ei_kwargs = (;
         # Names re-exported by a dependency rather than imported from their owner.
         all_explicit_imports_via_owners = (;
