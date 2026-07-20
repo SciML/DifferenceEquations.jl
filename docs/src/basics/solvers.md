@@ -3,8 +3,7 @@
 Solving a state-space problem is as simple as calling `solve(prob)`, which automatically selects an appropriate algorithm. You can also pass an algorithm explicitly via `solve(prob, alg)`.
 
 ```@docs
-solve
-remake
+solve(::AbstractStateSpaceProblem)
 DirectIteration
 ```
 
