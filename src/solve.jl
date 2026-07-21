@@ -93,7 +93,40 @@ function default_alg(
     return KalmanFilter()
 end
 
-# Select default algorithm if not provided
+"""
+    solve(prob::AbstractStateSpaceProblem; kwargs...)
+
+Solve a state-space problem using its automatically selected algorithm.
+
+For a [`LinearStateSpaceProblem`](@ref), this selects [`KalmanFilter`](@ref) when the
+problem provides a Gaussian initial-state prior, Gaussian observation noise, observed
+data, matrix-valued `A`, `B`, and `C`, and leaves `noise = nothing`. Otherwise it uses
+[`DirectIteration`](@ref). Pass an algorithm explicitly to override this selection.
+
+# Arguments
+
+  - `prob`: State-space problem to solve.
+
+# Keyword Arguments
+
+All keyword arguments are forwarded to the selected solver. In particular,
+`save_everystep = false` stores only the initial and final states.
+
+# Examples
+
+```jldoctest
+julia> A = [0.95 0.1; 0.0 0.2];
+
+julia> B = [0.0; 0.01;;];
+
+julia> prob = LinearStateSpaceProblem(A, B, zeros(2), (0, 10));
+
+julia> sol = solve(prob);
+
+julia> length(sol.u)
+11
+```
+"""
 function CommonSolve.solve(prob::AbstractStateSpaceProblem; kwargs...)
     return CommonSolve.solve(
         prob,
