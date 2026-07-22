@@ -5,6 +5,10 @@ using LinearAlgebra
 run_qa(
     DifferenceEquations;
     JET = nothing,            # JET is run below as bespoke report_call cases (issue #187), not package-wide
+    # Public APIs intentionally re-exported from CommonSolve and SciMLBase.
+    reexports_allow = (:init, :remake, :solve, :solve!),
+    # `remake` is owned and documented by SciMLBase, not DifferenceEquations.
+    api_docs_kwargs = (; rendered_ignore = (:remake,)),
     ei_kwargs = (;
         # Names re-exported by a dependency rather than imported from their owner.
         all_explicit_imports_via_owners = (;
