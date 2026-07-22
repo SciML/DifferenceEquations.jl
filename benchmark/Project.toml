@@ -12,3 +12,11 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [sources]
 DifferenceEquations = {path = ".."}
+
+[compat]
+BenchmarkTools = "1.8.0"
+Distributions = "0.25.129"
+Enzyme = "0.13.190"
+ForwardDiff = "1.4.1"
+PkgBenchmark = "0.2.15"
+StaticArrays = "1.9.18"
