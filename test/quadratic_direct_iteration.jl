@@ -1,4 +1,4 @@
-using DifferenceEquations, LinearAlgebra, Test, Random, DelimitedFiles, DiffEqBase
+using DifferenceEquations, LinearAlgebra, Test, Random, DelimitedFiles
 using DifferenceEquations: init, solve!
 
 # =============================================================================

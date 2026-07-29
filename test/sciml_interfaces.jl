@@ -1,5 +1,5 @@
-using DifferenceEquations, Distributions, LinearAlgebra, Test
-using DelimitedFiles, DiffEqBase, Plots, DataFrames
+using DifferenceEquations, Distributions, LinearAlgebra, SciMLBase, Test
+using DelimitedFiles, Plots, DataFrames
 
 # --- RBC model data (shared by both problem types) ---
 

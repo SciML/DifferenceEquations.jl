@@ -280,12 +280,19 @@ function _solve_direct_iteration_endpoints!(
     )
 end
 
+function _concrete_solve_problem(prob::AbstractStateSpaceProblem, alg; kwargs...)
+    concrete_prob = SciMLBase.get_concrete_problem(prob, false; kwargs...)
+    SciMLBase.check_prob_alg_pairing(concrete_prob, alg)
+    return concrete_prob
+end
+
 # Single __solve route for all problem types with DirectIteration
-function DiffEqBase.__solve(
+function SciMLBase.__solve(
         prob::AbstractStateSpaceProblem, alg::DirectIteration, args...;
         save_everystep = true, kwargs...
     )
-    ws = CommonSolve.init(prob, alg; save_everystep, kwargs...)
+    concrete_prob = _concrete_solve_problem(prob, alg; kwargs...)
+    ws = CommonSolve.init(concrete_prob, alg; save_everystep, kwargs...)
     return CommonSolve.solve!(ws; kwargs...)
 end
 
@@ -501,11 +508,12 @@ function _solve_conditional_likelihood_endpoints!(
     )
 end
 
-function DiffEqBase.__solve(
+function SciMLBase.__solve(
         prob::AbstractStateSpaceProblem, alg::ConditionalLikelihood, args...;
         save_everystep = true, kwargs...
     )
-    ws = CommonSolve.init(prob, alg; save_everystep, kwargs...)
+    concrete_prob = _concrete_solve_problem(prob, alg; kwargs...)
+    ws = CommonSolve.init(concrete_prob, alg; save_everystep, kwargs...)
     return CommonSolve.solve!(ws; kwargs...)
 end
 
@@ -797,10 +805,11 @@ function _solve_kalman_endpoints!(
     )
 end
 
-function DiffEqBase.__solve(
+function SciMLBase.__solve(
         prob::LinearStateSpaceProblem, alg::KalmanFilter, args...;
         save_everystep = true, kwargs...
     )
-    ws = CommonSolve.init(prob, alg; save_everystep, kwargs...)
+    concrete_prob = _concrete_solve_problem(prob, alg; kwargs...)
+    ws = CommonSolve.init(concrete_prob, alg; save_everystep, kwargs...)
     return CommonSolve.solve!(ws; kwargs...)
 end

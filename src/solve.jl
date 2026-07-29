@@ -1,5 +1,4 @@
-using DiffEqBase: KeywordArgSilent
-using SciMLBase: AbstractDEAlgorithm
+using SciMLBase: AbstractDEAlgorithm, keyword_arg_silent
 
 abstract type AbstractDifferenceEquationAlgorithm <: AbstractDEAlgorithm end
 
@@ -131,7 +130,7 @@ function CommonSolve.solve(prob::AbstractStateSpaceProblem; kwargs...)
     return CommonSolve.solve(
         prob,
         default_alg(prob);
-        kwargshandle = KeywordArgSilent,
+        kwargshandle = keyword_arg_silent,
         kwargs...
     )
 end
@@ -140,7 +139,14 @@ function CommonSolve.solve(prob::AbstractStateSpaceProblem, alg::Nothing, args..
         prob,
         default_alg(prob),
         args...;
-        kwargshandle = KeywordArgSilent,
+        kwargshandle = keyword_arg_silent,
         kwargs...
     )
+end
+
+function CommonSolve.solve(
+        prob::AbstractStateSpaceProblem, alg::AbstractDifferenceEquationAlgorithm, args...;
+        kwargs...
+    )
+    return SciMLBase.__solve(prob, alg, args...; kwargs...)
 end

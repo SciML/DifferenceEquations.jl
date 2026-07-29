@@ -1,5 +1,5 @@
 using DifferenceEquations, Distributions, LinearAlgebra, Test
-using DelimitedFiles, DiffEqBase, Random
+using DelimitedFiles, Random
 using DifferenceEquations: init, solve!
 
 A_rbc = [0.9568351489231076 6.209371005755285; 3.0153731819288737e-18 0.20000000000000007]

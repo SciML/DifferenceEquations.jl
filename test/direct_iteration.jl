@@ -1,4 +1,4 @@
-using DifferenceEquations, Distributions, LinearAlgebra, Test, Random, DelimitedFiles, DiffEqBase
+using DifferenceEquations, Distributions, LinearAlgebra, Test, Random, DelimitedFiles, SciMLBase
 using DifferenceEquations: init, solve!
 
 # --- Helper: quadratic callbacks ---
@@ -367,7 +367,7 @@ noise_2_rbc_short = noise_2_rbc[1:T_rbc]
         observables_noise = Diagonal(D_2_rbc), noise = noise_2_rbc_short,
         observables = observables_2_rbc_short
     )
-    DiffEqBase.get_concrete_problem(prob, false)
+    SciMLBase.get_concrete_problem(prob, false)
     sol = solve(prob)
 end
 
