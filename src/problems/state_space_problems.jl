@@ -23,7 +23,7 @@ function DiffEqBase.get_concrete_problem(
     u0_promote = promote_u0(u0, p, tspan[1])
 
     if isconcreteu0(prob, tspan[1], kwargs) &&
-            typeof(u0_promote) === typeof(prob.u0) &&
+            u0_promote === prob.u0 &&
             p === prob.p &&
             return prob
     else
