@@ -123,8 +123,9 @@ Pkg.status(; mode = PKGMODE_MANIFEST) # hide
 ```@eval
 using TOML
 using Markdown
-version = TOML.parse(read("../../Project.toml", String))["version"]
-name = TOML.parse(read("../../Project.toml", String))["name"]
+project = TOML.parsefile(joinpath(dirname(Base.active_project()), "..", "Project.toml"))
+version = project["version"]
+name = project["name"]
 link_manifest = "https://github.com/SciML/" * name * ".jl/tree/gh-pages/v" * version *
                 "/assets/Manifest.toml"
 link_project = "https://github.com/SciML/" * name * ".jl/tree/gh-pages/v" * version *
