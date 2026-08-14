@@ -9,11 +9,11 @@ Subtypes include [`LinearStateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem
 abstract type AbstractStateSpaceProblem <: AbstractDEProblem end
 
 # TODO: Can add in more checks on the algorithm choice
-DiffEqBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothing
+SciMLBase.check_prob_alg_pairing(prob::AbstractStateSpaceProblem, alg) = nothing
 
 # Perturbation problems don't have f, g
 # In discrete time, tspan should not have a sensitivity so the concretization is less obvious
-function DiffEqBase.get_concrete_problem(
+function SciMLBase.get_concrete_problem(
         prob::AbstractStateSpaceProblem, isadapt;
         kwargs...
     )

@@ -7,48 +7,6 @@ run_qa(
     JET = nothing,            # JET is run below as bespoke report_call cases (issue #187), not package-wide
     # Public APIs intentionally re-exported from CommonSolve and SciMLBase.
     reexports_allow = (:init, :remake, :solve, :solve!),
-    # `remake` is owned and documented by SciMLBase, not DifferenceEquations.
-    api_docs_kwargs = (; rendered_ignore = (:remake,)),
-    ei_kwargs = (;
-        # Names re-exported by a dependency rather than imported from their owner.
-        all_explicit_imports_via_owners = (;
-            ignore = (
-                :KeywordArgSilent,   # SciMLBase (imported from DiffEqBase)
-                :get_concrete_p,     # SciMLBase (imported from DiffEqBase)
-                :get_concrete_u0,    # SciMLBase (imported from DiffEqBase)
-                :isconcreteu0,       # SciMLBase (imported from DiffEqBase)
-                :promote_u0,         # SciMLBase (imported from DiffEqBase)
-                :ismutable,          # Base (imported from StaticArrays)
-            ),
-        ),
-        all_qualified_accesses_via_owners = (;
-            ignore = (
-                :__solve,            # SciMLBase (accessed via DiffEqBase)
-            ),
-        ),
-        # Non-public names of dependency packages (go public as those base libs release).
-        all_qualified_accesses_are_public = (;
-            ignore = (
-                :__solve,                    # DiffEqBase
-                :check_prob_alg_pairing,     # DiffEqBase
-                :get_concrete_problem,       # DiffEqBase
-                :getindepsym,                # SciMLBase
-                :getindepsym_defaultt,       # SciMLBase
-            ),
-        ),
-        all_explicit_imports_are_public = (;
-            ignore = (
-                :var"@add_kwonly",       # SciMLBase
-                :ConstantInterpolation,  # SciMLBase
-                :KeywordArgSilent,       # DiffEqBase
-                :get_concrete_p,         # DiffEqBase
-                :get_concrete_u0,        # DiffEqBase
-                :isconcreteu0,           # DiffEqBase
-                :ismutable,              # StaticArrays
-                :promote_u0,             # DiffEqBase
-            ),
-        ),
-    ),
 )
 
 # JET cases tied to issue #187 are bespoke `report_call`s on specific solve paths:

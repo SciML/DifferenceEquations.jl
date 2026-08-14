@@ -1,6 +1,5 @@
-using DifferenceEquations, Distributions, LinearAlgebra, Test, Random
+using DifferenceEquations, Distributions, LinearAlgebra, Test, Random, SciMLBase
 using DelimitedFiles
-using DiffEqBase
 using DifferenceEquations: init, solve!
 
 # --- RBC Model Data ---
@@ -216,8 +215,8 @@ end
     sol = solve(prob)
     @inferred solve(prob)
 
-    DiffEqBase.get_concrete_problem(prob, false)
-    @inferred DiffEqBase.get_concrete_problem(prob, false)
+    SciMLBase.get_concrete_problem(prob, false)
+    @inferred SciMLBase.get_concrete_problem(prob, false)
 
     joint_likelihood_1(A_rbc, B_rbc, C_rbc, u0_rbc, noise_rbc_5, observables_rbc_5, D_rbc)
     @inferred joint_likelihood_1(

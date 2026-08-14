@@ -2,12 +2,13 @@ module DifferenceEquations
 
 using CommonSolve: CommonSolve, solve, init, solve!
 using ConcreteStructs: @concrete
-using DiffEqBase: DiffEqBase, get_concrete_u0, get_concrete_p, isconcreteu0, promote_u0
+using Base: ismutable
 using LinearAlgebra: LinearAlgebra, Diagonal, NoPivot, Symmetric, cholesky,
     cholesky!, dot, ldiv!, mul!, transpose!
 using SciMLBase: SciMLBase, @add_kwonly, NullParameters, promote_tspan, AbstractDEProblem,
-    AbstractRODESolution, ODEFunction, remake, ConstantInterpolation, build_solution, ReturnCode
-using StaticArrays: StaticArrays, SVector, SMatrix, StaticMatrix, ismutable
+    AbstractRODESolution, ODEFunction, remake, ConstantInterpolation, build_solution, ReturnCode,
+    get_concrete_u0, get_concrete_p, isconcreteu0, promote_u0
+using StaticArrays: StaticArrays, SVector, SMatrix, StaticMatrix
 using SymbolicIndexingInterface: SymbolicIndexingInterface, SymbolCache, variable_index
 
 include("utilities_bangbang.jl")

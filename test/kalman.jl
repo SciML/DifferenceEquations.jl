@@ -1,4 +1,4 @@
-using DifferenceEquations, Distributions, LinearAlgebra, Test, DelimitedFiles, DiffEqBase
+using DifferenceEquations, Distributions, LinearAlgebra, Test, DelimitedFiles, SciMLBase
 using DifferenceEquations: init, solve!
 
 # --- Helpers ---
@@ -319,8 +319,8 @@ end
     sol = solve(prob)
     @inferred solve(prob)
 
-    prob_concrete = DiffEqBase.get_concrete_problem(prob, false)
-    @inferred DiffEqBase.get_concrete_problem(prob, false)
+    prob_concrete = SciMLBase.get_concrete_problem(prob, false)
+    @inferred SciMLBase.get_concrete_problem(prob, false)
 
     kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
     @inferred kalman_likelihood(A_rbc, B_rbc, C_rbc, u0_rbc, observables_rbc, D_rbc)
