@@ -4,15 +4,28 @@
 Solution type returned by `solve` for all state-space problems.
 
 # Fields
-- `u`: State trajectory as `Vector{Vector{T}}`.
-- `t`: Time values.
-- `z`: Observation trajectory as `Vector{Vector{T}}`, or `nothing`.
-- `W`: Noise sequence as `Vector{Vector{T}}`, or `nothing` (e.g., for `KalmanFilter`).
-- `P`: Posterior covariances as `Vector{Matrix{T}}` (`KalmanFilter` only), or `nothing`.
-- `logpdf`: Log-likelihood value. Zero when no `observables` are provided.
-- `retcode`: `ReturnCode.Success`. Errors are thrown as exceptions, not encoded in the return code.
-- `prob`: The original problem.
-- `alg`: The algorithm used.
+- `u`: State trajectory as `Vector{Vector{T}}` or a compatible collection.
+- `u_analytic`: Analytic state trajectory, currently `nothing`.
+- `errors`: Per-time errors, currently `nothing`.
+- `t`: Time values, with one entry per saved state.
+- `W`: Noise sequence, or `nothing` when no concrete noise was used.
+- `prob`: The original [`AbstractStateSpaceProblem`](@ref).
+- `alg`: The algorithm used to construct the solution.
+- `interp`: Constant interpolation over the saved states.
+- `dense`: Whether dense output is available.
+- `tslocation`: Current time-series location used by SciMLBase indexing.
+- `stats`: Solver statistics, when provided.
+- `retcode`: Solver return code. Runtime errors are thrown as exceptions.
+- `P`: Posterior covariances for [`KalmanFilter`](@ref), or `nothing` otherwise.
+- `logpdf`: Log-likelihood value, zero when no observations are provided.
+- `z`: Observation trajectory, or `nothing` when no observation equation exists.
+
+# Returns
+
+- `StateSpaceSolution`: A SciML-compatible solution containing states, observations,
+  noise, and optional filtering statistics.
+
+# Examples
 
 # Symbolic Indexing
 Access time series by symbol name:

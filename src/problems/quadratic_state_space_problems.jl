@@ -37,6 +37,25 @@ with optional observation equation
   "The Pruned State-Space System for Non-Linear DSGE Models: Theory and Empirical Applications."
 
 See also: [`PrunedQuadraticStateSpaceProblem`](@ref), [`LinearStateSpaceProblem`](@ref).
+
+# Fields
+
+- `A_0`, `A_1`, `A_2`: Constant, linear, and quadratic transition coefficients.
+- `B`: Noise input matrix or `nothing`.
+- `C_0`, `C_1`, `C_2`: Optional observation coefficients.
+- `u0`: Initial state.
+- `tspan`: Integer-step time span.
+- `p`: User parameters.
+- `observables_noise`, `observables`, `noise`: Observation and simulation data.
+- `syms`, `obs_syms`: Optional state and observation names for symbolic indexing.
+
+# Returns
+
+- `QuadraticStateSpaceProblem`: A quadratic discrete-time state-space problem.
+
+# Throws
+
+- `ArgumentError`: If `tspan` does not have an integer distance.
 """
 @concrete struct QuadraticStateSpaceProblem <: AbstractStateSpaceProblem
     f           # ODEFunction (SciML interface/syms only)
@@ -105,6 +124,25 @@ Arguments are identical to [`QuadraticStateSpaceProblem`](@ref).
   "The Pruned State-Space System for Non-Linear DSGE Models: Theory and Empirical Applications."
 
 See also: [`QuadraticStateSpaceProblem`](@ref).
+
+# Fields
+
+- `A_0`, `A_1`, `A_2`: Constant, linear, and quadratic transition coefficients.
+- `B`: Noise input matrix or `nothing`.
+- `C_0`, `C_1`, `C_2`: Optional observation coefficients.
+- `u0`: Initial state and the initial value of the linear component `u_f`.
+- `tspan`: Integer-step time span.
+- `p`: User parameters.
+- `observables_noise`, `observables`, `noise`: Observation and simulation data.
+- `syms`, `obs_syms`: Optional state and observation names for symbolic indexing.
+
+# Returns
+
+- `PrunedQuadraticStateSpaceProblem`: A pruned quadratic state-space problem.
+
+# Throws
+
+- `ArgumentError`: If `tspan` does not have an integer distance.
 """
 @concrete struct PrunedQuadraticStateSpaceProblem <: AbstractStateSpaceProblem
     f           # ODEFunction (SciML interface/syms only)

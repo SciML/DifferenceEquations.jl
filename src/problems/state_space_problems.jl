@@ -1,10 +1,40 @@
 """
     AbstractStateSpaceProblem <: AbstractDEProblem
 
-Abstract supertype for all discrete-time state-space problems in DifferenceEquations.jl.
+Abstract supertype for all discrete-time state-space problems in
+DifferenceEquations.jl.
 
-Subtypes include [`LinearStateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
-[`PrunedQuadraticStateSpaceProblem`](@ref), and [`StateSpaceProblem`](@ref).
+Every concrete subtype supplies an initial state `u0`, an integer-step `tspan`,
+parameters `p`, and model-specific fields required by the solver. The public
+problem interface is consumed by [`solve`](@ref), [`init`](@ref), [`remake`](@ref),
+and [`StateSpaceSolution`](@ref).
+
+# Interface
+
+Callers may treat any subtype as an `AbstractDEProblem` and pass it to the standard
+SciML problem and solver functions. The time span must have an integer distance
+because the discrete trajectory contains one state for every integer step.
+Additional problem subtypes must preserve the callback and field semantics described
+by their concrete constructors.
+
+The internal solver hooks used to implement additional problem types are documented
+on the developer API page. They are package-extension interfaces, not a requirement
+for ordinary users.
+
+# Examples
+
+```julia
+julia > using DifferenceEquations
+
+julia > prob = LinearStateSpaceProblem([1.0;;], nothing, [0.0], (0, 2));
+
+julia > prob isa AbstractStateSpaceProblem
+true
+```
+
+Subtypes include [`LinearStateSpaceProblem`](@ref),
+[`QuadraticStateSpaceProblem`](@ref), [`PrunedQuadraticStateSpaceProblem`](@ref),
+and [`StateSpaceProblem`](@ref).
 """
 abstract type AbstractStateSpaceProblem <: AbstractDEProblem end
 
@@ -44,7 +74,7 @@ u_{n+1} = A \\, u_n + B \\, w_{n+1}
 
 with optional observation equation ``z_n = C \\, u_n + v_n``.
 
-# Positional Arguments
+# Arguments
 - `A`: Transition matrix (n×n).
 - `B`: Noise input matrix (n×k), or `nothing` for deterministic dynamics.
 - `u0`: Initial state vector, or a `Distribution` for random initial conditions.
@@ -69,6 +99,26 @@ with optional observation equation ``z_n = C \\, u_n + v_n``.
 
 See also: [`StateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
 [`DirectIteration`](@ref), [`KalmanFilter`](@ref).
+
+# Fields
+
+- `A`: State transition matrix.
+- `B`: Noise input matrix or `nothing` for deterministic dynamics.
+- `C`: Observation matrix or `nothing` when observations are disabled.
+- `u0`: Initial state or initial-state distribution.
+- `tspan`: Integer-step time span.
+- `p`: User parameters.
+- `observables_noise`, `observables`, `noise`: Observation and simulation data.
+- `u0_prior_mean`, `u0_prior_var`: Optional Gaussian prior for [`KalmanFilter`](@ref).
+- `syms`, `obs_syms`: Optional state and observation names for symbolic indexing.
+
+# Returns
+
+- `LinearStateSpaceProblem`: A SciML-compatible linear discrete-time problem.
+
+# Throws
+
+- `ArgumentError`: If `tspan` does not have an integer distance.
 """
 struct LinearStateSpaceProblem{
         uType, uPriorMeanType, uPriorVarType, tType, P, NP, F, AType,
@@ -143,7 +193,7 @@ Define a generic state-space model with user-provided callback functions:
 u_{n+1} = f(u_n, w_{n+1}, p, t_n), \\quad z_n = g(u_n, p, t_n)
 ```
 
-# Positional Arguments
+# Arguments
 - `transition`: Callback `f!!(x_next, x, w, p, t) -> x_next`. For mutable arrays, mutate
   `x_next` in place and return it; for immutable arrays (e.g., `SVector`), return a new value.
 - `observation`: Callback `g!!(y, x, p, t) -> y`, or `nothing` for no observations.
@@ -161,6 +211,25 @@ u_{n+1} = f(u_n, w_{n+1}, p, t_n), \\quad z_n = g(u_n, p, t_n)
 - `obs_syms`: Observation variable names for symbolic indexing.
 
 See also: [`LinearStateSpaceProblem`](@ref), [`DirectIteration`](@ref).
+
+# Fields
+
+- `transition`: In-place or out-of-place transition callback.
+- `observation`: In-place or out-of-place observation callback, or `nothing`.
+- `u0`: Initial state or initial-state distribution.
+- `tspan`: Integer-step time span.
+- `p`: Parameters passed to both callbacks.
+- `n_shocks`, `n_obs`: Noise and observation dimensions.
+- `observables_noise`, `observables`, `noise`: Observation and simulation data.
+- `syms`, `obs_syms`: Optional state and observation names for symbolic indexing.
+
+# Returns
+
+- `StateSpaceProblem`: A SciML-compatible callback-based state-space problem.
+
+# Throws
+
+- `ArgumentError`: If `tspan` does not have an integer distance.
 """
 struct StateSpaceProblem{
         uType, tType, P, NP, TF, GF, F,
