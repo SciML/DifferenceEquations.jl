@@ -74,7 +74,9 @@ The `observables_noise` keyword has a dual role:
 
 ## Remaking Problems
 
-Use `remake` to create a modified copy of a problem, changing specific fields while keeping everything else. This is useful for parameter sweeps and optimization loops.
+Use `SciMLBase.remake` to create a modified copy of a problem, changing specific
+fields while keeping everything else. This is useful for parameter sweeps and
+optimization loops.
 
 ```@example remake_example
 using DifferenceEquations, LinearAlgebra

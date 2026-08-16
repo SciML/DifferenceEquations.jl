@@ -28,10 +28,16 @@ See also: [`KalmanFilter`](@ref).
 
 - `DirectIteration`: An algorithm object selecting forward state propagation.
 
+# Fields
+
+`DirectIteration` is stateless and has no fields.
+
 # Examples
 
-```julia
-julia > DirectIteration() isa AbstractDEAlgorithm
+```jldoctest
+julia> using DifferenceEquations
+
+julia> DirectIteration() isa DifferenceEquations.AbstractDifferenceEquationAlgorithm
 true
 ```
 """
@@ -58,10 +64,16 @@ See also: [`DirectIteration`](@ref).
 
 - `KalmanFilter`: An algorithm object selecting Gaussian state estimation.
 
+# Fields
+
+`KalmanFilter` is stateless and has no fields.
+
 # Examples
 
-```julia
-julia > KalmanFilter() isa AbstractDEAlgorithm
+```jldoctest
+julia> using DifferenceEquations
+
+julia> KalmanFilter() isa DifferenceEquations.AbstractDifferenceEquationAlgorithm
 true
 ```
 """
@@ -93,17 +105,33 @@ See also: [`DirectIteration`](@ref), [`KalmanFilter`](@ref).
 
 - `ConditionalLikelihood`: An algorithm object selecting prediction-error likelihood.
 
+# Fields
+
+`ConditionalLikelihood` is stateless and has no fields.
+
 # Examples
 
-```julia
-julia > ConditionalLikelihood() isa AbstractDEAlgorithm
+```jldoctest
+julia> using DifferenceEquations
+
+julia> ConditionalLikelihood() isa DifferenceEquations.AbstractDifferenceEquationAlgorithm
 true
 ```
 """
 struct ConditionalLikelihood <: AbstractDifferenceEquationAlgorithm end
 
-# The typical algorithm in discrete-time is DirectIteration()
-# Unlike continuous time, there aren't many simple variations
+"""
+    default_alg(prob::AbstractStateSpaceProblem)
+
+Select the algorithm used by [`solve`](@ref) when the caller does not provide one.
+The generic fallback returns [`DirectIteration`](@ref); eligible linear Gaussian
+problems use [`KalmanFilter`](@ref) through a more specific method.
+
+This is a developer extension point. A new problem type must either implement a
+matching `default_alg(prob)` method or require callers to pass an algorithm
+explicitly. The selected algorithm must have matching `alloc_sol` and `alloc_cache`
+methods.
+"""
 default_alg(prob::AbstractStateSpaceProblem) = DirectIteration()
 
 # If a normal prior, normal observational noise, no noise given, and observables provided then can use a kalman filter
@@ -152,8 +180,11 @@ data, matrix-valued `A`, `B`, and `C`, and leaves `noise = nothing`. Otherwise i
 
 # Keyword Arguments
 
-All keyword arguments are forwarded to the selected solver. In particular,
-`save_everystep = false` stores only the initial and final states.
+- `save_everystep::Bool = true`: Store the complete trajectory when `true`; retain
+  only the initial and final states when `false`.
+- `perturb_diagonal`: Diagonal perturbation used when factoring observation
+  covariance matrices.
+- `kwargs...`: Additional options forwarded to the selected algorithm.
 
 # Returns
 

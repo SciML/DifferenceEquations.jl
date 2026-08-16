@@ -6,8 +6,8 @@ DifferenceEquations.jl.
 
 Every concrete subtype supplies an initial state `u0`, an integer-step `tspan`,
 parameters `p`, and model-specific fields required by the solver. The public
-problem interface is consumed by [`solve`](@ref), [`init`](@ref), [`remake`](@ref),
-and [`StateSpaceSolution`](@ref).
+problem interface is consumed by [`solve`](@ref), [`init`](@ref),
+`SciMLBase.remake`, and [`StateSpaceSolution`](@ref).
 
 # Interface
 
@@ -23,12 +23,12 @@ for ordinary users.
 
 # Examples
 
-```julia
-julia > using DifferenceEquations
+```jldoctest
+julia> using DifferenceEquations
 
-julia > prob = LinearStateSpaceProblem([1.0;;], nothing, [0.0], (0, 2));
+julia> prob = LinearStateSpaceProblem([1.0;;], nothing, [0.0], (0, 2));
 
-julia > prob isa AbstractStateSpaceProblem
+julia> prob isa AbstractStateSpaceProblem
 true
 ```
 
@@ -102,6 +102,8 @@ See also: [`StateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
 
 # Fields
 
+- `f`: Internal `SciMLBase.ODEFunction` bridge used for SciML interfaces and
+  symbolic indexing; it does not define the state transition.
 - `A`: State transition matrix.
 - `B`: Noise input matrix or `nothing` for deterministic dynamics.
 - `C`: Observation matrix or `nothing` when observations are disabled.
@@ -111,6 +113,7 @@ See also: [`StateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
 - `observables_noise`, `observables`, `noise`: Observation and simulation data.
 - `u0_prior_mean`, `u0_prior_var`: Optional Gaussian prior for [`KalmanFilter`](@ref).
 - `syms`, `obs_syms`: Optional state and observation names for symbolic indexing.
+- `kwargs`: Additional constructor keyword arguments retained for remaking.
 
 # Returns
 
@@ -119,6 +122,17 @@ See also: [`StateSpaceProblem`](@ref), [`QuadraticStateSpaceProblem`](@ref),
 # Throws
 
 - `ArgumentError`: If `tspan` does not have an integer distance.
+
+# Examples
+
+```jldoctest
+julia> using DifferenceEquations
+
+julia> prob = LinearStateSpaceProblem([1.0;;], nothing, [1.0], (0, 2));
+
+julia> length(solve(prob).u)
+3
+```
 """
 struct LinearStateSpaceProblem{
         uType, uPriorMeanType, uPriorVarType, tType, P, NP, F, AType,
@@ -222,6 +236,9 @@ See also: [`LinearStateSpaceProblem`](@ref), [`DirectIteration`](@ref).
 - `n_shocks`, `n_obs`: Noise and observation dimensions.
 - `observables_noise`, `observables`, `noise`: Observation and simulation data.
 - `syms`, `obs_syms`: Optional state and observation names for symbolic indexing.
+- `f`: Internal `SciMLBase.ODEFunction` bridge used for SciML interfaces and
+  symbolic indexing.
+- `kwargs`: Additional constructor keyword arguments retained for remaking.
 
 # Returns
 
@@ -230,6 +247,20 @@ See also: [`LinearStateSpaceProblem`](@ref), [`DirectIteration`](@ref).
 # Throws
 
 - `ArgumentError`: If `tspan` does not have an integer distance.
+
+# Examples
+
+```jldoctest
+julia> using DifferenceEquations
+
+julia> transition = (x_next, x, w, p, t) -> copyto!(x_next, x);
+
+julia> prob = StateSpaceProblem(transition, nothing, [1.0], (0, 2); n_shocks = 0);
+
+julia> solve(prob).u[end]
+1-element Vector{Float64}:
+ 1.0
+```
 """
 struct StateSpaceProblem{
         uType, tType, P, NP, TF, GF, F,
