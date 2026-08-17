@@ -22,30 +22,30 @@ u: 31-element Vector{Vector{Float64}}:
  [0.0, 0.0]
  [-7.824904812740593e-5, 0.007883556016042917]
  [0.04891988885175858, -0.007221874756335411]
- [0.0017589257528020396, -0.010182309773363343]
+ [0.0017589257528020405, -0.010182309773363343]
  [-0.061214384981922526, -0.009369011599021596]
  [-0.11600722245697045, -0.008895754307381123]
- [-0.1651243120498138, -0.002504969541934924]
- [-0.17243509703288032, -0.009630227771786251]
- [-0.22320283898400928, 0.0043901627568102754]
- [-0.18491763906354783, 0.01526486530847619]
+ [-0.16512431204981382, -0.002504969541934924]
+ [-0.17243509703288035, -0.009630227771786251]
+ [-0.2232028389840093, 0.0043901627568102754]
+ [-0.18491763906354786, 0.01526486530847619]
  ⋮
- [0.058305824094747605, 0.01193042589888877]
+ [0.0583058240947476, 0.01193042589888877]
  [0.12977249524792234, 0.0052839691241533]
  [0.15609644165272454, -0.014251596803596712]
- [0.0603341824604796, -0.0006663062536166405]
- [0.05310607708731666, -0.006224420214619914]
- [0.011879503547645217, 0.005244589569794043]
+ [0.06033418246047959, -0.0006663062536166405]
+ [0.053106077087316655, -0.006224420214619914]
+ [0.011879503547645213, 0.005244589569794043]
  [0.043813971057767936, 0.014407612549804024]
  [0.13156389952858036, -0.003777682906262093]
- [0.10149351503106013, -0.01081151648500947]</code></pre><p>The solution has the same structure as the linear case: <code>sol.u</code> holds the state trajectory, <code>sol.z</code> holds observations, and <code>sol.W</code> holds the noise sequence – all as <code>Vector{Vector}</code>.</p><h2 id="Plotting-and-Ensembles"><a class="docs-heading-anchor" href="#Plotting-and-Ensembles">Plotting and Ensembles</a><a id="Plotting-and-Ensembles-1"></a><a class="docs-heading-anchor-permalink" href="#Plotting-and-Ensembles" title="Permalink"></a></h2><p>The standard plotting recipes work identically:</p><pre><code class="language-julia hljs">plot(sol)</code></pre><img src="0658fdfa.svg" alt="Example block output"/><p>Ensemble simulations follow the same SciML interface:</p><pre><code class="language-julia hljs">using DiffEqBase
+ [0.10149351503106013, -0.01081151648500947]</code></pre><p>The solution has the same structure as the linear case: <code>sol.u</code> holds the state trajectory, <code>sol.z</code> holds observations, and <code>sol.W</code> holds the noise sequence – all as <code>Vector{Vector}</code>.</p><h2 id="Plotting-and-Ensembles"><a class="docs-heading-anchor" href="#Plotting-and-Ensembles">Plotting and Ensembles</a><a id="Plotting-and-Ensembles-1"></a><a class="docs-heading-anchor-permalink" href="#Plotting-and-Ensembles" title="Permalink"></a></h2><p>The standard plotting recipes work identically:</p><pre><code class="language-julia hljs">plot(sol)</code></pre><img src="da943507.svg" alt="Example block output"/><p>Ensemble simulations follow the same SciML interface:</p><pre><code class="language-julia hljs">using DiffEqBase
 
 prob_ens = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, T);
     C_0, C_1, C_2, observables_noise = D, syms = (:a, :b))
 ensemble_sol = solve(EnsembleProblem(prob_ens), DirectIteration(), EnsembleThreads();
     trajectories = 50)
 summ = EnsembleSummary(ensemble_sol)
-plot(summ)</code></pre><img src="182a2d2d.svg" alt="Example block output"/><h2 id="Joint-Likelihood"><a class="docs-heading-anchor" href="#Joint-Likelihood">Joint Likelihood</a><a id="Joint-Likelihood-1"></a><a class="docs-heading-anchor-permalink" href="#Joint-Likelihood" title="Permalink"></a></h2><p>When both <code>noise</code> and <code>observables</code> are provided, the solver computes the joint log-likelihood conditioned on the noise realization. As with linear models, observables correspond to <span>$z_1, \ldots, z_T$</span>, so we pass <code>sol.z[2:end]</code>.</p><pre><code class="language-julia hljs">observables = sol.z[2:end]  # Vector{Vector}, length T
+plot(summ)</code></pre><img src="2a4d2a63.svg" alt="Example block output"/><h2 id="Joint-Likelihood"><a class="docs-heading-anchor" href="#Joint-Likelihood">Joint Likelihood</a><a id="Joint-Likelihood-1"></a><a class="docs-heading-anchor-permalink" href="#Joint-Likelihood" title="Permalink"></a></h2><p>When both <code>noise</code> and <code>observables</code> are provided, the solver computes the joint log-likelihood conditioned on the noise realization. As with linear models, observables correspond to <span>$z_1, \ldots, z_T$</span>, so we pass <code>sol.z[2:end]</code>.</p><pre><code class="language-julia hljs">observables = sol.z[2:end]  # Vector{Vector}, length T
 noise = sol.W               # Vector{Vector}, length T
 
 prob_lik = QuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0, (0, length(observables));
@@ -61,20 +61,20 @@ u: 31-element Vector{Vector{Float64}}:
  [0.0, 0.0]
  [-7.824904812740593e-5, 0.007883556016042917]
  [0.048919930430745995, -0.007221874756335411]
- [0.0017589864378015187, -0.010182309773363343]
+ [0.0017589864378015196, -0.010182309773363343]
  [-0.06121425835630855, -0.009369011599021596]
  [-0.11600689560416926, -0.008895754307381123]
- [-0.16512369313247072, -0.002504969541934924]
- [-0.17243443044707005, -0.009630227771786251]
- [-0.22320180468519848, 0.0043901627568102754]
- [-0.18491703215469107, 0.01526486530847619]
+ [-0.16512369313247074, -0.002504969541934924]
+ [-0.17243443044707008, -0.009630227771786251]
+ [-0.2232018046851985, 0.0043901627568102754]
+ [-0.1849170321546911, 0.01526486530847619]
  ⋮
- [0.05830411781022135, 0.01193042589888877]
- [0.12977002636611878, 0.0052839691241533]
- [0.1560936562742395, -0.014251596803596712]
- [0.06033299313394192, -0.0006663062536166405]
- [0.05310506782710932, -0.006224420214619914]
- [0.011879244006927931, 0.005244589569794043]
+ [0.05830411781022134, 0.01193042589888877]
+ [0.12977002636611876, 0.0052839691241533]
+ [0.15609365627423946, -0.014251596803596712]
+ [0.060332993133941915, -0.0006663062536166405]
+ [0.05310506782710931, -0.006224420214619914]
+ [0.011879244006927928, 0.005244589569794043]
  [0.04381319104050511, 0.014407612549804024]
  [0.13156176216772178, -0.003777682906262093]
  [0.1014920994933044, -0.01081151648500947]</code></pre><p>With the same noise, we can compare the pruned and unpruned trajectories:</p><pre><code class="language-julia hljs">Random.seed!(100)
@@ -91,7 +91,7 @@ plot(
     plot([sol_pruned_compare.u[t][1] for t in eachindex(sol_pruned_compare.u)],
         label = &quot;pruned&quot;, title = &quot;State 1 (pruned)&quot;),
     layout = (1, 2)
-)</code></pre><img src="80b691e6.svg" alt="Example block output"/><p>The pruned joint likelihood works the same way:</p><pre><code class="language-julia hljs">obs_pruned = sol_pruned.z[2:end]
+)</code></pre><img src="dbf8f4ca.svg" alt="Example block output"/><p>The pruned joint likelihood works the same way:</p><pre><code class="language-julia hljs">obs_pruned = sol_pruned.z[2:end]
 noise_pruned = sol_pruned.W
 
 prob_pruned_lik = PrunedQuadraticStateSpaceProblem(A_0, A_1, A_2, B, u0,
@@ -126,4 +126,4 @@ Enzyme.autodiff(Reverse, quad_joint_loglik,
     Duplicated(copy(D), zero(D)),
     Duplicated(deepcopy(ws0.output), Enzyme.make_zero(deepcopy(ws0.output))),
     Duplicated(deepcopy(ws0.cache), Enzyme.make_zero(deepcopy(ws0.cache))))
-dA_1  # gradient of logpdf with respect to A_1</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../conditional_likelihood/">« Conditional Likelihood</a><a class="docs-footer-nextpage" href="../generic_callbacks/">Generic Callbacks »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 17 August 2026 07:50">Monday 17 August 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+dA_1  # gradient of logpdf with respect to A_1</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../conditional_likelihood/">« Conditional Likelihood</a><a class="docs-footer-nextpage" href="../generic_callbacks/">Generic Callbacks »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 17 August 2026 12:50">Monday 17 August 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

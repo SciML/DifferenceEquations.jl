@@ -29,9 +29,9 @@ u: 11-element Vector{Vector{Float64}}:
  [-0.011248100485393202, 0.000370392834315229]
  [-0.008389259888369121, -0.008923007079156962]
  [-0.06329244078472383, 0.003927223157563366]
- [-0.035779035168594764, 0.001180694173184593]
- [-0.026669779536420548, 0.0009464212701223977]
- [-0.019468478684840654, -0.009589546259799365]
+ [-0.03577903516859477, 0.001180694173184593]
+ [-0.026669779536420555, 0.0009464212701223977]
+ [-0.01946847868484066, -0.009589546259799365]
  [-0.07795024156135469, 0.0003416764506392804]
  [-0.07193433548932342, 0.0004483876493976216]
  [-0.065557615288592, 0.002125268964511902]</code></pre><p>The solution has the same structure as the linear case:</p><pre><code class="language-julia hljs">sol.u  # state trajectory, Vector{Vector}</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Vector{Float64}}:
@@ -40,9 +40,9 @@ u: 11-element Vector{Vector{Float64}}:
  [-0.011248100485393202, 0.000370392834315229]
  [-0.008389259888369121, -0.008923007079156962]
  [-0.06329244078472383, 0.003927223157563366]
- [-0.035779035168594764, 0.001180694173184593]
- [-0.026669779536420548, 0.0009464212701223977]
- [-0.019468478684840654, -0.009589546259799365]
+ [-0.03577903516859477, 0.001180694173184593]
+ [-0.026669779536420555, 0.0009464212701223977]
+ [-0.01946847868484066, -0.009589546259799365]
  [-0.07795024156135469, 0.0003416764506392804]
  [-0.07193433548932342, 0.0004483876493976216]
  [-0.065557615288592, 0.002125268964511902]</code></pre><pre><code class="language-julia hljs">sol.z  # observations, Vector{Vector}</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Vector{Float64}}:
@@ -51,9 +51,9 @@ u: 11-element Vector{Vector{Float64}}:
  [-0.0007641658446941847, -0.011248100485393202]
  [-0.006733448132988386, -0.008389259888369121]
  [-0.0030650801550576898, -0.06329244078472383]
- [-0.0024290480691398515, -0.035779035168594764]
- [-0.0017661779072958425, -0.026669779536420548]
- [-0.008177159075701233, -0.019468478684840654]
+ [-0.002429048069139852, -0.03577903516859477]
+ [-0.0017661779072958433, -0.026669779536420555]
+ [-0.008177159075701235, -0.01946847868484066]
  [-0.006786598518593604, -0.07795024156135469]
  [-0.006173670468942701, -0.07193433548932342]
  [-0.004476255169750306, -0.065557615288592]</code></pre><p>We can verify this matches the matrix-based formulation:</p><pre><code class="language-julia hljs">Random.seed!(123)
@@ -126,9 +126,9 @@ sol_sym[:capital]  # state time series by name</code></pre><pre class="documente
  -0.011248100485393202
  -0.008389259888369121
  -0.06329244078472383
- -0.035779035168594764
- -0.026669779536420548
- -0.019468478684840654
+ -0.03577903516859477
+ -0.026669779536420555
+ -0.01946847868484066
  -0.07795024156135469
  -0.07193433548932342
  -0.065557615288592</code></pre><pre><code class="language-julia hljs">sol_sym[:output]  # observation time series by name</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">11-element Vector{Float64}:
@@ -142,4 +142,4 @@ sol_sym[:capital]  # state time series by name</code></pre><pre class="documente
  -0.0258966136034754
   0.23748227725788143
   0.36760954852501876
-  0.4689714881218356</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../quadratic/">« Quadratic Models</a><a class="docs-footer-nextpage" href="../../basics/problem_types/">Problem Types »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 17 August 2026 07:50">Monday 17 August 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+  0.4689714881218356</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../quadratic/">« Quadratic Models</a><a class="docs-footer-nextpage" href="../../basics/problem_types/">Problem Types »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 17 August 2026 12:50">Monday 17 August 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
