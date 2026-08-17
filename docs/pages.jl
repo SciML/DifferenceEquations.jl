@@ -21,4 +21,5 @@ pages = [
         "StaticArrays" => "advanced/static_arrays.md",
         "Internals" => "advanced/internals.md",
     ],
+    "Developer API" => "developer_interfaces.md",
 ]

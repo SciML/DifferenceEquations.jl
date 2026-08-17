@@ -1,5 +1,16 @@
 using SciMLBase: AbstractDEAlgorithm, keyword_arg_silent
 
+"""
+    AbstractDifferenceEquationAlgorithm <: AbstractDEAlgorithm
+
+Developer supertype for algorithms accepted by DifferenceEquations' state-space
+solver. The package currently provides [`DirectIteration`](@ref),
+[`KalmanFilter`](@ref), and [`ConditionalLikelihood`](@ref).
+
+Custom subtypes are not a user-facing extension point unless they implement the
+internal allocation, transition, observation, and solve hooks documented on the
+developer API page.
+"""
 abstract type AbstractDifferenceEquationAlgorithm <: AbstractDEAlgorithm end
 
 """
@@ -12,6 +23,23 @@ noise history `W`, and (if `observables` are provided) the joint log-likelihood 
 This is the default algorithm for all problem types.
 
 See also: [`KalmanFilter`](@ref).
+
+# Returns
+
+- `DirectIteration`: An algorithm object selecting forward state propagation.
+
+# Fields
+
+`DirectIteration` is stateless and has no fields.
+
+# Examples
+
+```jldoctest
+julia> using DifferenceEquations
+
+julia> DirectIteration() isa DifferenceEquations.AbstractDifferenceEquationAlgorithm
+true
+```
 """
 struct DirectIteration <: AbstractDifferenceEquationAlgorithm end
 
@@ -31,6 +59,23 @@ The solution contains filtered means in `sol.u`, posterior covariances in `sol.P
 predicted observations in `sol.z`, and the marginal log-likelihood in `sol.logpdf`.
 
 See also: [`DirectIteration`](@ref).
+
+# Returns
+
+- `KalmanFilter`: An algorithm object selecting Gaussian state estimation.
+
+# Fields
+
+`KalmanFilter` is stateless and has no fields.
+
+# Examples
+
+```jldoctest
+julia> using DifferenceEquations
+
+julia> KalmanFilter() isa DifferenceEquations.AbstractDifferenceEquationAlgorithm
+true
+```
 """
 struct KalmanFilter <: AbstractDifferenceEquationAlgorithm end
 
@@ -55,11 +100,38 @@ equation is present), the conditional log-likelihood in `sol.logpdf`, and the
 state trajectory (clamped to observables) in `sol.u`.
 
 See also: [`DirectIteration`](@ref), [`KalmanFilter`](@ref).
+
+# Returns
+
+- `ConditionalLikelihood`: An algorithm object selecting prediction-error likelihood.
+
+# Fields
+
+`ConditionalLikelihood` is stateless and has no fields.
+
+# Examples
+
+```jldoctest
+julia> using DifferenceEquations
+
+julia> ConditionalLikelihood() isa DifferenceEquations.AbstractDifferenceEquationAlgorithm
+true
+```
 """
 struct ConditionalLikelihood <: AbstractDifferenceEquationAlgorithm end
 
-# The typical algorithm in discrete-time is DirectIteration()
-# Unlike continuous time, there aren't many simple variations
+"""
+    default_alg(prob::AbstractStateSpaceProblem)
+
+Select the algorithm used by [`solve`](@ref) when the caller does not provide one.
+The generic fallback returns [`DirectIteration`](@ref); eligible linear Gaussian
+problems use [`KalmanFilter`](@ref) through a more specific method.
+
+This is a developer extension point. A new problem type must either implement a
+matching `default_alg(prob)` method or require callers to pass an algorithm
+explicitly. The selected algorithm must have matching `alloc_sol` and `alloc_cache`
+methods.
+"""
 default_alg(prob::AbstractStateSpaceProblem) = DirectIteration()
 
 # If a normal prior, normal observational noise, no noise given, and observables provided then can use a kalman filter
@@ -108,12 +180,26 @@ data, matrix-valued `A`, `B`, and `C`, and leaves `noise = nothing`. Otherwise i
 
 # Keyword Arguments
 
-All keyword arguments are forwarded to the selected solver. In particular,
-`save_everystep = false` stores only the initial and final states.
+- `save_everystep::Bool = true`: Store the complete trajectory when `true`; retain
+  only the initial and final states when `false`.
+- `perturb_diagonal`: Diagonal perturbation used when factoring observation
+  covariance matrices.
+- `kwargs...`: Additional options forwarded to the selected algorithm.
+
+# Returns
+
+- `StateSpaceSolution`: The simulated or filtered state-space solution.
+
+# Throws
+
+- `ArgumentError`: If problem dimensions, noise lengths, or observation lengths do
+  not match the time span.
 
 # Examples
 
 ```jldoctest
+julia> using DifferenceEquations
+
 julia> A = [0.95 0.1; 0.0 0.2];
 
 julia> B = [0.0; 0.01;;];

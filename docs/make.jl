@@ -11,10 +11,9 @@ makedocs(
     sitename = "DifferenceEquations.jl",
     authors = "Various Authors",
     clean = true,
-    doctest = false,
+    doctest = true,
     linkcheck = true,
     checkdocs = :exports,
-    warnonly = [:missing_docs, :linkcheck],
     modules = [DifferenceEquations],
     plugins = [links],
     format = Documenter.HTML(

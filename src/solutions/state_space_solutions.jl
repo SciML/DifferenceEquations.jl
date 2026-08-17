@@ -4,28 +4,50 @@
 Solution type returned by `solve` for all state-space problems.
 
 # Fields
-- `u`: State trajectory as `Vector{Vector{T}}`.
-- `t`: Time values.
-- `z`: Observation trajectory as `Vector{Vector{T}}`, or `nothing`.
-- `W`: Noise sequence as `Vector{Vector{T}}`, or `nothing` (e.g., for `KalmanFilter`).
-- `P`: Posterior covariances as `Vector{Matrix{T}}` (`KalmanFilter` only), or `nothing`.
-- `logpdf`: Log-likelihood value. Zero when no `observables` are provided.
-- `retcode`: `ReturnCode.Success`. Errors are thrown as exceptions, not encoded in the return code.
-- `prob`: The original problem.
-- `alg`: The algorithm used.
+- `u`: State trajectory as `Vector{Vector{T}}` or a compatible collection.
+- `u_analytic`: Analytic state trajectory, currently `nothing`.
+- `errors`: Per-time errors, currently `nothing`.
+- `t`: Time values, with one entry per saved state.
+- `W`: Noise sequence, or `nothing` when no concrete noise was used.
+- `prob`: The original [`AbstractStateSpaceProblem`](@ref).
+- `alg`: The algorithm used to construct the solution.
+- `interp`: Constant interpolation over the saved states.
+- `dense`: Whether dense output is available.
+- `tslocation`: Current time-series location used by SciMLBase indexing.
+- `stats`: Solver statistics, when provided.
+- `retcode`: Solver return code. Runtime errors are thrown as exceptions.
+- `P`: Posterior covariances for [`KalmanFilter`](@ref), or `nothing` otherwise.
+- `logpdf`: Log-likelihood value, zero when no observations are provided.
+- `z`: Observation trajectory, or `nothing` when no observation equation exists.
 
-# Symbolic Indexing
-Access time series by symbol name:
+# Returns
+
+- `StateSpaceSolution`: A SciML-compatible solution containing states, observations,
+  noise, and optional filtering statistics.
+
+# Examples
+
+```jldoctest
+julia> using DifferenceEquations
+
+julia> prob = LinearStateSpaceProblem([1.0;;], nothing, [1.0], (0, 2));
+
+julia> sol = solve(prob);
+
+julia> sol.u[end]
+1-element Vector{Float64}:
+ 1.0
+```
+
+Solutions with symbolic names also support symbol indexing:
+
 ```julia
-sol[:x]      # state variable time series (requires `syms`)
+sol[:x]      # state variable time series (requires `syms = (:x,)`)
 sol[:output] # observation time series (requires `obs_syms`)
 ```
 
-# Standard Indexing
-```julia
-sol[i]       # state at time step i (same as sol.u[i])
-sol[end]     # final state
-```
+Integer indexing returns the state at that time step, so `sol[i]` is equivalent to
+`sol.u[i]` and `sol[end]` returns the final state.
 """
 struct StateSpaceSolution{
         T, N, uType, uType2, DType, tType, randType, P, A, IType, DE,
