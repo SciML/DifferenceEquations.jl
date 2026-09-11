@@ -1,45 +1,51 @@
-using DifferenceEquations, BenchmarkTools, Enzyme
-using LinearAlgebra, Random, StaticArrays
-
-# Check if MKL or not
-julia_mkl = @static if VERSION < v"1.7"
-    LinearAlgebra.BLAS.vendor() === :mkl
-else
-    any(contains("mkl"), getfield.(LinearAlgebra.BLAS.get_config().loaded_libs, :libname))
-end
-
-if !julia_mkl
-    openblas_threads = min(4, Int64(round(Sys.CPU_THREADS / 2)))
-    BLAS.set_num_threads(openblas_threads)
-end
-
-println(
-    "Threads.nthreads = $(Threads.nthreads()), MKL = $julia_mkl, " *
-        "BLAS.num_threads = $(BLAS.get_num_threads())\n"
-)
-
-BenchmarkTools.DEFAULT_PARAMETERS.seconds = 5.0
-BenchmarkTools.DEFAULT_PARAMETERS.evals = 1
-
-# Enzyme reverse-mode AD corrupts GC metadata under repeated invocation, causing segfaults.
-# GC disabled globally to prevent GC from running during Enzyme AD.
-# Between benchmark samples, Enzyme @benchmarkable calls use a `teardown` to briefly
-# re-enable GC, collect, and disable again — safe because Enzyme is not running at that point.
-# This prevents OOM from leaked memory accumulating across samples.
-# Upstream: https://github.com/EnzymeAD/Enzyme.jl/issues/2355
-GC.enable(false)
+using DifferenceEquations, BenchmarkTools
+using StableRNGs, LinearAlgebra
 
 const SUITE = BenchmarkGroup()
-const _bdir = joinpath(pkgdir(DifferenceEquations), "benchmark")
-SUITE["kalman"] = include(joinpath(_bdir, "enzyme_kalman.jl"))
-SUITE["linear_likelihood"] = include(joinpath(_bdir, "enzyme_linear_likelihood.jl"))
-SUITE["linear_simulation"] = include(joinpath(_bdir, "enzyme_linear_simulation.jl"))
-SUITE["quadratic"] = include(joinpath(_bdir, "enzyme_quadratic.jl"))
-SUITE["static_arrays"] = include(joinpath(_bdir, "static_arrays.jl"))
-SUITE["ensemble"] = include(joinpath(_bdir, "ensemble.jl"))
-SUITE["forwarddiff_kalman"] = include(joinpath(_bdir, "forwarddiff_kalman.jl"))
-SUITE["forwarddiff_linear_likelihood"] = include(joinpath(_bdir, "forwarddiff_linear_likelihood.jl"))
-SUITE["forwarddiff_linear_simulation"] = include(joinpath(_bdir, "forwarddiff_linear_simulation.jl"))
-SUITE["conditional_likelihood"] = include(joinpath(_bdir, "enzyme_conditional_likelihood.jl"))
-SUITE["forwarddiff_conditional_likelihood"] = include(joinpath(_bdir, "forwarddiff_conditional_likelihood.jl"))
-SUITE["gradient_comparison"] = include(joinpath(_bdir, "gradient_comparison.jl"))
+const rng = StableRNG(123)
+
+# Small linear state-space model (RBC-style): x_t = A x_{t-1} + B w_t, z_t = C x_t
+nx, nw, nz, T = 3, 2, 2, 200
+A = [0.9 0.1 0.0; 0.0 0.8 0.1; 0.0 0.0 0.5]
+B = [0.5 0.0; 0.0 0.5; 0.0 0.2]
+C = [1.0 0.0 0.0; 0.0 1.0 0.0]
+D = Diagonal([0.1, 0.1])
+u0 = zeros(nx)
+noise = [randn(rng, nw) for _ in 1:T]
+obs = [randn(rng, nz) for _ in 1:T]
+u0_prior_mean = zeros(nx)
+u0_prior_var = Matrix{Float64}(I, nx, nx)
+
+prob_direct = LinearStateSpaceProblem(A, B, u0, (0, T); noise = noise)
+prob_obs = LinearStateSpaceProblem(A, B, u0, (0, T); C = C, noise = noise)
+prob_kalman = LinearStateSpaceProblem(
+    A, B, u0, (0, T);
+    C = C, observables_noise = D, observables = obs,
+    u0_prior_mean = u0_prior_mean, u0_prior_var = u0_prior_var
+)
+
+# =============================================================================
+# Solves
+# =============================================================================
+
+SUITE["solve"] = BenchmarkGroup()
+
+SUITE["solve"]["direct"] = @benchmarkable solve($prob_direct, DirectIteration())
+SUITE["solve"]["direct_obs"] = @benchmarkable solve(
+    $prob_obs, DirectIteration()
+)
+SUITE["solve"]["kalman"] = @benchmarkable solve($prob_kalman, KalmanFilter())
+
+# =============================================================================
+# Workspace reuse path
+# =============================================================================
+
+SUITE["workspace"] = BenchmarkGroup()
+
+SUITE["workspace"]["init"] = @benchmarkable init($prob_obs, DirectIteration())
+SUITE["workspace"]["solve!"] = @benchmarkable solve!(ws) setup = (
+    ws = init($prob_obs, DirectIteration())
+)
+SUITE["workspace"]["solve!_kalman"] = @benchmarkable solve!(ws) setup = (
+    ws = init($prob_kalman, KalmanFilter())
+)
