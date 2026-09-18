@@ -15,4 +15,9 @@ jobs:
   build-and-deploy-docs:
     name: "Documentation"
     uses: "SciML/.github/.github/workflows/documentation.yml@v1"
+    with:
+      # Julia 1.13 + Enzyme v0.13 cannot differentiate stdlib BLAS/LAPACK, which
+      # segfaults the Enzyme AD page (see test/test_groups.toml). Docs run the
+      # Enzyme examples, so build them on Julia 1.12 where the AD suite passes.
+      julia-version: "1.12"
     secrets: "inherit"
