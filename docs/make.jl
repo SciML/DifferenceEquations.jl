@@ -1,13 +1,6 @@
 using Documenter, DifferenceEquations
 using DocumenterInterLinks
 
-# Force the GR null device. Without it, the Plots-based tutorials segfault on CI
-# (exit 139, no Julia stack trace) while GR probes for a display.
-ENV["GKSwstype"] = "100"
-
-# TEMP DIAGNOSTIC: identify the page/block that segfaults on CI (revert before merge)
-ENV["JULIA_DEBUG"] = "Documenter"
-
 include("pages.jl")
 
 links = InterLinks(
