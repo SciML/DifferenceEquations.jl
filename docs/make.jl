@@ -1,7 +1,8 @@
 using Documenter, DifferenceEquations
 using DocumenterInterLinks
 
-# Make sure that plots don't throw a bunch of warnings / errors!
+# Force the GR null device. Without it, the Plots-based tutorials segfault on CI
+# (exit 139, no Julia stack trace) while GR probes for a display.
 ENV["GKSwstype"] = "100"
 
 include("pages.jl")
