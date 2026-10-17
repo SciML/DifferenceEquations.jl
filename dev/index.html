@@ -9,17 +9,17 @@ prob = LinearStateSpaceProblem(A, B, u0, (0, T))
 sol = solve(prob)
 sol.u[end]  # final state</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
  -0.0012340755937890878
- -0.0012274738683213534</code></pre><h2 id="Mathematical-Background"><a class="docs-heading-anchor" href="#Mathematical-Background">Mathematical Background</a><a id="Mathematical-Background-1"></a><a class="docs-heading-anchor-permalink" href="#Mathematical-Background" title="Permalink"></a></h2><p>The general class of discrete-time state-space models supported by this package takes an initial condition <span>$u_0$</span> and an evolution equation</p><p class="math-container">\[u_{n+1} = f(u_n, p, t_n) + g(u_n, p, t_n)\, w_{n+1}\]</p><p>for transition function <span>$f$</span>, noise coefficient <span>$g$</span>, and IID noise shocks <span>$w_{n+1}$</span>. The parameter vector <span>$p$</span> is potentially differentiable.</p><p>An optional observation equation relates the latent state to measured data:</p><p class="math-container">\[z_n = h(u_n, p, t_n) + v_n\]</p><p>where <span>$v_n$</span> is observation noise and <span>$z_n$</span> may have a different dimension from <span>$u_n$</span>.</p><h3 id="Specializations"><a class="docs-heading-anchor" href="#Specializations">Specializations</a><a id="Specializations-1"></a><a class="docs-heading-anchor-permalink" href="#Specializations" title="Permalink"></a></h3><ul><li><strong>Linear</strong>: <span>$f(u) = A\,u$</span>, <span>$g(u) = B$</span>, <span>$h(u) = C\,u$</span>. Solved by <a href="basics/solvers/#DifferenceEquations.DirectIteration"><code>DirectIteration</code></a> or <a href="basics/solvers/#DifferenceEquations.KalmanFilter"><code>KalmanFilter</code></a>. See <a href="basics/problem_types/#DifferenceEquations.LinearStateSpaceProblem"><code>LinearStateSpaceProblem</code></a>.</li><li><strong>Quadratic</strong>: Adds second-order terms <span>$u^\top A_2\, u$</span> to both transition and observation. Useful for pruned perturbation solutions of DSGE models. See <a href="basics/problem_types/#DifferenceEquations.QuadraticStateSpaceProblem"><code>QuadraticStateSpaceProblem</code></a> and <a href="basics/problem_types/#DifferenceEquations.PrunedQuadraticStateSpaceProblem"><code>PrunedQuadraticStateSpaceProblem</code></a>.</li><li><strong>Generic</strong>: User-supplied <code>transition</code> and <code>observation</code> callbacks. See <a href="basics/problem_types/#DifferenceEquations.StateSpaceProblem"><code>StateSpaceProblem</code></a>.</li></ul><p>When the system is linear, the shocks are Gaussian, and a Gaussian prior is provided, the <a href="basics/solvers/#DifferenceEquations.KalmanFilter"><code>KalmanFilter</code></a> computes the exact marginal log-likelihood. For all other cases, <a href="basics/solvers/#DifferenceEquations.DirectIteration"><code>DirectIteration</code></a> iterates the state forward and (optionally) accumulates a joint log-likelihood.</p><div class="admonition is-info" id="Note-a55e04add7058c3a"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-a55e04add7058c3a" title="Permalink"></a></header><div class="admonition-body"><p>Boundary value problems and difference-algebraic equations are not in scope.</p></div></div><h2 id="Contributing"><a class="docs-heading-anchor" href="#Contributing">Contributing</a><a id="Contributing-1"></a><a class="docs-heading-anchor-permalink" href="#Contributing" title="Permalink"></a></h2><ul><li><p>Please refer to the <a href="https://github.com/SciML/ColPrac/blob/master/README.md">SciML ColPrac: Contributor&#39;s Guide on Collaborative Practices for Community Packages</a> for guidance on PRs, issues, and other matters relating to contributing to SciML.</p></li><li><p>See the <a href="https://github.com/SciML/SciMLStyle">SciML Style Guide</a> for common coding practices and other style decisions.</p></li><li><p>There are a few community forums:</p><ul><li>The #diffeq-bridged and #sciml-bridged channels in the <a href="https://julialang.org/slack/">Julia Slack</a></li><li>The #diffeq-bridged and #sciml-bridged channels in the <a href="https://julialang.zulipchat.com/#narrow/stream/279055-sciml-bridged">Julia Zulip</a></li><li>On the <a href="https://discourse.julialang.org">Julia Discourse forums</a></li><li>See also <a href="https://sciml.ai/community/">SciML Community page</a></li></ul></li></ul><h2 id="Reproducibility"><a class="docs-heading-anchor" href="#Reproducibility">Reproducibility</a><a id="Reproducibility-1"></a><a class="docs-heading-anchor-permalink" href="#Reproducibility" title="Permalink"></a></h2><details><summary>The documentation of this SciML package was built using these direct dependencies,</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Status</span></span> `~/work/DifferenceEquations.jl/DifferenceEquations.jl/docs/Project.toml`
+ -0.0012274738683213534</code></pre><h2 id="Mathematical-Background"><a class="docs-heading-anchor" href="#Mathematical-Background">Mathematical Background</a><a id="Mathematical-Background-1"></a><a class="docs-heading-anchor-permalink" href="#Mathematical-Background" title="Permalink"></a></h2><p>The general class of discrete-time state-space models supported by this package takes an initial condition <span>$u_0$</span> and an evolution equation</p><p class="math-container">\[u_{n+1} = f(u_n, p, t_n) + g(u_n, p, t_n)\, w_{n+1}\]</p><p>for transition function <span>$f$</span>, noise coefficient <span>$g$</span>, and IID noise shocks <span>$w_{n+1}$</span>. The parameter vector <span>$p$</span> is potentially differentiable.</p><p>An optional observation equation relates the latent state to measured data:</p><p class="math-container">\[z_n = h(u_n, p, t_n) + v_n\]</p><p>where <span>$v_n$</span> is observation noise and <span>$z_n$</span> may have a different dimension from <span>$u_n$</span>.</p><h3 id="Specializations"><a class="docs-heading-anchor" href="#Specializations">Specializations</a><a id="Specializations-1"></a><a class="docs-heading-anchor-permalink" href="#Specializations" title="Permalink"></a></h3><ul><li><strong>Linear</strong>: <span>$f(u) = A\,u$</span>, <span>$g(u) = B$</span>, <span>$h(u) = C\,u$</span>. Solved by <a href="basics/solvers/#DifferenceEquations.DirectIteration"><code>DirectIteration</code></a> or <a href="basics/solvers/#DifferenceEquations.KalmanFilter"><code>KalmanFilter</code></a>. See <a href="basics/problem_types/#DifferenceEquations.LinearStateSpaceProblem"><code>LinearStateSpaceProblem</code></a>.</li><li><strong>Quadratic</strong>: Adds second-order terms <span>$u^\top A_2\, u$</span> to both transition and observation. Useful for pruned perturbation solutions of DSGE models. See <a href="basics/problem_types/#DifferenceEquations.QuadraticStateSpaceProblem"><code>QuadraticStateSpaceProblem</code></a> and <a href="basics/problem_types/#DifferenceEquations.PrunedQuadraticStateSpaceProblem"><code>PrunedQuadraticStateSpaceProblem</code></a>.</li><li><strong>Generic</strong>: User-supplied <code>transition</code> and <code>observation</code> callbacks. See <a href="basics/problem_types/#DifferenceEquations.StateSpaceProblem"><code>StateSpaceProblem</code></a>.</li></ul><p>When the system is linear, the shocks are Gaussian, and a Gaussian prior is provided, the <a href="basics/solvers/#DifferenceEquations.KalmanFilter"><code>KalmanFilter</code></a> computes the exact marginal log-likelihood. For all other cases, <a href="basics/solvers/#DifferenceEquations.DirectIteration"><code>DirectIteration</code></a> iterates the state forward and (optionally) accumulates a joint log-likelihood.</p><div class="admonition is-info" id="Note-a55e04add7058c3a"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-a55e04add7058c3a" title="Permalink"></a></header><div class="admonition-body"><p>Boundary value problems and difference-algebraic equations are not in scope.</p></div></div><h2 id="Contributing"><a class="docs-heading-anchor" href="#Contributing">Contributing</a><a id="Contributing-1"></a><a class="docs-heading-anchor-permalink" href="#Contributing" title="Permalink"></a></h2><ul><li><p>Please refer to the <a href="https://github.com/SciML/ColPrac/blob/master/README.md">SciML ColPrac: Contributor&#39;s Guide on Collaborative Practices for Community Packages</a> for guidance on PRs, issues, and other matters relating to contributing to SciML.</p></li><li><p>See the <a href="https://github.com/SciML/SciMLStyle">SciML Style Guide</a> for common coding practices and other style decisions.</p></li><li><p>There are a few community forums:</p><ul><li>The #diffeq-bridged and #sciml-bridged channels in the <a href="https://julialang.org/slack/">Julia Slack</a></li><li>The #diffeq-bridged and #sciml-bridged channels in the <a href="https://julialang.zulipchat.com/#narrow/stream/279055-sciml-bridged">Julia Zulip</a></li><li>On the <a href="https://discourse.julialang.org">Julia Discourse forums</a></li><li>See also <a href="https://sciml.ai/community/">SciML Community page</a></li></ul></li></ul><h2 id="Reproducibility"><a class="docs-heading-anchor" href="#Reproducibility">Reproducibility</a><a id="Reproducibility-1"></a><a class="docs-heading-anchor-permalink" href="#Reproducibility" title="Permalink"></a></h2><details><summary>The documentation of this SciML package was built using these direct dependencies,</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Status</span></span> `~/_work/DifferenceEquations.jl/DifferenceEquations.jl/docs/Project.toml`
   <span class="sgr90">[a93c6f00] </span>DataFrames v1.8.2
   <span class="sgr90">[2b5f629d] </span>DiffEqBase v7.21.4
-  <span class="sgr90">[e0ca9c66] </span>DifferenceEquations v1.1.5 `~/work/DifferenceEquations.jl/DifferenceEquations.jl`
+  <span class="sgr90">[e0ca9c66] </span>DifferenceEquations v1.1.5 `~/_work/DifferenceEquations.jl/DifferenceEquations.jl`
   <span class="sgr90">[31c24e10] </span>Distributions v0.25.131
   <span class="sgr90">[e30172f5] </span>Documenter v1.19.0
   <span class="sgr90">[d12716ef] </span>DocumenterInterLinks v1.1.0
   <span class="sgr90">[7da242da] </span>Enzyme v0.13.216
   <span class="sgr90">[f6369f11] </span>ForwardDiff v1.4.6
   <span class="sgr90">[7f7a1694] </span>Optimization v5.9.1
-  <span class="sgr90">[36348300] </span>OptimizationOptimJL v0.4.21
+  <span class="sgr90">[36348300] </span>OptimizationOptimJL v0.4.22
   <span class="sgr90">[91a5bcdd] </span>Plots v1.41.7
   <span class="sgr90">[90137ffa] </span>StaticArrays v1.9.23
   <span class="sgr90">[37e2e46d] </span>LinearAlgebra v1.13.0
@@ -29,11 +29,14 @@ Build Info:
   Official https://julialang.org release
 Platform Info:
   OS: Linux (x86_64-linux-gnu)
-  CPU: 4 × AMD EPYC 7763 64-Core Processor
+  CPU: 192 × AMD EPYC 9455 48-Core Processor
   WORD_SIZE: 64
-  LLVM: libLLVM-20.1.8 (ORCJIT, znver3)
+  LLVM: libLLVM-20.1.8 (ORCJIT, znver5)
   GC: Built with stock GC
-Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></details><details><summary>A more complete overview of all dependencies and their versions is also provided.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Status</span></span> `~/work/DifferenceEquations.jl/DifferenceEquations.jl/docs/Manifest.toml`
+Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)
+Environment:
+  JULIA_CPU_THREADS = 4
+  JULIA_NUM_PRECOMPILE_TASKS = 4</code></pre></details><details><summary>A more complete overview of all dependencies and their versions is also provided.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr32"><span class="sgr1">Status</span></span> `~/_work/DifferenceEquations.jl/DifferenceEquations.jl/docs/Manifest.toml`
   <span class="sgr90">[47edcb42] </span>ADTypes v1.24.0
   <span class="sgr90">[a4c015fc] </span>ANSIColoredPrinters v0.0.1
   <span class="sgr90">[1520ce14] </span>AbstractTrees v0.4.5
@@ -66,7 +69,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[2b5f629d] </span>DiffEqBase v7.21.4
   <span class="sgr90">[163ba53b] </span>DiffResults v1.1.0
   <span class="sgr90">[b552c78f] </span>DiffRules v1.16.0
-  <span class="sgr90">[e0ca9c66] </span>DifferenceEquations v1.1.5 `~/work/DifferenceEquations.jl/DifferenceEquations.jl`
+  <span class="sgr90">[e0ca9c66] </span>DifferenceEquations v1.1.5 `~/_work/DifferenceEquations.jl/DifferenceEquations.jl`
   <span class="sgr90">[a0c0ee7d] </span>DifferentiationInterface v0.7.21
   <span class="sgr90">[31c24e10] </span>Distributions v0.25.131
   <span class="sgr90">[43dc2714] </span>DocInventories v1.0.0
@@ -80,7 +83,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[c87230d0] </span>FFMPEG v0.4.6
   <span class="sgr90">[7034ab61] </span>FastBroadcast v1.4.0
   <span class="sgr90">[9aa1b823] </span>FastClosures v0.3.2
-  <span class="sgr90">[a4df4552] </span>FastPower v1.5.0
+  <span class="sgr90">[a4df4552] </span>FastPower v1.5.1
   <span class="sgr90">[1a297f60] </span>FillArrays v1.18.1
   <span class="sgr90">[64ca27bc] </span>FindFirstFunctions v3.4.1
   <span class="sgr90">[6a86dc24] </span>FiniteDiff v2.33.0
@@ -104,7 +107,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[82899510] </span>IteratorInterfaceExtensions v1.0.0
   <span class="sgr90">[1019f520] </span>JLFzf v0.1.11
   <span class="sgr90">[692b3bcd] </span>JLLWrappers v1.8.0
-  <span class="sgr90">[682c06a0] </span>JSON v1.10.0
+  <span class="sgr90">[682c06a0] </span>JSON v1.11.0
 <span class="sgr33">⌅</span> <span class="sgr90">[929cbde3] </span>LLVM v9.13.2
   <span class="sgr90">[11f193de] </span>LMDB v3.0.1
   <span class="sgr90">[b964fa9f] </span>LaTeXStrings v1.4.1
@@ -112,7 +115,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[0e77f7df] </span>LazilyInitializedFields v1.3.0
   <span class="sgr90">[1d6d02ad] </span>LeftChildRightSiblingTrees v0.3.0
   <span class="sgr90">[d3d80556] </span>LineSearches v7.8.2
-  <span class="sgr90">[2ab3a3ac] </span>LogExpFunctions v1.0.2
+  <span class="sgr90">[2ab3a3ac] </span>LogExpFunctions v1.0.3
   <span class="sgr90">[e6f89c97] </span>LoggingExtras v1.2.0
   <span class="sgr90">[1914dd2f] </span>MacroTools v0.5.16
   <span class="sgr90">[d0879d2d] </span>MarkdownAST v0.1.3
@@ -127,7 +130,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[429524aa] </span>Optim v2.3.2
   <span class="sgr90">[7f7a1694] </span>Optimization v5.9.1
   <span class="sgr90">[bca83a33] </span>OptimizationBase v5.9.0
-  <span class="sgr90">[36348300] </span>OptimizationOptimJL v0.4.21
+  <span class="sgr90">[36348300] </span>OptimizationOptimJL v0.4.22
   <span class="sgr90">[bac558e1] </span>OrderedCollections v2.0.3
   <span class="sgr90">[90014a1f] </span>PDMats v0.11.41
   <span class="sgr90">[69de0a69] </span>Parsers v3.0.0
@@ -138,7 +141,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[85a6dd25] </span>PositiveFactorizations v0.2.4
   <span class="sgr90">[d236fae5] </span>PreallocationTools v1.7.1
   <span class="sgr90">[aea7be01] </span>PrecompileTools v1.3.4
-  <span class="sgr90">[21216c6a] </span>Preferences v1.6.0
+  <span class="sgr90">[21216c6a] </span>Preferences v1.6.1
   <span class="sgr90">[08abe8d2] </span>PrettyTables v3.5.0
   <span class="sgr90">[33c8b6b6] </span>ProgressLogging v0.1.6
   <span class="sgr90">[92933f4c] </span>ProgressMeter v1.11.0
@@ -146,7 +149,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[1fd47b50] </span>QuadGK v2.11.3
   <span class="sgr90">[3cdcf5f2] </span>RecipesBase v1.4.0
   <span class="sgr90">[01d81517] </span>RecipesPipeline v0.6.12
-  <span class="sgr90">[731186ca] </span>RecursiveArrayTools v4.5.4
+  <span class="sgr90">[731186ca] </span>RecursiveArrayTools v4.5.5
   <span class="sgr90">[189a3867] </span>Reexport v1.2.2
   <span class="sgr90">[2792f1a3] </span>RegistryInstances v0.1.0
   <span class="sgr90">[05181044] </span>RelocatableFolders v1.0.1
@@ -178,7 +181,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[4c63d2b9] </span>StatsFuns v2.2.1
   <span class="sgr90">[892a3eda] </span>StringManipulation v0.6.1
   <span class="sgr90">[53d494c1] </span>StructIO v0.3.1
-  <span class="sgr90">[ec057cc2] </span>StructUtils v2.9.2
+  <span class="sgr90">[ec057cc2] </span>StructUtils v2.10.0
   <span class="sgr90">[2efcf032] </span>SymbolicIndexingInterface v0.3.55
   <span class="sgr90">[3783bdb8] </span>TableTraits v1.0.1
   <span class="sgr90">[bd369af6] </span>Tables v1.14.0
@@ -219,9 +222,9 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
 <span class="sgr33">⌅</span> <span class="sgr90">[e9f186c6] </span>Libffi_jll v3.4.7+0
   <span class="sgr90">[7e76a0d4] </span>Libglvnd_jll v1.7.1+1
   <span class="sgr90">[94ce4f54] </span>Libiconv_jll v1.18.0+0
-  <span class="sgr90">[4b2f31a3] </span>Libmount_jll v2.42.2+0
+  <span class="sgr90">[4b2f31a3] </span>Libmount_jll v2.42.4+0
   <span class="sgr90">[89763e89] </span>Libtiff_jll v4.7.3+0
-  <span class="sgr90">[38a345b3] </span>Libuuid_jll v2.42.0+0
+  <span class="sgr90">[38a345b3] </span>Libuuid_jll v2.42.4+0
   <span class="sgr90">[e7412a2a] </span>Ogg_jll v1.3.6+0
   <span class="sgr90">[9bd350c2] </span>OpenSSH_jll v10.6.1+0
   <span class="sgr90">[efe28fd5] </span>OpenSpecFun_jll v0.5.6+0
@@ -330,4 +333,4 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   <span class="sgr90">[8e850b90] </span>libblastrampoline_jll v5.15.0+0
   <span class="sgr90">[8e850ede] </span>nghttp2_jll v1.70.0+0
   <span class="sgr90">[3f19e933] </span>p7zip_jll v17.8.3+0
-<span class="sgr36"><span class="sgr1">Info</span></span> Packages marked with <span class="sgr32">⌃</span> and <span class="sgr33">⌅</span> have new versions available. Those with <span class="sgr32">⌃</span> may be upgradable, but those with <span class="sgr33">⌅</span> are restricted by compatibility constraints from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/DifferenceEquations.jl/tree/gh-pages/v1.1.5/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/DifferenceEquations.jl/tree/gh-pages/v1.1.5/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Thursday 15 October 2026 23:00">Thursday 15 October 2026</span>. Using Julia version 1.13.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<span class="sgr36"><span class="sgr1">Info</span></span> Packages marked with <span class="sgr32">⌃</span> and <span class="sgr33">⌅</span> have new versions available. Those with <span class="sgr32">⌃</span> may be upgradable, but those with <span class="sgr33">⌅</span> are restricted by compatibility constraints from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/DifferenceEquations.jl/tree/gh-pages/v1.1.5/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/DifferenceEquations.jl/tree/gh-pages/v1.1.5/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Saturday 17 October 2026 17:51">Saturday 17 October 2026</span>. Using Julia version 1.13.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
